@@ -47,3 +47,12 @@ def test_comfy_requirements_do_not_replace_torch_or_pull_training_stacks():
     active = [line.strip() for line in requirements.splitlines() if line.strip() and not line.lstrip().startswith("#")]
     assert not any(line.startswith(("torch", "torchaudio", "torchvision")) for line in active)
     assert not any(line.startswith(("descript-audiotools", "openai-whisper")) for line in active)
+    assert len(active) == 8
+    assert not any(line.startswith(("matplotlib", "modelscope")) for line in active)
+    assert [line for line in active if "<" in line] == ["transformers>=4.52.1,<5"]
+
+    optional = (model_store.PLUGIN_ROOT / "requirements-modelscope.txt").read_text(encoding="utf-8").lower()
+    optional_active = [
+        line.strip() for line in optional.splitlines() if line.strip() and not line.lstrip().startswith("#")
+    ]
+    assert optional_active == ["modelscope>=1.27"]

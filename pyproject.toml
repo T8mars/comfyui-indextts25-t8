@@ -17,6 +17,7 @@ classifiers = [
 Repository = "https://github.com/T8mars/comfyui-indextts25-t8"
 Upstream = "https://github.com/index-tts/index-tts"
 Model = "https://huggingface.co/IndexTeam/IndexTTS-2.5"
+ModelScope = "https://modelscope.cn/models/IndexTeam/IndexTTS-2.5"
 
 [tool.comfy]
 PublisherId = "t8star-aix"

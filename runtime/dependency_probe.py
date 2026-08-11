@@ -16,7 +16,6 @@ REQUIRED_MODULES = {
     "fugashi": "fugashi",
     "munch": "munch",
     "scipy": "scipy",
-    "matplotlib": "matplotlib",
 }
 
 
@@ -32,7 +31,7 @@ def require_runtime_dependencies(plugin_root: Path) -> None:
     raise RuntimeError(
         "IndexTTS 2.5 推理依赖不完整："
         + ", ".join(missing)
-        + "。请使用 ComfyUI 的 Python 执行：python -m pip install -r \""
+        + "。请先确认 ComfyUI 自身依赖安装完整，再使用 ComfyUI 的 Python 执行：python -m pip install -r \""
         + str(requirements)
         + "\"。不要单独降级或重装 torch。"
     )

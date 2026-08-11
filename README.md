@@ -60,7 +60,8 @@ Windows 便携版通常应从 ComfyUI 目录执行：
 
 `requirements.txt` 故意不包含 `torch`、`torchaudio` 和 `torchvision`，避免覆盖 ComfyUI 已安装的
 CUDA/PyTorch 组合。若缺少 torchaudio，请安装与现有 torch 完全对应的版本，不要直接执行上游项目的
-完整 torch 锁定安装。
+完整 torch 锁定安装。基础依赖仅列出 ComfyUI 之外的必要运行项；除 `transformers<5` 的上游兼容边界外，
+不限制最高版本。
 
 当前固定核心已在 Windows、Python 3.10、PyTorch 2.8 环境验证。其他 ComfyUI Python 版本请先运行
 环境检查脚本；上游对新版本 Python 的兼容范围可能更窄。
@@ -84,6 +85,12 @@ ComfyUI 模型目录规范，可由多个工作流共享，避免复制。
 另行把完整的 `IndexTTS-2.5` 模型目录放到其 `ComfyUI/models/TTS/`。不要只发送单个 `.py` 文件。
 
 在节点已放到 ComfyUI 后执行：
+
+使用 ModelScope 前先安装可选下载依赖：
+
+```powershell
+python -m pip install -r ComfyUI/custom_nodes/comfyui-indextts25-T8/requirements-modelscope.txt
+```
 
 ```powershell
 python ComfyUI/custom_nodes/comfyui-indextts25-T8/scripts/download_models.py `
@@ -146,6 +153,15 @@ python scripts/download_models.py --target "D:\ComfyUI\models\TTS\IndexTTS-2.5" 
 - IndexTTS 代码：`56eead7eb0888ecac6abbf9d777c27f798a2c730`
 - IndexTTS 2.5 模型：`ba2480d9f7f629eb18f6acaebb357679d9ba88a4`
 - 模型清单：`manifests/model_2_5.json`
+
+## 官方项目、模型下载与致谢
+
+- IndexTTS 官方仓库：[index-tts/index-tts](https://github.com/index-tts/index-tts)
+- IndexTTS 2.5 模型（ModelScope）：[IndexTeam/IndexTTS-2.5](https://modelscope.cn/models/IndexTeam/IndexTTS-2.5)
+- IndexTTS 2.5 模型（Hugging Face）：[IndexTeam/IndexTTS-2.5](https://huggingface.co/IndexTeam/IndexTTS-2.5)
+
+感谢 IndexTTS 团队开源 IndexTTS 及 IndexTTS 2.5 模型。本项目是在其开源成果基础上开发的第三方
+ComfyUI 集成；请支持并关注官方项目。
 
 ## 许可证与免责声明
 

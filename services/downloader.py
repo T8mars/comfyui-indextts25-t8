@@ -38,7 +38,14 @@ def download_main_model(target: Path, source: str) -> None:
             local_dir=str(target),
         )
     elif source == "modelscope":
-        from modelscope.hub.snapshot_download import snapshot_download
+        try:
+            from modelscope.hub.snapshot_download import snapshot_download
+        except ImportError as exc:
+            optional_requirements = PLUGIN_ROOT / "requirements-modelscope.txt"
+            raise RuntimeError(
+                "ModelScope 下载支持是可选项，请先使用 ComfyUI 的 Python 执行："
+                f'python -m pip install -r "{optional_requirements}"'
+            ) from exc
 
         downloaded = Path(snapshot_download(model_id=repository, revision=revision)).resolve()
         _copy_snapshot(downloaded, target)
@@ -125,4 +132,3 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
