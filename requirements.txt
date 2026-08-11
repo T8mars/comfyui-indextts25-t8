@@ -1,17 +1,11 @@
-# Do not add torch, torchaudio, or torchvision here. Use the versions shipped by ComfyUI.
-accelerate>=1.8.1,<2
-einops>=0.8.1,<1
-filelock>=3.13,<4
-fugashi>=1.2.0,<2
-huggingface-hub>=0.33,<1
-librosa>=0.10.2,<0.12
-matplotlib>=3.8,<4
-modelscope>=1.27,<2
-munch>=4,<5
-omegaconf>=2.3,<3
-safetensors>=0.5,<1
-sentencepiece>=0.2,<1
-tiktoken>=0.7,<1
-tqdm>=4.67,<5
+# Extra runtime dependencies on top of a complete ComfyUI installation.
+# ComfyUI already provides torch/torchaudio, einops, safetensors, sentencepiece,
+# scipy, tqdm, filelock and the Hugging Face stack.
+accelerate>=1.8.1
+fugashi>=1.2.0
+librosa>=0.10.2
+munch>=4.0.0
+omegaconf>=2.3.0
+tiktoken>=0.7.0
 transformers>=4.52.1,<5
-unidic-lite>=1.0,<2
+unidic-lite>=1.0
