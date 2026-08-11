@@ -30,9 +30,15 @@ from transformers.cache_utils import (
     DynamicCache,
     EncoderDecoderCache,
     OffloadedCache,
-    QuantizedCacheConfig,
     StaticCache,
 )
+try:
+    from transformers.cache_utils import QuantizedCacheConfig
+except ImportError:  # Transformers 4.57+
+    from transformers.cache_utils import QuantizedCache
+
+    QuantizedCacheConfig = None
+
 from transformers.configuration_utils import PretrainedConfig
 from transformers.integrations.deepspeed import is_deepspeed_zero3_enabled
 from transformers.integrations.fsdp import is_fsdp_managed_module
@@ -55,16 +61,23 @@ from transformers.generation.candidate_generator import (
     AssistedCandidateGeneratorDifferentTokenizers,
     CandidateGenerator,
     PromptLookupCandidateGenerator,
-    _crop_past_key_values,
     _prepare_attention_mask,
     _prepare_token_type_ids,
 )
-from transformers.generation.configuration_utils import (
-    NEED_SETUP_CACHE_CLASSES_MAPPING,
-    QUANT_BACKEND_CLASSES_MAPPING,
-    GenerationConfig,
-    GenerationMode,
-)
+try:
+    from transformers.generation.candidate_generator import _crop_past_key_values as _hf_crop_past_key_values
+except ImportError:  # Transformers 4.57+
+    _hf_crop_past_key_values = None
+
+from transformers.generation.configuration_utils import GenerationConfig, GenerationMode
+try:
+    from transformers.generation.configuration_utils import (
+        NEED_SETUP_CACHE_CLASSES_MAPPING,
+        QUANT_BACKEND_CLASSES_MAPPING,
+    )
+except ImportError:  # Transformers 4.57+
+    NEED_SETUP_CACHE_CLASSES_MAPPING = {"static": StaticCache}
+    QUANT_BACKEND_CLASSES_MAPPING = {}
 from transformers.generation.logits_process import (
     EncoderNoRepeatNGramLogitsProcessor,
     EncoderRepetitionPenaltyLogitsProcessor,
@@ -113,6 +126,35 @@ logger = logging.get_logger(__name__)
 
 if is_accelerate_available():
     from accelerate.hooks import AlignDevicesHook, add_hook_to_module
+
+
+def _crop_past_key_values(model, past_key_values, max_length):
+    if _hf_crop_past_key_values is not None:
+        return _hf_crop_past_key_values(model, past_key_values, max_length)
+    if isinstance(past_key_values, Cache):
+        past_key_values.crop(max_length)
+        return past_key_values
+    if model.config.is_encoder_decoder:
+        return tuple(
+            (
+                layer[0][:, :, :max_length, :],
+                layer[1][:, :, :max_length, :],
+                layer[2],
+                layer[3],
+            )
+            for layer in past_key_values
+        )
+    if past_key_values is None:
+        return None
+    return tuple(
+        (
+            layer[0][:, :, :max_length, :],
+            layer[1][:, :, :max_length, :],
+        )
+        if layer != ([], [])
+        else layer
+        for layer in past_key_values
+    )
 
 
 @dataclass
@@ -1002,7 +1044,7 @@ class GenerationMixin:
                     device=device,
                 )
             )
-        if generation_config.forced_decoder_ids is not None:
+        if getattr(generation_config, "forced_decoder_ids", None) is not None:
             # TODO (sanchit): move this exception to GenerationConfig.validate() when TF & FLAX are aligned with PT
             raise ValueError(
                 "You have explicitly specified `forced_decoder_ids`. Please remove the `forced_decoder_ids` argument "
@@ -1742,26 +1784,35 @@ class GenerationMixin:
                         "cache, please open an issue and tag @zucchini-nlp."
                     )
 
-                cache_config = (
-                    generation_config.cache_config
-                    if generation_config.cache_config is not None
-                    else QuantizedCacheConfig()
-                )
-                cache_class = QUANT_BACKEND_CLASSES_MAPPING[cache_config.backend]
+                if QuantizedCacheConfig is None:
+                    cache_config = dict(generation_config.cache_config or {})
+                    backend = cache_config.pop("backend", "quanto")
+                else:
+                    cache_config = (
+                        generation_config.cache_config
+                        if generation_config.cache_config is not None
+                        else QuantizedCacheConfig()
+                    )
+                    backend = cache_config.backend
 
                 # if cache_config.backend == "quanto" and not (is_optimum_quanto_available() or is_quanto_available()):
-                if cache_config.backend == "quanto" and not is_optimum_quanto_available():
+                if backend == "quanto" and not is_optimum_quanto_available():
                     raise ImportError(
                         "You need to install optimum-quanto in order to use KV cache quantization with optimum-quanto backend. "
                         "Please install it via  with `pip install optimum-quanto`"
                     )
-                elif cache_config.backend == "HQQ" and not is_hqq_available():
+                elif backend == "HQQ" and not is_hqq_available():
                     raise ImportError(
                         "You need to install `HQQ` in order to use KV cache quantization with HQQ backend. "
                         "Please install it via  with `pip install hqq`"
                     )
 
-                model_kwargs[cache_name] = cache_class(cache_config)
+                if QuantizedCacheConfig is None:
+                    cache_config.setdefault("config", self.config.get_text_config())
+                    model_kwargs[cache_name] = QuantizedCache(backend=backend, **cache_config)
+                else:
+                    cache_class = QUANT_BACKEND_CLASSES_MAPPING[backend]
+                    model_kwargs[cache_name] = cache_class(cache_config)
             elif generation_config.cache_implementation == "offloaded":
                 model_kwargs[cache_name] = OffloadedCache()
 
