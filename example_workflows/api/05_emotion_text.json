@@ -1,0 +1,59 @@
+{
+  "1": {
+    "class_type": "T8_IndexTTS25_ModelLoader",
+    "inputs": {
+      "model_name": "IndexTTS-2.5",
+      "device": "auto",
+      "precision": "auto",
+      "use_cuda_kernel": false,
+      "release_after_run": false,
+      "verify_hashes": false,
+      "custom_model_path": ""
+    }
+  },
+  "2": {
+    "class_type": "LoadAudio",
+    "inputs": {
+      "audio": "voice_reference.wav"
+    }
+  },
+  "3": {
+    "class_type": "T8_IndexTTS25_EmotionControl",
+    "inputs": {
+      "mode": "text",
+      "mode.emotion_text": "克制但难掩喜悦，声音温柔，结尾带一点轻松的笑意。",
+      "mode.strength": 0.85
+    }
+  },
+  "4": {
+    "class_type": "T8_IndexTTS25_Generate",
+    "inputs": {
+      "model": [
+        "1",
+        0
+      ],
+      "speaker_audio": [
+        "2",
+        0
+      ],
+      "text": "等了这么久，我们终于可以一起出发了。",
+      "language": "ZH",
+      "duration_factor": 1.05,
+      "seed": 20260811,
+      "emotion": [
+        "3",
+        0
+      ]
+    }
+  },
+  "5": {
+    "class_type": "SaveAudio",
+    "inputs": {
+      "audio": [
+        "4",
+        0
+      ],
+      "filename_prefix": "IndexTTS25_T8/emotion_text"
+    }
+  }
+}

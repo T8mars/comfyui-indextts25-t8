@@ -1,0 +1,65 @@
+from __future__ import annotations
+
+import asyncio
+import importlib.util
+import sys
+from pathlib import Path
+
+import pytest
+
+
+pytest.importorskip("comfy_api.latest")
+
+
+def _load_plugin():
+    root = Path(__file__).resolve().parents[1]
+    spec = importlib.util.spec_from_file_location(
+        "comfyui_indextts25_t8_test",
+        root / "__init__.py",
+        submodule_search_locations=[str(root)],
+    )
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_registers_exactly_four_pure_v3_nodes():
+    plugin = _load_plugin()
+    extension = asyncio.run(plugin.comfy_entrypoint())
+    nodes = asyncio.run(extension.get_node_list())
+    schemas = [node.GET_SCHEMA() for node in nodes]
+    assert [schema.node_id for schema in schemas] == [
+        "T8_IndexTTS25_ModelLoader",
+        "T8_IndexTTS25_EmotionControl",
+        "T8_IndexTTS25_SamplingConfig",
+        "T8_IndexTTS25_Generate",
+    ]
+    assert all(schema.category == "T8star-Aix/Audio/IndexTTS 2.5" for schema in schemas)
+    assert schemas[-1].outputs[0].io_type == "AUDIO"
+    assert not hasattr(plugin, "NODE_CLASS_MAPPINGS")
+
+
+def test_emotion_vector_is_safely_normalized():
+    plugin = _load_plugin()
+    from comfyui_indextts25_t8_test.nodes_v3 import T8IndexTTS25EmotionControl
+
+    result = T8IndexTTS25EmotionControl.execute(
+        {
+            "mode": "vector",
+            "happy": 1.0,
+            "angry": 1.0,
+            "sad": 0.0,
+            "afraid": 0.0,
+            "disgusted": 0.0,
+            "melancholic": 0.0,
+            "surprised": 0.0,
+            "calm": 0.0,
+            "strength": 1.0,
+            "use_random": False,
+        }
+    )
+    emotion = result[0]
+    assert sum(emotion.vector) == pytest.approx(0.8)
+    assert emotion.notes
+

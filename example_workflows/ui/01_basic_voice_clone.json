@@ -1,0 +1,344 @@
+{
+  "last_node_id": 4,
+  "last_link_id": 3,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "T8_IndexTTS25_ModelLoader",
+      "pos": [
+        0,
+        0
+      ],
+      "size": [
+        390,
+        290
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model_name",
+          "type": "COMBO",
+          "widget": {
+            "name": "model_name"
+          },
+          "link": null
+        },
+        {
+          "name": "device",
+          "type": "COMBO",
+          "widget": {
+            "name": "device"
+          },
+          "link": null
+        },
+        {
+          "name": "precision",
+          "type": "COMBO",
+          "widget": {
+            "name": "precision"
+          },
+          "link": null
+        },
+        {
+          "name": "use_cuda_kernel",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "use_cuda_kernel"
+          },
+          "link": null
+        },
+        {
+          "name": "release_after_run",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "release_after_run"
+          },
+          "link": null
+        },
+        {
+          "name": "verify_hashes",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "verify_hashes"
+          },
+          "link": null
+        },
+        {
+          "name": "custom_model_path",
+          "type": "STRING",
+          "widget": {
+            "name": "custom_model_path"
+          },
+          "link": null,
+          "shape": 7
+        }
+      ],
+      "outputs": [
+        {
+          "name": "model",
+          "type": "T8_INDEXTTS25_MODEL",
+          "links": [
+            1
+          ]
+        },
+        {
+          "name": "model_info",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "T8_IndexTTS25_ModelLoader",
+        "cnr_id": "comfyui-indextts25-t8",
+        "ver": "0.1.0"
+      },
+      "widgets_values": [
+        "IndexTTS-2.5",
+        "auto",
+        "auto",
+        false,
+        false,
+        false,
+        ""
+      ]
+    },
+    {
+      "id": 2,
+      "type": "LoadAudio",
+      "pos": [
+        0,
+        340
+      ],
+      "size": [
+        330,
+        130
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "audio",
+          "type": "COMBO",
+          "widget": {
+            "name": "audio"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "AUDIO",
+          "type": "AUDIO",
+          "links": [
+            2
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadAudio",
+        "cnr_id": "comfy-core",
+        "ver": "0.1.0"
+      },
+      "widgets_values": [
+        "voice_reference.wav"
+      ],
+      "title": "音色参考音频"
+    },
+    {
+      "id": 3,
+      "type": "T8_IndexTTS25_Generate",
+      "pos": [
+        900,
+        100
+      ],
+      "size": [
+        470,
+        390
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "T8_INDEXTTS25_MODEL",
+          "link": 1
+        },
+        {
+          "name": "speaker_audio",
+          "type": "AUDIO",
+          "link": 2
+        },
+        {
+          "name": "text",
+          "type": "STRING",
+          "widget": {
+            "name": "text"
+          },
+          "link": null
+        },
+        {
+          "name": "language",
+          "type": "COMBO",
+          "widget": {
+            "name": "language"
+          },
+          "link": null
+        },
+        {
+          "name": "duration_factor",
+          "type": "FLOAT",
+          "widget": {
+            "name": "duration_factor"
+          },
+          "link": null
+        },
+        {
+          "name": "seed",
+          "type": "INT",
+          "widget": {
+            "name": "seed"
+          },
+          "link": null
+        },
+        {
+          "name": "emotion",
+          "type": "T8_INDEXTTS25_EMOTION",
+          "link": null,
+          "shape": 7
+        },
+        {
+          "name": "sampling",
+          "type": "T8_INDEXTTS25_SAMPLING",
+          "link": null,
+          "shape": 7
+        }
+      ],
+      "outputs": [
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "links": [
+            3
+          ]
+        },
+        {
+          "name": "generation_info",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "T8_IndexTTS25_Generate",
+        "cnr_id": "comfyui-indextts25-t8",
+        "ver": "0.1.0"
+      },
+      "widgets_values": [
+        "欢迎使用 IndexTTS 2.5，来自 B 站：T8star-Aix。",
+        "ZH",
+        1.0,
+        20260811,
+        "fixed"
+      ]
+    },
+    {
+      "id": 4,
+      "type": "SaveAudio",
+      "pos": [
+        1460,
+        180
+      ],
+      "size": [
+        320,
+        130
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "link": 3
+        },
+        {
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "SaveAudio",
+        "cnr_id": "comfy-core",
+        "ver": "0.1.0"
+      },
+      "widgets_values": [
+        "IndexTTS25_T8/basic"
+      ]
+    }
+  ],
+  "links": [
+    [
+      1,
+      1,
+      0,
+      3,
+      0,
+      "T8_INDEXTTS25_MODEL"
+    ],
+    [
+      2,
+      2,
+      0,
+      3,
+      1,
+      "AUDIO"
+    ],
+    [
+      3,
+      3,
+      0,
+      4,
+      0,
+      "AUDIO"
+    ]
+  ],
+  "groups": [
+    {
+      "title": "01 基础音色克隆 · B站：T8star-Aix",
+      "bounding": [
+        -40,
+        -60,
+        1860,
+        570
+      ],
+      "color": "#3f789e",
+      "font_size": 24,
+      "flags": {}
+    }
+  ],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.9,
+      "offset": [
+        80,
+        60
+      ]
+    }
+  },
+  "version": 0.4
+}

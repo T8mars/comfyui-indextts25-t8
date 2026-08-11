@@ -1,0 +1,68 @@
+{
+  "1": {
+    "class_type": "T8_IndexTTS25_ModelLoader",
+    "inputs": {
+      "model_name": "IndexTTS-2.5",
+      "device": "auto",
+      "precision": "auto",
+      "use_cuda_kernel": false,
+      "release_after_run": false,
+      "verify_hashes": false,
+      "custom_model_path": ""
+    }
+  },
+  "2": {
+    "class_type": "LoadAudio",
+    "inputs": {
+      "audio": "voice_reference.wav"
+    }
+  },
+  "3": {
+    "class_type": "LoadAudio",
+    "inputs": {
+      "audio": "emotion_reference.wav"
+    }
+  },
+  "4": {
+    "class_type": "T8_IndexTTS25_EmotionControl",
+    "inputs": {
+      "mode": "reference_audio",
+      "mode.emotion_audio": [
+        "3",
+        0
+      ],
+      "mode.strength": 0.8
+    }
+  },
+  "5": {
+    "class_type": "T8_IndexTTS25_Generate",
+    "inputs": {
+      "model": [
+        "1",
+        0
+      ],
+      "speaker_audio": [
+        "2",
+        0
+      ],
+      "text": "虽然经历了许多困难，我们依然看见了新的希望。",
+      "language": "ZH",
+      "duration_factor": 1.0,
+      "seed": 20260811,
+      "emotion": [
+        "4",
+        0
+      ]
+    }
+  },
+  "6": {
+    "class_type": "SaveAudio",
+    "inputs": {
+      "audio": [
+        "5",
+        0
+      ],
+      "filename_prefix": "IndexTTS25_T8/emotion_reference"
+    }
+  }
+}

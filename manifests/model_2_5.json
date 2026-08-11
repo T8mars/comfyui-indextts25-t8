@@ -1,0 +1,84 @@
+{
+  "codeRepository": "index-tts/index-tts",
+  "codeRevision": "56eead7eb0888ecac6abbf9d777c27f798a2c730",
+  "modelRepository": "IndexTeam/IndexTTS-2.5",
+  "modelRevision": "ba2480d9f7f629eb18f6acaebb357679d9ba88a4",
+  "files": {
+    "config.yaml": {
+      "size": 2860,
+      "sha256": "d310ac2d0784e9b1fb093713ea136bd7d6a600c97a0ced89557222191c51ea9f"
+    },
+    "gpt.pth": {
+      "size": 3259599833,
+      "sha256": "43a8f4c30eccdf201958d3b9713511482c19d56dc20b0b1c4ee1e6b080b19d85"
+    },
+    "codec.pth": {
+      "size": 607290935,
+      "sha256": "d15cbed16a40f478438c961fb043f68dfa6353bf56c966761315db3433e9722c"
+    },
+    "s2mel.pth": {
+      "size": 414908601,
+      "sha256": "9b1b0003fc189c94cc349758d7ebc25f903b7eb2de4602879959cc64ce816456"
+    },
+    "feat1.pt": {
+      "size": 57170,
+      "sha256": "f219cb447d80216ba615666da2ff8d63ac544eee26657f3a7b278692bf7a67c4"
+    },
+    "feat2.pt": {
+      "size": 374866,
+      "sha256": "9c4292e96dee535aea9a6206e9a0c856dd578dde9212acdb16dd3ada4d12bf80"
+    },
+    "wav2vec2bert_stats.pt": {
+      "size": 9343,
+      "sha256": "c9c176c2b8850ab2e3ba828bbfa969deaf4566ce55db5f2687b8430b87526ad2"
+    },
+    "multilingual_zh_ja_yue_char_del.tiktoken": {
+      "size": 907395,
+      "sha256": "747979631e813193436aabcff7c1c235d37de8097b71c563ec8b63b7a515c718"
+    },
+    "qwen0.6bemo4-merge/model.safetensors": {
+      "size": 1192135096,
+      "sha256": "11293257a8df593c154a8ecd5fc039f3076de35411e35f06d41b471e136f6641"
+    },
+    "qwen0.6bemo4-merge/added_tokens.json": {
+      "size": 707,
+      "sha256": "c0284b582e14987fbd3d5a2cb2bd139084371ed9acbae488829a1c900833c680"
+    },
+    "qwen0.6bemo4-merge/chat_template.jinja": {
+      "size": 550,
+      "sha256": "a13337ea164ac47b2c1e644b6338d5e7e91cdcb58218511899c083112472730c"
+    },
+    "qwen0.6bemo4-merge/generation_config.json": {
+      "size": 117,
+      "sha256": "6453260cdb41552215d87400ab399a760f25509ec2860ceb07817b195651626d"
+    },
+    "qwen0.6bemo4-merge/merges.txt": {
+      "size": 1671853,
+      "sha256": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5"
+    },
+    "qwen0.6bemo4-merge/Modelfile": {
+      "size": 360,
+      "sha256": "986c18655a26bbbdeb486a9478c8653925c7db7111d6cf20c9991b348853cb95"
+    },
+    "qwen0.6bemo4-merge/special_tokens_map.json": {
+      "size": 616,
+      "sha256": "6676f091c8bc4d1b50146427cfde92073402866b87b6e39223227931b70083e9"
+    },
+    "qwen0.6bemo4-merge/tokenizer.json": {
+      "size": 11422654,
+      "sha256": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4"
+    },
+    "qwen0.6bemo4-merge/tokenizer_config.json": {
+      "size": 5433,
+      "sha256": "147bae7844ddfb8767c1f9cc0f505d4a26839bd6fbb0656d6d6bc17c82e9108a"
+    },
+    "qwen0.6bemo4-merge/vocab.json": {
+      "size": 2776833,
+      "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"
+    },
+    "qwen0.6bemo4-merge/config.json": {
+      "size": 727,
+      "sha256": "2e04bc223dfb548dde52faebe2a819964523ff749cbe26467c49380aa371594f"
+    }
+  }
+}

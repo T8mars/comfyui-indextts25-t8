@@ -1,0 +1,32 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ipynb_checkpoints/
+.coverage
+htmlcov/
+.venv/
+venv/
+
+# Runtime/download artifacts must stay outside the custom node repository.
+/checkpoints/
+/models/
+*.pth
+*.pt
+*.bin
+*.safetensors
+*.ckpt
+*.onnx
+*.wav
+*.flac
+*.mp3
+*.opus
+.download.lock
+
+# Small upstream inference constant bundled with the pinned 2.5 core.
+!indextts/utils/maskgct/models/tts/maskgct/ckpt/wav2vec2bert_stats.pt
+
+# Editors and operating systems.
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
