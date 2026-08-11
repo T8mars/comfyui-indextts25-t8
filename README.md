@@ -66,8 +66,25 @@ CUDA/PyTorch 组合。若缺少 torchaudio，请安装与现有 torch 完全对�
 当前固定核心已在 Windows、Python 3.10、PyTorch 2.8 环境验证。其他 ComfyUI Python 版本请先运行
 环境检查脚本；上游对新版本 Python 的兼容范围可能更窄。
 
+### Transformers 版本兼容
+
 Transformers 已实测兼容 `4.52.1` 和 `4.57.6`（后者对应 `tokenizers 0.22.2`）。依赖范围保持为
 `transformers>=4.52.1,<5`；Transformers 5.x 的生成与缓存 API 变化较大，目前不在支持范围内。
+
+已经使用 Transformers 4.57.6 的 ComfyUI 无需降级。需要显式升级到已验证组合时，请使用 ComfyUI
+自己的 Python：
+
+```powershell
+python -m pip install --upgrade "transformers==4.57.6" "tokenizers==0.22.2"
+```
+
+Windows 便携版：
+
+```powershell
+..\python_embeded\python.exe -m pip install --upgrade "transformers==4.57.6" "tokenizers==0.22.2"
+```
+
+升级后重启 ComfyUI。不要单独安装 Transformers 5.x，也不要因此重装 ComfyUI 的 PyTorch。
 
 中文数字、日期等文本归一化依赖是可选项。在 Windows 上可额外安装 `wetext`；不安装或当前 Python
 版本不兼容时，节点会自动使用原文本继续生成，建议把数字写成口语形式。该可选项不会影响 2.5 模型、
