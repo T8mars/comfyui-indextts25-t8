@@ -8,6 +8,12 @@ from comfy_api.latest import ComfyExtension, io
 from typing_extensions import override
 
 from .runtime.inference_adapter import run_inference
+from .runtime.pronunciation import (
+    PronunciationValidationError,
+    format_pronunciation_report,
+    parse_dictionary_text,
+    process_pronunciation_text,
+)
 from .runtime.types import EmotionConfig, ModelHandle, SamplingConfig
 from .services.model_store import (
     MISSING_MODEL_OPTION,
@@ -405,6 +411,87 @@ class T8IndexTTS25SamplingConfig(io.ComfyNode):
         return io.NodeOutput(config, info)
 
 
+class T8IndexTTS25Pronunciation(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="T8_IndexTTS25_Pronunciation",
+            display_name="IndexTTS 2.5 发音控制 · T8star-Aix",
+            category=CATEGORY,
+            search_aliases=["IndexTTS pronunciation", "多音字", "拼音", "CMU phoneme", "日语假名"],
+            description=(
+                "将持久词典规则转换成 IndexTTS 2.5 官方 <文字|读音> 标注；"
+                "已有手工标注优先，输出可直接连接语音生成节点。"
+            ),
+            inputs=[
+                io.String.Input(
+                    "text",
+                    display_name="原始文本",
+                    multiline=True,
+                    default="他在银行里工作，行长正在开会。",
+                    dynamic_prompts=True,
+                ),
+                io.Combo.Input(
+                    "language",
+                    display_name="默认语言",
+                    options=["ZH", "EN", "JA", "ES", "AR"],
+                    default="ZH",
+                    tooltip="每条词典记录也可在第三列单独指定 ZH、EN 或 JA。",
+                ),
+                io.String.Input(
+                    "dictionary",
+                    display_name="发音词典",
+                    multiline=True,
+                    default="银行|YIN2 HANG2|ZH\n行长|HANG2 ZHANG3|ZH",
+                    placeholder="每行：文字|读音|语言，例如 银行|YIN2 HANG2|ZH",
+                    tooltip=(
+                        "按长词优先替换；词典内容保存在工作流中。也支持本项目导出的 YAML/JSON。"
+                    ),
+                ),
+                io.Boolean.Input(
+                    "strict",
+                    display_name="严格校验",
+                    default=True,
+                    tooltip="无效拼音、CMU 音素、日语假名或损坏标注会阻止排队。",
+                ),
+            ],
+            outputs=[
+                io.String.Output("annotated_text", display_name="发音标注文本"),
+                io.String.Output("pronunciation_report", display_name="替换/校验报告"),
+            ],
+        )
+
+    @classmethod
+    def validate_inputs(
+        cls,
+        text: str,
+        language: str,
+        dictionary: str,
+        strict: bool,
+        **kwargs,
+    ) -> bool | str:
+        if not str(text).strip():
+            return "原始文本不能为空。"
+        try:
+            entries = parse_dictionary_text(dictionary, language)
+            process_pronunciation_text(text, language, entries, strict=bool(strict))
+        except PronunciationValidationError as exc:
+            return str(exc)
+        return True
+
+    @classmethod
+    def execute(
+        cls,
+        text: str,
+        language: str,
+        dictionary: str,
+        strict: bool,
+    ) -> io.NodeOutput:
+        entries = parse_dictionary_text(dictionary, language)
+        result = process_pronunciation_text(text, language, entries, strict=bool(strict))
+        return io.NodeOutput(result.text, format_pronunciation_report(result))
+
+
 class T8IndexTTS25Generate(io.ComfyNode):
     @classmethod
     def define_schema(cls) -> io.Schema:
@@ -414,7 +501,10 @@ class T8IndexTTS25Generate(io.ComfyNode):
             category=CATEGORY,
             essentials_category="Audio",
             search_aliases=["IndexTTS TTS", "voice clone", "语音克隆", "T8star-Aix"],
-            description="使用正式 IndexTTS 2.5 模型进行多语种零样本音色克隆，并输出标准 ComfyUI AUDIO。",
+            description=(
+                "使用正式 IndexTTS 2.5 模型进行多语种零样本音色克隆，并输出标准 ComfyUI AUDIO；"
+                "支持手写 <文字|读音> 或连接发音控制节点。"
+            ),
             inputs=[
                 ModelType.Input("model", display_name="IndexTTS 2.5 模型"),
                 io.Audio.Input("speaker_audio", display_name="音色参考音频"),
@@ -424,6 +514,10 @@ class T8IndexTTS25Generate(io.ComfyNode):
                     multiline=True,
                     default="欢迎使用 IndexTTS 2.5，来自 B 站：T8star-Aix。",
                     dynamic_prompts=True,
+                    tooltip=(
+                        "可直接使用 <文字|读音>：中文 <行|XING2>、英文 CMU 音素、日语假名；"
+                        "批量规则建议连接“发音控制”节点。"
+                    ),
                 ),
                 io.Combo.Input(
                     "language",
@@ -513,6 +607,7 @@ class T8IndexTTS25Extension(ComfyExtension):
             T8IndexTTS25ModelLoader,
             T8IndexTTS25EmotionControl,
             T8IndexTTS25SamplingConfig,
+            T8IndexTTS25Pronunciation,
             T8IndexTTS25Generate,
         ]
 
@@ -529,4 +624,3 @@ __all__ = [
     "T8IndexTTS25Extension",
     "comfy_entrypoint",
 ]
-

@@ -80,7 +80,7 @@
           "name": "model",
           "type": "T8_INDEXTTS25_MODEL",
           "links": [
-            1
+            2
           ]
         },
         {
@@ -133,7 +133,7 @@
           "name": "AUDIO",
           "type": "AUDIO",
           "links": [
-            2
+            3
           ]
         }
       ],
@@ -149,138 +149,75 @@
     },
     {
       "id": 3,
-      "type": "T8_IndexTTS25_SamplingConfig",
+      "type": "T8_IndexTTS25_Pronunciation",
       "pos": [
         440,
-        330
+        0
       ],
       "size": [
-        390,
-        490
+        430,
+        360
       ],
       "flags": {},
       "order": 2,
       "mode": 0,
       "inputs": [
         {
-          "name": "do_sample",
+          "name": "text",
+          "type": "STRING",
+          "widget": {
+            "name": "text"
+          },
+          "link": null
+        },
+        {
+          "name": "language",
+          "type": "COMBO",
+          "widget": {
+            "name": "language"
+          },
+          "link": null
+        },
+        {
+          "name": "dictionary",
+          "type": "STRING",
+          "widget": {
+            "name": "dictionary"
+          },
+          "link": null
+        },
+        {
+          "name": "strict",
           "type": "BOOLEAN",
           "widget": {
-            "name": "do_sample"
-          },
-          "link": null
-        },
-        {
-          "name": "temperature",
-          "type": "FLOAT",
-          "widget": {
-            "name": "temperature"
-          },
-          "link": null
-        },
-        {
-          "name": "top_p",
-          "type": "FLOAT",
-          "widget": {
-            "name": "top_p"
-          },
-          "link": null
-        },
-        {
-          "name": "top_k",
-          "type": "INT",
-          "widget": {
-            "name": "top_k"
-          },
-          "link": null
-        },
-        {
-          "name": "num_beams",
-          "type": "INT",
-          "widget": {
-            "name": "num_beams"
-          },
-          "link": null
-        },
-        {
-          "name": "repetition_penalty",
-          "type": "FLOAT",
-          "widget": {
-            "name": "repetition_penalty"
-          },
-          "link": null
-        },
-        {
-          "name": "length_penalty",
-          "type": "FLOAT",
-          "widget": {
-            "name": "length_penalty"
-          },
-          "link": null
-        },
-        {
-          "name": "max_mel_tokens",
-          "type": "INT",
-          "widget": {
-            "name": "max_mel_tokens"
-          },
-          "link": null
-        },
-        {
-          "name": "max_text_tokens_per_segment",
-          "type": "INT",
-          "widget": {
-            "name": "max_text_tokens_per_segment"
-          },
-          "link": null
-        },
-        {
-          "name": "segment_silence_ms",
-          "type": "INT",
-          "widget": {
-            "name": "segment_silence_ms"
-          },
-          "link": null
-        },
-        {
-          "name": "text_normalization",
-          "type": "BOOLEAN",
-          "widget": {
-            "name": "text_normalization"
+            "name": "strict"
           },
           "link": null
         }
       ],
       "outputs": [
         {
-          "name": "sampling",
-          "type": "T8_INDEXTTS25_SAMPLING",
+          "name": "annotated_text",
+          "type": "STRING",
           "links": [
-            3
+            1
           ]
         },
         {
-          "name": "sampling_info",
+          "name": "pronunciation_report",
           "type": "STRING",
           "links": []
         }
       ],
       "properties": {
-        "Node name for S&R": "T8_IndexTTS25_SamplingConfig",
+        "Node name for S&R": "T8_IndexTTS25_Pronunciation",
         "cnr_id": "comfyui-indextts25-t8",
         "ver": "0.2.0"
       },
       "widgets_values": [
-        true,
-        0.85,
-        0.9,
-        40,
-        1,
-        10.0,
-        0.0,
-        1500,
-        80,
-        350,
+        "He had a <minute|M IH1 . N AH0 T> to examine the <minute|M AY0 . N UW1 T> details.",
+        "EN",
+        "Bilibili|B IY1 . L IY1 . B IY1 . L IY1|EN",
         true
       ]
     },
@@ -288,8 +225,8 @@
       "id": 4,
       "type": "T8_IndexTTS25_Generate",
       "pos": [
-        900,
-        180
+        950,
+        60
       ],
       "size": [
         470,
@@ -302,12 +239,12 @@
         {
           "name": "model",
           "type": "T8_INDEXTTS25_MODEL",
-          "link": 1
+          "link": 2
         },
         {
           "name": "speaker_audio",
           "type": "AUDIO",
-          "link": 2
+          "link": 3
         },
         {
           "name": "text",
@@ -315,7 +252,7 @@
           "widget": {
             "name": "text"
           },
-          "link": null
+          "link": 1
         },
         {
           "name": "language",
@@ -350,7 +287,7 @@
         {
           "name": "sampling",
           "type": "T8_INDEXTTS25_SAMPLING",
-          "link": 3,
+          "link": null,
           "shape": 7
         }
       ],
@@ -374,10 +311,10 @@
         "ver": "0.2.0"
       },
       "widgets_values": [
-        "第一段用于演示随机采样，并通过固定种子保持结果可复现。第二段用于演示长文本自动分段，以及段落之间的静音控制。你可以修改温度、顶部概率和顶部候选数量，观察语气细节的变化。",
-        "ZH",
+        "He had a <minute|M IH1 . N AH0 T> to examine the <minute|M AY0 . N UW1 T> details.",
+        "EN",
         1.0,
-        998877,
+        20260811,
         "fixed"
       ]
     },
@@ -385,8 +322,8 @@
       "id": 5,
       "type": "SaveAudio",
       "pos": [
-        1460,
-        300
+        1510,
+        170
       ],
       "size": [
         320,
@@ -423,13 +360,21 @@
         "ver": "0.2.0"
       },
       "widgets_values": [
-        "IndexTTS25_T8/random_long_text"
+        "IndexTTS25_T8/pronunciation_en"
       ]
     }
   ],
   "links": [
     [
       1,
+      3,
+      0,
+      4,
+      2,
+      "STRING"
+    ],
+    [
+      2,
       1,
       0,
       4,
@@ -437,20 +382,12 @@
       "T8_INDEXTTS25_MODEL"
     ],
     [
-      2,
+      3,
       2,
       0,
       4,
       1,
       "AUDIO"
-    ],
-    [
-      3,
-      3,
-      0,
-      4,
-      7,
-      "T8_INDEXTTS25_SAMPLING"
     ],
     [
       4,
@@ -463,12 +400,12 @@
   ],
   "groups": [
     {
-      "title": "06 随机采样与长文本 · B站：T8star-Aix",
+      "title": "09 英文 CMU 音素 · B站：T8star-Aix",
       "bounding": [
         -40,
         -60,
-        1860,
-        900
+        1910,
+        550
       ],
       "color": "#3f789e",
       "font_size": 24,

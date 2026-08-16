@@ -24,7 +24,7 @@ def _load_plugin():
     return module
 
 
-def test_registers_exactly_four_pure_v3_nodes():
+def test_registers_exactly_five_pure_v3_nodes():
     plugin = _load_plugin()
     extension = asyncio.run(plugin.comfy_entrypoint())
     nodes = asyncio.run(extension.get_node_list())
@@ -33,11 +33,26 @@ def test_registers_exactly_four_pure_v3_nodes():
         "T8_IndexTTS25_ModelLoader",
         "T8_IndexTTS25_EmotionControl",
         "T8_IndexTTS25_SamplingConfig",
+        "T8_IndexTTS25_Pronunciation",
         "T8_IndexTTS25_Generate",
     ]
     assert all(schema.category == "T8star-Aix/Audio/IndexTTS 2.5" for schema in schemas)
     assert schemas[-1].outputs[0].io_type == "AUDIO"
     assert not hasattr(plugin, "NODE_CLASS_MAPPINGS")
+
+
+def test_pronunciation_node_outputs_portable_annotated_text():
+    _load_plugin()
+    from comfyui_indextts25_t8_test.nodes_v3 import T8IndexTTS25Pronunciation
+
+    result = T8IndexTTS25Pronunciation.execute(
+        "银行的行长到了。",
+        "ZH",
+        "银行|YIN2 HANG2|ZH\n行长|HANG2 ZHANG3|ZH",
+        True,
+    )
+    assert result[0] == "<银行|YIN2 HANG2>的<行长|HANG2 ZHANG3>到了。"
+    assert "已应用 2 处" in result[1]
 
 
 def test_emotion_vector_is_safely_normalized():
@@ -62,4 +77,3 @@ def test_emotion_vector_is_safely_normalized():
     emotion = result[0]
     assert sum(emotion.vector) == pytest.approx(0.8)
     assert emotion.notes
-

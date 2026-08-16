@@ -23,7 +23,12 @@ IndexTTS 2.5 的 ComfyUI V3 原生节点集成。节点菜单位于：
 3. `IndexTTS 2.5 采样设置 · T8star-Aix`
    - 稳定默认值、随机采样、beam、temperature、top-p/top-k
    - 长文本分段、段间停顿、最大语音 token、文本归一化
-4. `IndexTTS 2.5 语音生成 · T8star-Aix`
+4. `IndexTTS 2.5 发音控制 · T8star-Aix`
+   - 官方 `<文字|读音>` 标注格式
+   - 中文数字声调拼音、英文 CMU 音素、日语假名校验
+   - 工作流内嵌发音词典、长词优先、手工标注优先
+   - 输出处理后文本和完整替换/校验报告，不修改模型全局状态
+5. `IndexTTS 2.5 语音生成 · T8star-Aix`
    - 标准 ComfyUI `AUDIO` 输入/输出
    - 中、英、日、西、阿五种语言入口
    - 音色克隆、seed、官方 `duration_factor=0.5~2.0` 语速/时长适配
@@ -140,8 +145,9 @@ MaskGCT、CAMPPlus 和 BigVGAN 辅助模型。下载结束后重启 ComfyUI，�
 1. 用 ComfyUI 原生 `Load Audio` 载入清晰、单人、无背景音乐的参考音频，建议 3–10 秒。
 2. 添加模型加载器并选择 `IndexTTS-2.5`。
 3. 添加语音生成节点，连接模型和参考音频，填写文本与语言。
-4. 可选连接情感控制和采样设置。
-5. 将生成 AUDIO 连接到 `Save Audio` 或 `Preview Audio`。
+4. 需要多音字或专有词发音时，添加发音控制节点，将其文本输出连接到语音生成节点。
+5. 可选连接情感控制和采样设置。
+6. 将生成 AUDIO 连接到 `Save Audio` 或 `Preview Audio`。
 
 超过 15 秒的参考音频会被截取并提示。节点会把参考音频按内容哈希缓存到 ComfyUI 的临时目录，
 不会污染 input/output。相同模型的并发推理会串行化，防止上游内部音色/情感缓存互相覆盖。
@@ -154,8 +160,31 @@ MaskGCT、CAMPPlus 和 BigVGAN 辅助模型。下载结束后重启 ComfyUI，�
 
 它是模型内的长度调节，不是简单的后处理拉伸；仍不承诺逐字或字幕级精确时长。
 
-完整示例见 `example_workflows/README.md`，包含 7 组可直接打开的 UI 工作流和 7 组 API prompt：
-基础克隆、语速对比、情感参考音频、八维情感、文本情感、随机采样长文本和五语种生成。使用前把
+### 多音字与精确发音
+
+不连接发音控制节点时，也可以在语音生成正文中直接使用官方格式：
+
+```text
+他在银<行|XING2>里<行|HANG2>走了半天。
+He had a <minute|M IH1 . N AH0 T> to check the <minute|M AY0 . N UW1 T> details.
+彼は料理が<上手|じょうず>だが、囲碁では<上手|うわて>に負けた。
+```
+
+批量规则建议使用发音控制节点。词典每行格式为 `文字|读音|语言`，例如：
+
+```text
+银行|YIN2 HANG2|ZH
+行长|HANG2 ZHANG3|ZH
+Bilibili|B IY1 . L IY1 . B IY1 . L IY1|EN
+```
+
+词典保存在工作流 JSON 内，发送工作流时不会丢失。已有手工标注永远优先；词典按照长词优先，
+不会改写 `<文字|读音>` 内部。严格校验默认开启，错误会在排队前给出；关闭后无效词条保持原文并
+写入报告。该节点不依赖额外 G2P 模型，也不会修改已缓存模型的全局 glossary。
+
+完整示例见 `example_workflows/README.md`，包含 10 组可直接打开的 UI 工作流和 10 组 API prompt：
+基础克隆、语速对比、情感参考音频、八维情感、文本情感、随机采样长文本、五语种生成，以及中文
+多音字、英文 CMU 音素、日语假名发音控制。使用前把
 `voice_reference.wav`（情感音频示例还需 `emotion_reference.wav`）上传到 ComfyUI input。
 
 ## 环境与模型检查

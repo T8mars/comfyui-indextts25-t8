@@ -5,6 +5,8 @@ import importlib.util
 import sys
 from pathlib import Path
 
+import pytest
+
 
 PLUGIN_ROOT = Path(__file__).resolve().parents[1]
 EXAMPLES = (
@@ -15,6 +17,9 @@ EXAMPLES = (
     "05_emotion_text",
     "06_random_sampling_long_text",
     "07_multilingual_generation",
+    "08_chinese_pronunciation",
+    "09_english_cmu_pronunciation",
+    "10_japanese_kana_pronunciation",
 )
 
 
@@ -62,6 +67,14 @@ def test_examples_cover_every_emotion_mode_speed_sampling_and_language():
         for prompt in prompts
         for node in prompt.values()
     )
+    pronunciation_nodes = [
+        node
+        for prompt in prompts
+        for node in prompt.values()
+        if node["class_type"] == "T8_IndexTTS25_Pronunciation"
+    ]
+    assert {node["inputs"]["language"] for node in pronunciation_nodes} == {"ZH", "EN", "JA"}
+    assert any("银行|YIN2 HANG2|ZH" in node["inputs"]["dictionary"] for node in pronunciation_nodes)
 
 
 def test_v3_dynamic_combo_api_inputs_are_flattened():
@@ -76,7 +89,7 @@ def test_v3_dynamic_combo_api_inputs_are_flattened():
 
 
 def test_api_prompts_expand_with_the_current_comfyui_v3_schema():
-    from comfy_api.latest import _io
+    _io = pytest.importorskip("comfy_api.latest")._io
 
     package_name = "comfyui_indextts25_t8_workflow_test"
     spec = importlib.util.spec_from_file_location(
@@ -93,6 +106,7 @@ def test_api_prompts_expand_with_the_current_comfyui_v3_schema():
         "T8_IndexTTS25_ModelLoader": nodes_module.T8IndexTTS25ModelLoader,
         "T8_IndexTTS25_EmotionControl": nodes_module.T8IndexTTS25EmotionControl,
         "T8_IndexTTS25_SamplingConfig": nodes_module.T8IndexTTS25SamplingConfig,
+        "T8_IndexTTS25_Pronunciation": nodes_module.T8IndexTTS25Pronunciation,
         "T8_IndexTTS25_Generate": nodes_module.T8IndexTTS25Generate,
     }
     api_root = PLUGIN_ROOT / "example_workflows" / "api"

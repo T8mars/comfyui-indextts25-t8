@@ -14,6 +14,7 @@ API_ROOT = EXAMPLES_ROOT / "api"
 MODEL_NODE = "T8_IndexTTS25_ModelLoader"
 EMOTION_NODE = "T8_IndexTTS25_EmotionControl"
 SAMPLING_NODE = "T8_IndexTTS25_SamplingConfig"
+PRONUNCIATION_NODE = "T8_IndexTTS25_Pronunciation"
 GENERATE_NODE = "T8_IndexTTS25_Generate"
 
 
@@ -44,7 +45,7 @@ def properties(node_type: str, *, core: bool = False) -> dict[str, str]:
     return {
         "Node name for S&R": node_type,
         "cnr_id": "comfy-core" if core else "comfyui-indextts25-t8",
-        "ver": "0.1.0",
+        "ver": "0.2.0",
     }
 
 
@@ -267,6 +268,30 @@ def add_generate(
     )
 
 
+def add_pronunciation(
+    workflow: Workflow,
+    text: str,
+    language: str,
+    dictionary: str,
+    pos=(440, 0),
+    *,
+    strict: bool = True,
+) -> int:
+    return workflow.add(
+        PRONUNCIATION_NODE,
+        pos,
+        (430, 360),
+        [
+            widget_input("text", "STRING"),
+            widget_input("language", "COMBO"),
+            widget_input("dictionary", "STRING"),
+            widget_input("strict", "BOOLEAN"),
+        ],
+        [output("annotated_text", "STRING"), output("pronunciation_report", "STRING")],
+        [text, language, dictionary, strict],
+    )
+
+
 def add_save(workflow: Workflow, prefix: str, pos=(1460, 180), *, title: str | None = None) -> int:
     return workflow.add(
         "SaveAudio",
@@ -342,6 +367,18 @@ def api_generate(
     if sampling_id:
         inputs["sampling"] = [sampling_id, 0]
     return {"class_type": GENERATE_NODE, "inputs": inputs}
+
+
+def api_pronunciation(text: str, language: str, dictionary: str, *, strict: bool = True) -> dict[str, Any]:
+    return {
+        "class_type": PRONUNCIATION_NODE,
+        "inputs": {
+            "text": text,
+            "language": language,
+            "dictionary": dictionary,
+            "strict": strict,
+        },
+    }
 
 
 def api_save(generate_id: str, prefix: str) -> dict[str, Any]:
@@ -540,6 +577,61 @@ def multilingual_pair() -> tuple[dict[str, Any], dict[str, Any]]:
     return workflow.as_dict(), api
 
 
+def _pronunciation_pair(
+    title: str,
+    text: str,
+    language: str,
+    dictionary: str,
+    prefix: str,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    workflow = Workflow(title)
+    model = add_model(workflow)
+    speaker = add_load_audio(workflow, "voice_reference.wav", title="音色参考音频")
+    pronunciation = add_pronunciation(workflow, text, language, dictionary, pos=(440, 0))
+    generate = add_generate(workflow, text, language, 1.0, 20260811, pos=(950, 60))
+    save = add_save(workflow, prefix, pos=(1510, 170))
+    workflow.connect(pronunciation, "annotated_text", generate, "text")
+    wire_generation(workflow, model, speaker, generate, save)
+    api = {
+        "1": api_model(),
+        "2": api_audio("voice_reference.wav"),
+        "3": api_pronunciation(text, language, dictionary),
+        "4": api_generate("1", "2", ["3", 0], language, 1.0, 20260811),
+        "5": api_save("4", prefix),
+    }
+    return workflow.as_dict(), api
+
+
+def chinese_pronunciation_pair() -> tuple[dict[str, Any], dict[str, Any]]:
+    return _pronunciation_pair(
+        "08 中文多音字词典",
+        "他在银行里工作，行长正在开会；这段手工标注的银<行|HANG2>不会被词典覆盖。",
+        "ZH",
+        "银行|YIN2 HANG2|ZH\n行长|HANG2 ZHANG3|ZH\n重庆|CHONG2 QING4|ZH",
+        "IndexTTS25_T8/pronunciation_zh",
+    )
+
+
+def english_pronunciation_pair() -> tuple[dict[str, Any], dict[str, Any]]:
+    return _pronunciation_pair(
+        "09 英文 CMU 音素",
+        "He had a <minute|M IH1 . N AH0 T> to examine the <minute|M AY0 . N UW1 T> details.",
+        "EN",
+        "Bilibili|B IY1 . L IY1 . B IY1 . L IY1|EN",
+        "IndexTTS25_T8/pronunciation_en",
+    )
+
+
+def japanese_pronunciation_pair() -> tuple[dict[str, Any], dict[str, Any]]:
+    return _pronunciation_pair(
+        "10 日语假名发音",
+        "彼は料理が<上手|じょうず>だが、囲碁では<上手|うわて>に負けた。",
+        "JA",
+        "",
+        "IndexTTS25_T8/pronunciation_ja",
+    )
+
+
 EXAMPLES = {
     "01_basic_voice_clone": basic_pair,
     "02_speed_comparison": speed_pair,
@@ -548,6 +640,9 @@ EXAMPLES = {
     "05_emotion_text": text_emotion_pair,
     "06_random_sampling_long_text": sampling_pair,
     "07_multilingual_generation": multilingual_pair,
+    "08_chinese_pronunciation": chinese_pronunciation_pair,
+    "09_english_cmu_pronunciation": english_pronunciation_pair,
+    "10_japanese_kana_pronunciation": japanese_pronunciation_pair,
 }
 
 

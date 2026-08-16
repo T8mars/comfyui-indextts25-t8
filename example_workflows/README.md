@@ -16,6 +16,9 @@
 | `05_emotion_text.json` | Qwen 文本情感描述控制 | `voice_reference.wav` |
 | `06_random_sampling_long_text.json` | 固定 seed 的随机采样、长文本分段和段间静音 | `voice_reference.wav` |
 | `07_multilingual_generation.json` | 中文、英语、日语、西班牙语、阿拉伯语 | `voice_reference.wav` |
+| `08_chinese_pronunciation.json` | 中文多音字词典、长词优先和手工标注优先 | `voice_reference.wav` |
+| `09_english_cmu_pronunciation.json` | 英文同形异音与 CMU 音素校验 | `voice_reference.wav` |
+| `10_japanese_kana_pronunciation.json` | 日语假名发音控制 | `voice_reference.wav` |
 
 ## 使用方法
 
