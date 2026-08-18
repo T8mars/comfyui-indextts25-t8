@@ -71,12 +71,12 @@ CUDA/PyTorch 组合。若缺少 torchaudio，请安装与现有 torch 完全对�
 当前固定核心已在 Windows、Python 3.10、PyTorch 2.8 环境验证。其他 ComfyUI Python 版本请先运行
 环境检查脚本；上游对新版本 Python 的兼容范围可能更窄。
 
-### Transformers 版本兼容
+### 依赖版本兼容
 
-Transformers 已实测兼容 `4.52.1` 和 `4.57.6`（后者对应 `tokenizers 0.22.2`）。依赖范围保持为
-`transformers>=4.52.1,<5`；Transformers 5.x 的生成与缓存 API 变化较大，目前不在支持范围内。
+`transformers` 已实测兼容 `4.52.1` 和 `4.57.6`（后者对应 `tokenizers 0.22.2`）。依赖范围保持为
+`transformers>=4.52.1,<5`；`transformers` 5.x 的生成与缓存 API 变化较大，目前不在支持范围内。
 
-已经使用 Transformers 4.57.6 的 ComfyUI 无需降级。需要显式升级到已验证组合时，请使用 ComfyUI
+已经使用 `transformers` 4.57.6 的 ComfyUI 无需降级。需要显式升级到已验证组合时，请使用 ComfyUI
 自己的 Python：
 
 ```powershell
@@ -89,7 +89,7 @@ Windows 便携版：
 ..\python_embeded\python.exe -m pip install --upgrade "transformers==4.57.6" "tokenizers==0.22.2"
 ```
 
-升级后重启 ComfyUI。不要单独安装 Transformers 5.x，也不要因此重装 ComfyUI 的 PyTorch。
+升级后重启 ComfyUI。不要单独安装 `transformers` 5.x，也不要因此重装 ComfyUI 的 PyTorch。
 
 中文数字、日期等文本归一化依赖是可选项。在 Windows 上可额外安装 `wetext`；不安装或当前 Python
 版本不兼容时，节点会自动使用原文本继续生成，建议把数字写成口语形式。该可选项不会影响 2.5 模型、
@@ -199,7 +199,7 @@ python scripts/download_models.py --target "D:\ComfyUI\models\TTS\IndexTTS-2.5" 
 
 ## 固定版本
 
-- IndexTTS 代码：`56eead7eb0888ecac6abbf9d777c27f798a2c730`
+- IndexTTS 代码：`ee40fa7d6c6b8a2c7f06105f9f1e65775b74868c`
 - IndexTTS 2.5 模型：`ba2480d9f7f629eb18f6acaebb357679d9ba88a4`
 - 模型清单：`manifests/model_2_5.json`
 
@@ -211,6 +211,10 @@ python scripts/download_models.py --target "D:\ComfyUI\models\TTS\IndexTTS-2.5" 
 
 感谢 IndexTTS 团队开源 IndexTTS 及 IndexTTS 2.5 模型。本项目是在其开源成果基础上开发的第三方
 ComfyUI 集成；请支持并关注官方项目。
+
+当前节点已同步上游 2.5 的 QwenEmotion 标签兼容、无效 `use_gpt_latent` 路径移除、
+torchaudio 2.9+ WAV 防削波修复。低于 10GB 显存时会自动使用低显存策略：长文本分段，
+文本情感分析完成后先释放 QwenEmotion，再执行语音生成。
 
 ## 许可证与免责声明
 

@@ -7,6 +7,33 @@ import torchaudio
 
 MATPLOTLIB_FLAG = False
 
+# Keep IndexTTS' historical PCM-scale convention while producing a valid
+# 16-bit WAV on both torchaudio <= 2.8 and the TorchCodec-backed 2.9+ saver.
+PCM16_MAX = 32767.0
+
+
+def _torchaudio_honors_wav_encoding_args():
+    """Return whether torchaudio.save still honors WAV encoding arguments."""
+    raw = getattr(torchaudio, "__version__", "") or ""
+    parts = []
+    for chunk in raw.split("+")[0].split(".")[:2]:
+        if not chunk.isdigit():
+            return False
+        parts.append(int(chunk))
+    return len(parts) == 2 and tuple(parts) < (2, 9)
+
+
+def save_pcm_wav(path, wav, sampling_rate):
+    """Save a PCM-scale waveform as 16-bit PCM without TorchCodec clipping."""
+    wav = wav.detach().to(device="cpu", dtype=torch.float32) / PCM16_MAX
+    wav = wav.clamp_(-1.0, 1.0)
+    encoding_args = (
+        {"encoding": "PCM_S", "bits_per_sample": 16}
+        if _torchaudio_honors_wav_encoding_args()
+        else {}
+    )
+    torchaudio.save(path, wav, sampling_rate, **encoding_args)
+
 
 def load_audio(audiopath, sampling_rate):
     audio, sr = torchaudio.load(audiopath)

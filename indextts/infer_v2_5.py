@@ -19,6 +19,7 @@ from omegaconf import OmegaConf
 from indextts.codec.models import EnhancedCodec
 from indextts.gpt.model_v2 import UnifiedVoice
 from indextts.utils.checkpoint import load_checkpoint
+from indextts.utils.common import save_pcm_wav
 from indextts.utils.front import TextNormalizer
 from indextts.utils.tokenizer import get_tokenizer, lang_to_token
 from indextts.utils.ja_g2p import JapaneseG2PProcessor
@@ -73,7 +74,7 @@ def apply_pronunciation_annotations(text: str) -> str:
 class IndexTTS2:
     def __init__(
             self, cfg_path="checkpoints/config.yaml", model_dir="checkpoints", use_bf16=False, device=None,
-            use_gpt_latent=False, use_cuda_kernel=None,use_deepspeed=False, use_accel=False, use_torch_compile=False, use_qwen_emo=False
+            use_cuda_kernel=None,use_deepspeed=False, use_accel=False, use_torch_compile=False, use_qwen_emo=False
     ):
         """
         Args:
@@ -184,9 +185,8 @@ class IndexTTS2:
         self.semantic_codec = self.semantic_codec.to(self.device)
         print('>> semantic_codec weights restored cost: ', time.perf_counter() - start_time)
 
-        self.use_gpt_latent = use_gpt_latent
         s2mel_path = os.path.join(self.model_dir, self.cfg.s2mel_checkpoint)
-        s2mel = MyModel(self.cfg.s2mel, use_gpt_latent=use_gpt_latent)
+        s2mel = MyModel(self.cfg.s2mel)
         s2mel, _, _, _ = load_checkpoint2(
             s2mel,
             None,
@@ -548,7 +548,7 @@ class IndexTTS2:
                         os.remove(output_path)
                     if os.path.dirname(output_path) != "":
                         os.makedirs(os.path.dirname(output_path), exist_ok=True)
-                    torchaudio.save(output_path, wav, sampling_rate)
+                    save_pcm_wav(output_path, wav, sampling_rate)
                     print(">> wav file saved to:", output_path)
                     return output_path
                 else:
@@ -753,7 +753,6 @@ class IndexTTS2:
 
         wavs = []
         gpt_gen_time = 0
-        gpt_forward_time = 0
         s2mel_time = 0
         bigvgan_time = 0
         has_warned = False
@@ -838,33 +837,12 @@ class IndexTTS2:
                     print(f"fix codes shape: {codes.shape}, codes type: {codes.dtype}")
                     print(f"code len: {code_lens}")
 
-                m_start_time = time.perf_counter()
-                use_speed = torch.zeros(spk_cond_emb.size(0)).to(spk_cond_emb.device).long()
-                if self.use_gpt_latent:
-                    with torch.amp.autocast(text_tokens.device.type, enabled=self.dtype is not None, dtype=self.dtype):
-                        latent = self.gpt(
-                            speech_conditioning_latent,
-                            text_tokens,
-                            torch.tensor([text_tokens.shape[-1]], device=text_tokens.device),
-                            codes,
-                            torch.tensor([codes.shape[-1]], device=text_tokens.device),
-                            emo_cond_emb,
-                            cond_mel_lengths=torch.tensor([spk_cond_emb.shape[-1]], device=text_tokens.device),
-                            emo_cond_mel_lengths=torch.tensor([emo_cond_emb.shape[-1]], device=text_tokens.device),
-                            emo_vec=emovec,
-                            use_speed=use_speed,
-                        )
-                        gpt_forward_time += time.perf_counter() - m_start_time
-
                 dtype = None
                 with torch.amp.autocast(text_tokens.device.type, enabled=dtype is not None, dtype=dtype):
                     m_start_time = time.perf_counter()
                     diffusion_steps = 25
                     inference_cfg_rate = 0.7
                     S_infer = self.semantic_codec.decode(codes)
-                    if self.use_gpt_latent:
-                        latent = self.s2mel.models['gpt_layer'](latent)
-                        S_infer = S_infer + latent
                     target_lengths = torch.LongTensor(
                         [int(S_infer.shape[1] * 1.72 * duration_factor)]
                     ).to(codes.device)
@@ -906,7 +884,6 @@ class IndexTTS2:
         wav = torch.cat(wavs, dim=1)
         wav_length = wav.shape[-1] / sampling_rate
         print(f">> gpt_gen_time: {gpt_gen_time:.2f} seconds")
-        print(f">> gpt_forward_time: {gpt_forward_time:.2f} seconds")
         print(f">> s2mel_time: {s2mel_time:.2f} seconds")
         print(f">> bigvgan_time: {bigvgan_time:.2f} seconds")
         print(f">> Total inference time: {end_time - start_time:.2f} seconds")
@@ -923,7 +900,7 @@ class IndexTTS2:
             if os.path.dirname(output_path) != "":
                 os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
-            torchaudio.save(output_path, wav.type(torch.int16), sampling_rate)
+            save_pcm_wav(output_path, wav, sampling_rate)
             print(">> wav file saved to:", output_path)
             if stream_return:
                 return None
@@ -988,12 +965,48 @@ class QwenEmotion:
     def clamp_score(self, value):
         return max(self.min_score, min(self.max_score, value))
 
+    def normalize_content(self, content):
+        """Accept vector dictionaries and Qwen label-style emotion outputs."""
+        normalized = dict(content) if isinstance(content, dict) else {}
+
+        def label_to_cn_key(value):
+            if not isinstance(value, str):
+                return None
+            value = value.strip()
+            if value in self.cn_key_to_en:
+                return value
+            value_lower = value.lower()
+            for cn_key, en_key in self.cn_key_to_en.items():
+                if value_lower == en_key:
+                    return cn_key
+            return None
+
+        detected_key = label_to_cn_key(content) if isinstance(content, str) else None
+        if detected_key is None:
+            for alias in ("emotion", "emotion_label", "label", "情感", "情绪"):
+                detected_key = label_to_cn_key(normalized.get(alias))
+                if detected_key is not None:
+                    break
+        if detected_key is not None and all(
+            key not in normalized for key in self.desired_vector_order
+        ):
+            normalized[detected_key] = 1.0
+
+        for cn_key in self.desired_vector_order:
+            detected_key = label_to_cn_key(normalized.get(cn_key))
+            if detected_key is not None:
+                normalized[cn_key] = 1.0 if detected_key == cn_key else 0.0
+                if detected_key != cn_key:
+                    normalized[detected_key] = 1.0
+        return normalized
+
     def convert(self, content):
         # generate emotion vector dictionary:
         # - insert values in desired order (Python 3.7+ `dict` remembers insertion order)
         # - convert Chinese keys to English
         # - clamp all values to the allowed min/max range
         # - use 0.0 for any values that were missing in `content`
+        content = self.normalize_content(content)
         emotion_dict = {
             self.cn_key_to_en[cn_key]: self.clamp_score(content.get(cn_key, 0.0))
             for cn_key in self.desired_vector_order

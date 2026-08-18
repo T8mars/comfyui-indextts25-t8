@@ -15,15 +15,17 @@ class ModelHandle:
     use_cuda_kernel: bool = False
     release_after_run: bool = False
     model_revision: str = ""
+    low_vram: bool = False
 
     @property
-    def cache_key(self) -> tuple[str, str, bool, bool, str]:
+    def cache_key(self) -> tuple[str, str, bool, bool, str, bool]:
         return (
             str(self.model_dir.resolve()),
             self.device,
             self.use_bf16,
             self.use_cuda_kernel,
             self.model_revision,
+            self.low_vram,
         )
 
 
@@ -71,4 +73,3 @@ class SamplingConfig:
 
 DEFAULT_SAMPLING = SamplingConfig()
 DEFAULT_EMOTION = EmotionConfig()
-

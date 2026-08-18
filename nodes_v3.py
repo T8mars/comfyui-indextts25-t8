@@ -76,6 +76,14 @@ def _use_bf16(precision: str, device: str) -> bool:
     return device.startswith("xpu")
 
 
+def _is_low_vram(device: str, threshold_gb: float = 10.0) -> bool:
+    if not device.startswith("cuda") or not torch.cuda.is_available():
+        return False
+    index = int(device.split(":", 1)[1]) if ":" in device else torch.cuda.current_device()
+    total_gb = torch.cuda.get_device_properties(index).total_memory / (1024 ** 3)
+    return total_gb < threshold_gb
+
+
 class T8IndexTTS25ModelLoader(io.ComfyNode):
     @classmethod
     def define_schema(cls) -> io.Schema:
@@ -181,6 +189,7 @@ class T8IndexTTS25ModelLoader(io.ComfyNode):
         report = validate_model_dir(model_dir, verify_hashes=verify_hashes)
         report.require_valid()
         resolved_device = _resolve_device(device)
+        low_vram = _is_low_vram(resolved_device)
         manifest = load_manifest()
         handle = ModelHandle(
             model_dir=model_dir,
@@ -189,12 +198,14 @@ class T8IndexTTS25ModelLoader(io.ComfyNode):
             use_cuda_kernel=bool(use_cuda_kernel and resolved_device.startswith("cuda")),
             release_after_run=bool(release_after_run),
             model_revision=str(manifest["modelRevision"]),
+            low_vram=low_vram,
         )
         verification = "SHA-256 已校验" if report.hashes_verified else "文件大小已校验"
         info = (
             f"IndexTTS 2.5 | {model_dir} | device={resolved_device} | "
             f"precision={'bfloat16' if handle.use_bf16 else 'float32'} | {verification} | "
             f"model revision={manifest['modelRevision'][:12]}"
+            + (" | 低显存自动适配" if low_vram else "")
         )
         return io.NodeOutput(handle, info)
 

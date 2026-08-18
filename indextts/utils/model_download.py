@@ -62,6 +62,26 @@ def _download_single_file(repo_id: str, filename: str, local_path: str) -> str:
     return local_path
 
 
+_VERSION_TO_REPO = {
+    "2": "IndexTeam/IndexTTS-2",
+    "2.5": "IndexTeam/IndexTTS-2.5",
+}
+
+
+def ensure_config_available(model_dir: str, version: str = "2.5") -> None:
+    """Download the version-matched config.yaml when it is missing."""
+    if version not in _VERSION_TO_REPO:
+        supported = ", ".join(sorted(_VERSION_TO_REPO))
+        raise ValueError(f"Unsupported model version {version!r}. Supported versions: {supported}")
+    model_dir = model_dir or "."
+    config_path = os.path.join(model_dir, "config.yaml")
+    if os.path.isfile(config_path):
+        return
+    print(f">> config.yaml not found in {model_dir}, downloading...")
+    _download_single_file(_VERSION_TO_REPO[version], "config.yaml", config_path)
+    print(">> config.yaml downloaded.")
+
+
 def ensure_models_available(model_dir: str, bigvgan_repo: str = _BIGVGAN_REPO) -> dict:
     """
     Download all auxiliary models to ``{model_dir}/hf_cache/`` if missing.

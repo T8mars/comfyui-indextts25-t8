@@ -61,3 +61,53 @@ def test_adapter_maps_all_controls_without_global_side_effects(tmp_path: Path, m
     assert audio["waveform"].shape == (1, 1, 3)
     assert "seed=123" in status
     assert completed == [True]
+
+
+def test_low_vram_adapter_releases_qwen_before_speech_generation(tmp_path: Path, monkeypatch):
+    fake = FakeModel()
+
+    def ensure_qwen():
+        fake.qwen_loaded = True
+        fake.qwen_emo = SimpleNamespace(
+            inference=lambda text: {
+                "happy": 1.0,
+                "angry": 0.0,
+                "sad": 0.0,
+                "afraid": 0.0,
+                "disgusted": 0.0,
+                "melancholic": 0.0,
+                "surprised": 0.0,
+                "calm": 0.0,
+            }
+        )
+
+    fake.ensure_qwen_emotion = ensure_qwen
+    monkeypatch.setattr(inference_adapter, "_progress_callback", lambda: (lambda value, desc="": None))
+    monkeypatch.setattr(
+        inference_adapter.MODEL_CACHE,
+        "acquire",
+        lambda handle: SimpleNamespace(model=fake, lock=__import__("threading").RLock()),
+    )
+    monkeypatch.setattr(inference_adapter.MODEL_CACHE, "done", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        inference_adapter,
+        "comfy_audio_to_reference_wav",
+        lambda audio, kind: (tmp_path / f"{kind}.wav", ()),
+    )
+    monkeypatch.setattr(inference_adapter.torch.cuda, "is_available", lambda: False)
+    handle = ModelHandle(tmp_path, "cuda:0", True, low_vram=True)
+
+    _audio, status = inference_adapter.run_inference(
+        handle,
+        {"waveform": torch.zeros(1, 1, 100), "sample_rate": 22050},
+        "hello",
+        "EN",
+        1.0,
+        1,
+        EmotionConfig(mode="text", text="happy"),
+    )
+
+    assert fake.kwargs["use_emo_text"] is False
+    assert fake.kwargs["emo_vector"][0] == 1.0
+    assert fake.qwen_emo is None
+    assert "释放 QwenEmotion" in status

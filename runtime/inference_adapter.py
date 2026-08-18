@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import gc
 from typing import Any
+
+import torch
 
 from .audio_adapter import indextts_result_to_audio
 from .model_cache import MODEL_CACHE
@@ -76,6 +79,17 @@ def run_inference(
             try:
                 if use_emo_text:
                     entry.model.ensure_qwen_emotion()
+                    if handle.low_vram:
+                        try:
+                            emotion_dict = entry.model.qwen_emo.inference(emo_text)
+                            emo_vector = list(emotion_dict.values())
+                            use_emo_text = False
+                        finally:
+                            entry.model.qwen_emo = None
+                            gc.collect()
+                            if handle.device.startswith("cuda") and torch.cuda.is_available():
+                                torch.cuda.empty_cache()
+                        notes.append("低显存模式已在生成前释放 QwenEmotion")
                 with scoped_seed(seed, handle.device):
                     result = entry.model.infer(
                         spk_audio_prompt=str(speaker_path),
