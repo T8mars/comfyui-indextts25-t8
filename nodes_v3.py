@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 import logging
+from dataclasses import replace
 from pathlib import Path
 
 import torch
@@ -8,13 +10,29 @@ from comfy_api.latest import ComfyExtension, io
 from typing_extensions import override
 
 from .runtime.inference_adapter import run_inference
+from .runtime.model_cache import MODEL_CACHE
+from .runtime.acceleration import MODES, probe_acceleration, resolve_acceleration
+from .runtime.dialogue import (
+    compose_timeline,
+    fit_duration_factor,
+    missing_roles,
+    parse_batch_script,
+    parse_srt,
+)
 from .runtime.pronunciation import (
     PronunciationValidationError,
     format_pronunciation_report,
     parse_dictionary_text,
     process_pronunciation_text,
 )
-from .runtime.types import EmotionConfig, ModelHandle, SamplingConfig
+from .runtime.types import (
+    DialogueScript,
+    EmotionConfig,
+    ModelHandle,
+    RoleLibrary,
+    SamplingConfig,
+    VoiceProfile,
+)
 from .services.model_store import (
     MISSING_MODEL_OPTION,
     load_manifest,
@@ -31,6 +49,9 @@ CATEGORY = "T8star-Aix/Audio/IndexTTS 2.5"
 ModelType = io.Custom("T8_INDEXTTS25_MODEL")
 EmotionType = io.Custom("T8_INDEXTTS25_EMOTION")
 SamplingType = io.Custom("T8_INDEXTTS25_SAMPLING")
+VoiceType = io.Custom("T8_INDEXTTS25_VOICE")
+RoleLibraryType = io.Custom("T8_INDEXTTS25_ROLE_LIBRARY")
+DialogueScriptType = io.Custom("T8_INDEXTTS25_DIALOGUE_SCRIPT")
 
 
 def _device_options() -> list[str]:
@@ -115,12 +136,22 @@ class T8IndexTTS25ModelLoader(io.ComfyNode):
                     default="auto",
                     tooltip="auto 会在支持的 GPU 上使用 bfloat16，否则使用 float32。",
                 ),
+                io.Combo.Input(
+                    "acceleration_mode",
+                    display_name="可选加速模式",
+                    options=list(MODES),
+                    default="off",
+                    tooltip=(
+                        "默认关闭。缺少可选依赖会自动回退；DeepSpeed 不属于基础依赖，"
+                        "不会被自动安装或自动启用。"
+                    ),
+                ),
                 io.Boolean.Input(
                     "use_cuda_kernel",
-                    display_name="BigVGAN CUDA 融合核",
+                    display_name="旧工作流：BigVGAN CUDA 融合核",
                     default=False,
                     advanced=True,
-                    tooltip="首次使用可能编译扩展；不确定时保持关闭。",
+                    tooltip="仅为兼容旧工作流；新工作流请使用上方可选加速模式。",
                 ),
                 io.Boolean.Input(
                     "release_after_run",
@@ -157,6 +188,7 @@ class T8IndexTTS25ModelLoader(io.ComfyNode):
         model_name: str,
         device: str,
         precision: str,
+        acceleration_mode: str,
         use_cuda_kernel: bool,
         release_after_run: bool,
         verify_hashes: bool,
@@ -180,6 +212,7 @@ class T8IndexTTS25ModelLoader(io.ComfyNode):
         model_name: str,
         device: str,
         precision: str,
+        acceleration_mode: str,
         use_cuda_kernel: bool,
         release_after_run: bool,
         verify_hashes: bool,
@@ -190,12 +223,24 @@ class T8IndexTTS25ModelLoader(io.ComfyNode):
         report.require_valid()
         resolved_device = _resolve_device(device)
         low_vram = _is_low_vram(resolved_device)
+        requested_acceleration = (
+            "bigvgan_cuda"
+            if use_cuda_kernel and acceleration_mode in {"off", "auto_safe"}
+            else acceleration_mode
+        )
+        acceleration = resolve_acceleration(requested_acceleration, resolved_device)
         manifest = load_manifest()
         handle = ModelHandle(
             model_dir=model_dir,
             device=resolved_device,
             use_bf16=_use_bf16(precision, resolved_device),
-            use_cuda_kernel=bool(use_cuda_kernel and resolved_device.startswith("cuda")),
+            use_cuda_kernel=acceleration.use_cuda_kernel,
+            use_torch_compile=acceleration.use_torch_compile,
+            use_accel=acceleration.use_accel,
+            use_deepspeed=acceleration.use_deepspeed,
+            acceleration_requested=acceleration.requested,
+            acceleration_effective=acceleration.effective,
+            acceleration_note=acceleration.reason,
             release_after_run=bool(release_after_run),
             model_revision=str(manifest["modelRevision"]),
             low_vram=low_vram,
@@ -204,7 +249,8 @@ class T8IndexTTS25ModelLoader(io.ComfyNode):
         info = (
             f"IndexTTS 2.5 | {model_dir} | device={resolved_device} | "
             f"precision={'bfloat16' if handle.use_bf16 else 'float32'} | {verification} | "
-            f"model revision={manifest['modelRevision'][:12]}"
+            f"model revision={manifest['modelRevision'][:12]} | "
+            f"accel={acceleration.effective}（{acceleration.reason}）"
             + (" | 低显存自动适配" if low_vram else "")
         )
         return io.NodeOutput(handle, info)
@@ -503,6 +549,296 @@ class T8IndexTTS25Pronunciation(io.ComfyNode):
         return io.NodeOutput(result.text, format_pronunciation_report(result))
 
 
+class T8IndexTTS25VoiceProfile(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="T8_IndexTTS25_VoiceProfile",
+            display_name="IndexTTS 2.5 角色音色 · T8star-Aix",
+            category=CATEGORY,
+            search_aliases=["角色音色", "voice profile", "character voice"],
+            description="把角色名称、参考音频、默认语言和可选情感保存为可连线的工作流内音色。",
+            inputs=[
+                io.String.Input("role_name", display_name="角色名称", default="旁白"),
+                io.Audio.Input("speaker_audio", display_name="音色参考音频"),
+                io.Combo.Input("language", display_name="默认语言", options=["ZH", "EN", "JA", "ES", "AR"], default="ZH"),
+                EmotionType.Input("emotion", display_name="默认情感", optional=True),
+            ],
+            outputs=[
+                VoiceType.Output("voice", display_name="角色音色"),
+                io.String.Output("voice_info", display_name="音色信息"),
+            ],
+        )
+
+    @classmethod
+    def validate_inputs(cls, role_name: str, **kwargs) -> bool | str:
+        return True if str(role_name).strip() else "角色名称不能为空。"
+
+    @classmethod
+    def execute(
+        cls,
+        role_name: str,
+        speaker_audio: dict,
+        language: str,
+        emotion: EmotionConfig | None = None,
+    ) -> io.NodeOutput:
+        profile = VoiceProfile(str(role_name).strip(), speaker_audio, str(language).upper(), emotion)
+        return io.NodeOutput(profile, f"角色={profile.name} | language={profile.language} | " + ("含默认情感" if emotion else "情感跟随音色"))
+
+
+class T8IndexTTS25RoleLibrary(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="T8_IndexTTS25_RoleLibrary",
+            display_name="IndexTTS 2.5 角色音色库 · T8star-Aix",
+            category=CATEGORY,
+            search_aliases=["多角色", "role library", "音色库"],
+            description="自动增长输入，可连接 1–16 个角色音色；同名角色会被拒绝。",
+            inputs=[
+                io.Autogrow.Input(
+                    "voices",
+                    display_name="角色音色",
+                    template=io.Autogrow.TemplatePrefix(VoiceType.Input("voice"), prefix="voice_", min=1, max=16),
+                )
+            ],
+            outputs=[
+                RoleLibraryType.Output("role_library", display_name="角色音色库"),
+                io.String.Output("role_info", display_name="角色列表"),
+            ],
+        )
+
+    @staticmethod
+    def _profiles(value) -> list[VoiceProfile]:
+        if isinstance(value, VoiceProfile):
+            return [value]
+        if isinstance(value, dict):
+            result: list[VoiceProfile] = []
+            for nested in value.values():
+                result.extend(T8IndexTTS25RoleLibrary._profiles(nested))
+            return result
+        if isinstance(value, (list, tuple)):
+            result = []
+            for nested in value:
+                result.extend(T8IndexTTS25RoleLibrary._profiles(nested))
+            return result
+        return []
+
+    @classmethod
+    def execute(cls, voices: dict) -> io.NodeOutput:
+        profiles = cls._profiles(voices)
+        if not profiles:
+            raise ValueError("角色音色库至少需要连接一个角色音色。")
+        result: dict[str, VoiceProfile] = {}
+        for profile in profiles:
+            if profile.name in result:
+                raise ValueError(f"角色名称重复：{profile.name}")
+            result[profile.name] = profile
+        library = RoleLibrary(result)
+        return io.NodeOutput(library, "角色音色：" + "、".join(result))
+
+
+class T8IndexTTS25DialogueScript(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="T8_IndexTTS25_DialogueScript",
+            display_name="IndexTTS 2.5 批量台词 / SRT · T8star-Aix",
+            category=CATEGORY,
+            search_aliases=["SRT", "字幕配音", "批量台词", "dialogue script"],
+            description=(
+                "批量格式：角色|台词|语言|时长系数；SRT 支持 [角色] 台词 或 角色: 台词。"
+            ),
+            inputs=[
+                io.Combo.Input("script_type", display_name="脚本格式", options=["batch", "srt"], default="batch"),
+                io.String.Input(
+                    "script",
+                    display_name="批量台词或 SRT",
+                    multiline=True,
+                    dynamic_prompts=True,
+                    default="旁白|欢迎使用多角色批量配音。|ZH|1.0\n角色A|这是第二句。|ZH|0.9",
+                ),
+                io.String.Input("default_role", display_name="默认角色", default="旁白"),
+                io.Combo.Input("default_language", display_name="默认语言", options=["ZH", "EN", "JA", "ES", "AR"], default="ZH"),
+            ],
+            outputs=[
+                DialogueScriptType.Output("dialogue_script", display_name="台词脚本"),
+                io.String.Output("script_preview", display_name="解析预览 JSON"),
+            ],
+        )
+
+    @classmethod
+    def validate_inputs(cls, script_type: str, script: str, default_role: str, default_language: str, **kwargs) -> bool | str:
+        try:
+            (parse_srt if script_type == "srt" else parse_batch_script)(script, default_role, default_language)
+        except ValueError as exc:
+            return str(exc)
+        return True
+
+    @classmethod
+    def execute(cls, script_type: str, script: str, default_role: str, default_language: str) -> io.NodeOutput:
+        lines = (parse_srt if script_type == "srt" else parse_batch_script)(script, default_role, default_language)
+        payload = [line.to_dict() for line in lines]
+        return io.NodeOutput(DialogueScript(lines, script_type), json.dumps(payload, ensure_ascii=False, indent=2))
+
+
+class T8IndexTTS25DialogueGenerate(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="T8_IndexTTS25_DialogueGenerate",
+            display_name="IndexTTS 2.5 多角色 / SRT 生成 · T8star-Aix",
+            category=CATEGORY,
+            essentials_category="Audio",
+            search_aliases=["SRT generate", "多角色配音", "batch dialogue"],
+            description="按角色依次推理，再按顺延或原始时间轴合成为标准 AUDIO。",
+            inputs=[
+                ModelType.Input("model", display_name="IndexTTS 2.5 模型"),
+                RoleLibraryType.Input("role_library", display_name="角色音色库"),
+                DialogueScriptType.Input("dialogue_script", display_name="台词脚本"),
+                SamplingType.Input("sampling", display_name="采样设置", optional=True),
+                io.Int.Input("seed", display_name="起始 seed", default=0, min=0, max=0xFFFFFFFFFFFFFFFF, control_after_generate=True),
+                io.Combo.Input("timeline_policy", display_name="时间冲突策略", options=["shift", "overlay"], default="shift", tooltip="shift 顺延避免重叠；overlay 保留 SRT 起点并安全混音。"),
+                io.Boolean.Input("fit_srt_slots", display_name="二次推理适配字幕槽位", default=False, tooltip="仅 SRT 有效；不保证逐帧精确，超时会写入报告。"),
+                io.Int.Input("fit_tolerance_ms", display_name="允许时长误差（毫秒）", default=180, min=0, max=2000, step=10, advanced=True),
+                io.Int.Input("batch_gap_ms", display_name="批量句间静音（毫秒）", default=200, min=0, max=5000, step=10),
+            ],
+            outputs=[
+                io.Audio.Output("audio", display_name="合并音频"),
+                io.Audio.Output("line_audios", display_name="逐句音频", is_output_list=True),
+                io.String.Output("generation_report", display_name="生成报告 JSON"),
+            ],
+        )
+
+    @classmethod
+    def validate_inputs(cls, role_library: RoleLibrary, dialogue_script: DialogueScript, **kwargs) -> bool | str:
+        if not isinstance(role_library, RoleLibrary) or not isinstance(dialogue_script, DialogueScript):
+            return True
+        missing = missing_roles(dialogue_script.lines, role_library.profiles)
+        return "以下角色没有连接音色：" + "、".join(missing) if missing else True
+
+    @classmethod
+    def execute(
+        cls,
+        model: ModelHandle,
+        role_library: RoleLibrary,
+        dialogue_script: DialogueScript,
+        seed: int,
+        timeline_policy: str,
+        fit_srt_slots: bool,
+        fit_tolerance_ms: int,
+        batch_gap_ms: int,
+        sampling: SamplingConfig | None = None,
+    ) -> io.NodeOutput:
+        missing = missing_roles(dialogue_script.lines, role_library.profiles)
+        if missing:
+            raise ValueError("以下角色没有连接音色：" + "、".join(missing))
+        work_handle = replace(model, release_after_run=False)
+        clips: list[dict] = []
+        line_reports: list[dict] = []
+        sample_rate: int | None = None
+        try:
+            for offset, line in enumerate(dialogue_script.lines):
+                profile = role_library.profiles[line.role]
+                language = line.language or profile.language
+                audio, status = run_inference(
+                    work_handle,
+                    profile.speaker_audio,
+                    line.text,
+                    language,
+                    line.duration_factor,
+                    int(seed) + offset,
+                    emotion=profile.emotion,
+                    sampling=sampling,
+                )
+                actual_ms = audio["waveform"].shape[-1] * 1000 / audio["sample_rate"]
+                used_factor = line.duration_factor
+                regenerated = False
+                if fit_srt_slots and line.slot_ms and abs(actual_ms - line.slot_ms) > int(fit_tolerance_ms):
+                    fitted = fit_duration_factor(used_factor, actual_ms, line.slot_ms)
+                    if abs(fitted - used_factor) >= 0.02:
+                        audio, status = run_inference(
+                            work_handle,
+                            profile.speaker_audio,
+                            line.text,
+                            language,
+                            fitted,
+                            int(seed) + offset,
+                            emotion=profile.emotion,
+                            sampling=sampling,
+                        )
+                        used_factor = fitted
+                        actual_ms = audio["waveform"].shape[-1] * 1000 / audio["sample_rate"]
+                        regenerated = True
+                if sample_rate is None:
+                    sample_rate = int(audio["sample_rate"])
+                elif sample_rate != int(audio["sample_rate"]):
+                    raise RuntimeError("逐句输出采样率不一致，无法合并。")
+                clips.append(audio)
+                line_reports.append({
+                    **line.to_dict(),
+                    "actual_duration_ms": round(actual_ms),
+                    "used_duration_factor": round(used_factor, 4),
+                    "regenerated_for_slot": regenerated,
+                    "status": status,
+                })
+        finally:
+            if model.release_after_run:
+                MODEL_CACHE.release(work_handle)
+        assert sample_rate is not None
+        waveform, placements = compose_timeline(
+            [audio["waveform"] for audio in clips],
+            dialogue_script.lines,
+            sample_rate,
+            timeline_policy,
+            batch_gap_ms if dialogue_script.script_type == "batch" else 0,
+        )
+        for line_report, placement in zip(line_reports, placements):
+            line_report["timeline"] = placement.to_dict()
+        report = {
+            "script_type": dialogue_script.script_type,
+            "timeline_policy": timeline_policy,
+            "fit_srt_slots": bool(fit_srt_slots),
+            "sample_rate": sample_rate,
+            "duration_ms": round(waveform.shape[-1] * 1000 / sample_rate),
+            "lines": line_reports,
+        }
+        return io.NodeOutput(
+            {"waveform": waveform, "sample_rate": sample_rate},
+            clips,
+            json.dumps(report, ensure_ascii=False, indent=2),
+        )
+
+
+class T8IndexTTS25Environment(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="T8_IndexTTS25_Environment",
+            display_name="IndexTTS 2.5 环境与可选加速 · T8star-Aix",
+            category=CATEGORY,
+            search_aliases=["加速诊断", "DeepSpeed", "FlashAttention", "Triton"],
+            description="只做能力探测，不安装依赖、不加载模型；DeepSpeed 等附加包缺失属于正常情况。",
+            inputs=[io.Combo.Input("device", display_name="检查设备", options=_device_options(), default="auto")],
+            outputs=[io.String.Output("environment_report", display_name="环境报告 JSON")],
+        )
+
+    @classmethod
+    def execute(cls, device: str) -> io.NodeOutput:
+        resolved = _resolve_device(device)
+        capabilities = probe_acceleration(resolved)
+        modes = {
+            mode: {
+                "effective": selected.effective,
+                "available": selected.available,
+                "reason": selected.reason,
+            }
+            for mode in MODES
+            for selected in [resolve_acceleration(mode, resolved, capabilities)]
+        }
+        return io.NodeOutput(json.dumps({"device": resolved, "capabilities": capabilities, "modes": modes}, ensure_ascii=False, indent=2))
+
+
 class T8IndexTTS25Generate(io.ComfyNode):
     @classmethod
     def define_schema(cls) -> io.Schema:
@@ -620,6 +956,11 @@ class T8IndexTTS25Extension(ComfyExtension):
             T8IndexTTS25SamplingConfig,
             T8IndexTTS25Pronunciation,
             T8IndexTTS25Generate,
+            T8IndexTTS25VoiceProfile,
+            T8IndexTTS25RoleLibrary,
+            T8IndexTTS25DialogueScript,
+            T8IndexTTS25DialogueGenerate,
+            T8IndexTTS25Environment,
         ]
 
 
@@ -631,7 +972,13 @@ __all__ = [
     "T8IndexTTS25ModelLoader",
     "T8IndexTTS25EmotionControl",
     "T8IndexTTS25SamplingConfig",
+    "T8IndexTTS25Pronunciation",
     "T8IndexTTS25Generate",
+    "T8IndexTTS25VoiceProfile",
+    "T8IndexTTS25RoleLibrary",
+    "T8IndexTTS25DialogueScript",
+    "T8IndexTTS25DialogueGenerate",
+    "T8IndexTTS25Environment",
     "T8IndexTTS25Extension",
     "comfy_entrypoint",
 ]

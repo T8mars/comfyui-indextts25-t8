@@ -16,6 +16,11 @@ EMOTION_NODE = "T8_IndexTTS25_EmotionControl"
 SAMPLING_NODE = "T8_IndexTTS25_SamplingConfig"
 PRONUNCIATION_NODE = "T8_IndexTTS25_Pronunciation"
 GENERATE_NODE = "T8_IndexTTS25_Generate"
+VOICE_NODE = "T8_IndexTTS25_VoiceProfile"
+ROLE_LIBRARY_NODE = "T8_IndexTTS25_RoleLibrary"
+DIALOGUE_SCRIPT_NODE = "T8_IndexTTS25_DialogueScript"
+DIALOGUE_GENERATE_NODE = "T8_IndexTTS25_DialogueGenerate"
+ENVIRONMENT_NODE = "T8_IndexTTS25_Environment"
 
 
 def widget_input(name: str, data_type: str, *, optional: bool = False) -> dict[str, Any]:
@@ -131,13 +136,14 @@ def add_model(workflow: Workflow, pos=(0, 0), *, release_after_run: bool = False
             widget_input("model_name", "COMBO"),
             widget_input("device", "COMBO"),
             widget_input("precision", "COMBO"),
+            widget_input("acceleration_mode", "COMBO"),
             widget_input("use_cuda_kernel", "BOOLEAN"),
             widget_input("release_after_run", "BOOLEAN"),
             widget_input("verify_hashes", "BOOLEAN"),
             widget_input("custom_model_path", "STRING", optional=True),
         ],
         [output("model", "T8_INDEXTTS25_MODEL"), output("model_info", "STRING")],
-        ["IndexTTS-2.5", "auto", "auto", False, release_after_run, False, ""],
+        ["IndexTTS-2.5", "auto", "auto", "off", False, release_after_run, False, ""],
     )
 
 
@@ -305,6 +311,74 @@ def add_save(workflow: Workflow, prefix: str, pos=(1460, 180), *, title: str | N
     )
 
 
+def add_voice_profile(workflow: Workflow, role: str, language: str, pos=(400, 0)) -> int:
+    return workflow.add(
+        VOICE_NODE,
+        pos,
+        (360, 240),
+        [
+            widget_input("role_name", "STRING"),
+            slot_input("speaker_audio", "AUDIO"),
+            widget_input("language", "COMBO"),
+            slot_input("emotion", "T8_INDEXTTS25_EMOTION", optional=True),
+        ],
+        [output("voice", "T8_INDEXTTS25_VOICE"), output("voice_info", "STRING")],
+        [role, language],
+        title=f"角色音色：{role}",
+    )
+
+
+def add_role_library(workflow: Workflow, count: int, pos=(800, 40)) -> int:
+    return workflow.add(
+        ROLE_LIBRARY_NODE,
+        pos,
+        (360, 140 + count * 35),
+        [slot_input(f"voices.voice_{index}", "T8_INDEXTTS25_VOICE", optional=index > 0) for index in range(count)],
+        [output("role_library", "T8_INDEXTTS25_ROLE_LIBRARY"), output("role_info", "STRING")],
+    )
+
+
+def add_dialogue_script(workflow: Workflow, script_type: str, script: str, default_role: str, pos=(400, 620)) -> int:
+    return workflow.add(
+        DIALOGUE_SCRIPT_NODE,
+        pos,
+        (520, 390),
+        [
+            widget_input("script_type", "COMBO"),
+            widget_input("script", "STRING"),
+            widget_input("default_role", "STRING"),
+            widget_input("default_language", "COMBO"),
+        ],
+        [output("dialogue_script", "T8_INDEXTTS25_DIALOGUE_SCRIPT"), output("script_preview", "STRING")],
+        [script_type, script, default_role, "ZH"],
+    )
+
+
+def add_dialogue_generate(workflow: Workflow, pos=(1220, 240), *, policy="shift", fit=False) -> int:
+    return workflow.add(
+        DIALOGUE_GENERATE_NODE,
+        pos,
+        (470, 450),
+        [
+            slot_input("model", "T8_INDEXTTS25_MODEL"),
+            slot_input("role_library", "T8_INDEXTTS25_ROLE_LIBRARY"),
+            slot_input("dialogue_script", "T8_INDEXTTS25_DIALOGUE_SCRIPT"),
+            slot_input("sampling", "T8_INDEXTTS25_SAMPLING", optional=True),
+            widget_input("seed", "INT"),
+            widget_input("timeline_policy", "COMBO"),
+            widget_input("fit_srt_slots", "BOOLEAN"),
+            widget_input("fit_tolerance_ms", "INT"),
+            widget_input("batch_gap_ms", "INT"),
+        ],
+        [
+            output("audio", "AUDIO"),
+            output("line_audios", "AUDIO"),
+            output("generation_report", "STRING"),
+        ],
+        [20260818, "fixed", policy, fit, 180, 200],
+    )
+
+
 def wire_generation(
     workflow: Workflow,
     model: int,
@@ -331,6 +405,7 @@ def api_model(*, release_after_run: bool = False) -> dict[str, Any]:
             "model_name": "IndexTTS-2.5",
             "device": "auto",
             "precision": "auto",
+            "acceleration_mode": "off",
             "use_cuda_kernel": False,
             "release_after_run": release_after_run,
             "verify_hashes": False,
@@ -408,6 +483,48 @@ def api_emotion(mode: str, **values: Any) -> dict[str, Any]:
     elif mode != "speaker":
         raise ValueError(f"Unsupported emotion mode: {mode}")
     return {"class_type": EMOTION_NODE, "inputs": inputs}
+
+
+def api_voice(role: str, audio_id: str, language: str = "ZH") -> dict[str, Any]:
+    return {
+        "class_type": VOICE_NODE,
+        "inputs": {"role_name": role, "speaker_audio": [audio_id, 0], "language": language},
+    }
+
+
+def api_role_library(voice_ids: list[str]) -> dict[str, Any]:
+    return {
+        "class_type": ROLE_LIBRARY_NODE,
+        "inputs": {f"voices.voice_{index}": [voice_id, 0] for index, voice_id in enumerate(voice_ids)},
+    }
+
+
+def api_dialogue_script(script_type: str, script: str, default_role: str) -> dict[str, Any]:
+    return {
+        "class_type": DIALOGUE_SCRIPT_NODE,
+        "inputs": {
+            "script_type": script_type,
+            "script": script,
+            "default_role": default_role,
+            "default_language": "ZH",
+        },
+    }
+
+
+def api_dialogue_generate(model_id: str, library_id: str, script_id: str, *, policy="shift", fit=False) -> dict[str, Any]:
+    return {
+        "class_type": DIALOGUE_GENERATE_NODE,
+        "inputs": {
+            "model": [model_id, 0],
+            "role_library": [library_id, 0],
+            "dialogue_script": [script_id, 0],
+            "seed": 20260818,
+            "timeline_policy": policy,
+            "fit_srt_slots": fit,
+            "fit_tolerance_ms": 180,
+            "batch_gap_ms": 200,
+        },
+    }
 
 
 def api_sampling(**overrides: Any) -> dict[str, Any]:
@@ -632,6 +749,96 @@ def japanese_pronunciation_pair() -> tuple[dict[str, Any], dict[str, Any]]:
     )
 
 
+def _dialogue_pair(title: str, script_type: str, script: str, *, policy="shift", fit=False) -> tuple[dict[str, Any], dict[str, Any]]:
+    workflow = Workflow(title)
+    model = add_model(workflow, pos=(0, 0))
+    audio_a = add_load_audio(workflow, "role_a.wav", pos=(0, 340), title="角色 A 参考音频")
+    audio_b = add_load_audio(workflow, "role_b.wav", pos=(0, 520), title="角色 B 参考音频")
+    voice_a = add_voice_profile(workflow, "角色A", "ZH", pos=(400, 0))
+    voice_b = add_voice_profile(workflow, "角色B", "ZH", pos=(400, 300))
+    library = add_role_library(workflow, 2, pos=(800, 60))
+    script_node = add_dialogue_script(workflow, script_type, script, "角色A", pos=(650, 520))
+    generate = add_dialogue_generate(workflow, pos=(1220, 220), policy=policy, fit=fit)
+    save = add_save(workflow, f"IndexTTS25_T8/{script_type}_dialogue", pos=(1760, 360))
+    workflow.connect(audio_a, "AUDIO", voice_a, "speaker_audio")
+    workflow.connect(audio_b, "AUDIO", voice_b, "speaker_audio")
+    workflow.connect(voice_a, "voice", library, "voices.voice_0")
+    workflow.connect(voice_b, "voice", library, "voices.voice_1")
+    workflow.connect(model, "model", generate, "model")
+    workflow.connect(library, "role_library", generate, "role_library")
+    workflow.connect(script_node, "dialogue_script", generate, "dialogue_script")
+    workflow.connect(generate, "audio", save, "audio")
+    api = {
+        "1": api_model(),
+        "2": api_audio("role_a.wav"),
+        "3": api_audio("role_b.wav"),
+        "4": api_voice("角色A", "2"),
+        "5": api_voice("角色B", "3"),
+        "6": api_role_library(["4", "5"]),
+        "7": api_dialogue_script(script_type, script, "角色A"),
+        "8": api_dialogue_generate("1", "6", "7", policy=policy, fit=fit),
+        "9": api_save("8", f"IndexTTS25_T8/{script_type}_dialogue"),
+    }
+    return workflow.as_dict(), api
+
+
+def multi_role_pair() -> tuple[dict[str, Any], dict[str, Any]]:
+    return _dialogue_pair(
+        "11 多角色对话",
+        "batch",
+        "角色A|你终于来了，我们开始吧。|ZH|1.0\n角色B|好，我已经准备好了。|ZH|0.95\n角色A|第一幕，现在开始。|ZH|1.05",
+    )
+
+
+def batch_dialogue_pair() -> tuple[dict[str, Any], dict[str, Any]]:
+    script = json.dumps(
+        [
+            {"role": "角色A", "text": "第一条批量台词。", "language": "ZH", "duration_factor": 0.9},
+            {"role": "角色A", "text": "第二条批量台词。", "language": "ZH", "duration_factor": 1.0},
+            {"role": "角色B", "text": "最后由另一个角色收尾。", "language": "ZH", "duration_factor": 1.1},
+        ],
+        ensure_ascii=False,
+        indent=2,
+    )
+    return _dialogue_pair("12 JSON 批量台词", "batch", script)
+
+
+def srt_dialogue_pair() -> tuple[dict[str, Any], dict[str, Any]]:
+    script = (
+        "1\n00:00:00,500 --> 00:00:02,600\n[角色A] 这是第一条字幕。\n\n"
+        "2\n00:00:02,800 --> 00:00:05,000\n角色B：这是第二条字幕，会尝试贴合时间槽位。"
+    )
+    return _dialogue_pair("13 SRT 多角色配音", "srt", script, policy="shift", fit=True)
+
+
+def acceleration_pair() -> tuple[dict[str, Any], dict[str, Any]]:
+    workflow = Workflow("14 可选加速与环境诊断")
+    model = add_model(workflow)
+    workflow.nodes[model - 1]["widgets_values"][3] = "auto_safe"
+    speaker = add_load_audio(workflow, "voice_reference.wav", title="音色参考音频")
+    environment = workflow.add(
+        ENVIRONMENT_NODE,
+        (440, 0),
+        (390, 140),
+        [widget_input("device", "COMBO")],
+        [output("environment_report", "STRING")],
+        ["auto"],
+    )
+    generate = add_generate(workflow, "这是可选加速模式的安全回退测试。", "ZH", 1.0, 20260818, pos=(900, 180))
+    save = add_save(workflow, "IndexTTS25_T8/optional_acceleration")
+    wire_generation(workflow, model, speaker, generate, save)
+    model_api = api_model()
+    model_api["inputs"]["acceleration_mode"] = "auto_safe"
+    api = {
+        "1": model_api,
+        "2": api_audio("voice_reference.wav"),
+        "3": {"class_type": ENVIRONMENT_NODE, "inputs": {"device": "auto"}},
+        "4": api_generate("1", "2", "这是可选加速模式的安全回退测试。", "ZH", 1.0, 20260818),
+        "5": api_save("4", "IndexTTS25_T8/optional_acceleration"),
+    }
+    return workflow.as_dict(), api
+
+
 EXAMPLES = {
     "01_basic_voice_clone": basic_pair,
     "02_speed_comparison": speed_pair,
@@ -643,6 +850,10 @@ EXAMPLES = {
     "08_chinese_pronunciation": chinese_pronunciation_pair,
     "09_english_cmu_pronunciation": english_pronunciation_pair,
     "10_japanese_kana_pronunciation": japanese_pronunciation_pair,
+    "11_multi_role_dialogue": multi_role_pair,
+    "12_batch_dialogue_json": batch_dialogue_pair,
+    "13_srt_multi_role": srt_dialogue_pair,
+    "14_optional_acceleration": acceleration_pair,
 }
 
 

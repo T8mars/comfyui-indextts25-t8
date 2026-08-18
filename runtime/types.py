@@ -13,20 +13,50 @@ class ModelHandle:
     device: str
     use_bf16: bool
     use_cuda_kernel: bool = False
+    use_torch_compile: bool = False
+    use_accel: bool = False
+    use_deepspeed: bool = False
+    acceleration_requested: str = "off"
+    acceleration_effective: str = "off"
+    acceleration_note: str = ""
     release_after_run: bool = False
     model_revision: str = ""
     low_vram: bool = False
 
     @property
-    def cache_key(self) -> tuple[str, str, bool, bool, str, bool]:
+    def cache_key(self) -> tuple:
         return (
             str(self.model_dir.resolve()),
             self.device,
             self.use_bf16,
             self.use_cuda_kernel,
+            self.use_torch_compile,
+            self.use_accel,
+            self.use_deepspeed,
             self.model_revision,
             self.low_vram,
         )
+
+
+@dataclass(slots=True)
+class VoiceProfile:
+    """Workflow-local named voice and its optional default emotion."""
+
+    name: str
+    speaker_audio: dict[str, Any]
+    language: str = "ZH"
+    emotion: "EmotionConfig | None" = None
+
+
+@dataclass(slots=True)
+class RoleLibrary:
+    profiles: dict[str, VoiceProfile]
+
+
+@dataclass(slots=True)
+class DialogueScript:
+    lines: list[Any]
+    script_type: str = "batch"
 
 
 @dataclass(slots=True)

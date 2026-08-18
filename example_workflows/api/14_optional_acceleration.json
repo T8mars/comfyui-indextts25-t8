@@ -5,7 +5,7 @@
       "model_name": "IndexTTS-2.5",
       "device": "auto",
       "precision": "auto",
-      "acceleration_mode": "off",
+      "acceleration_mode": "auto_safe",
       "use_cuda_kernel": false,
       "release_after_run": false,
       "verify_hashes": false,
@@ -19,12 +19,9 @@
     }
   },
   "3": {
-    "class_type": "T8_IndexTTS25_Pronunciation",
+    "class_type": "T8_IndexTTS25_Environment",
     "inputs": {
-      "text": "He had a <minute|M IH1 . N AH0 T> to examine the <minute|M AY0 . N UW1 T> details.",
-      "language": "EN",
-      "dictionary": "Bilibili|B IY1 . L IY1 . B IY1 . L IY1|EN",
-      "strict": true
+      "device": "auto"
     }
   },
   "4": {
@@ -38,13 +35,10 @@
         "2",
         0
       ],
-      "text": [
-        "3",
-        0
-      ],
-      "language": "EN",
+      "text": "这是可选加速模式的安全回退测试。",
+      "language": "ZH",
       "duration_factor": 1.0,
-      "seed": 20260811
+      "seed": 20260818
     }
   },
   "5": {
@@ -54,7 +48,7 @@
         "4",
         0
       ],
-      "filename_prefix": "IndexTTS25_T8/pronunciation_en"
+      "filename_prefix": "IndexTTS25_T8/optional_acceleration"
     }
   }
 }

@@ -38,7 +38,8 @@ def test_discover_and_validate_model_directory(tmp_path: Path, monkeypatch):
 def test_manifest_is_pinned_to_formal_index_tts_25():
     manifest = model_store.load_manifest()
     assert manifest["codeRevision"] == "ee40fa7d6c6b8a2c7f06105f9f1e65775b74868c"
-    assert manifest["modelRevision"] == "ba2480d9f7f629eb18f6acaebb357679d9ba88a4"
+    assert manifest["modelRevision"] == "c39ce5ba981572cb187443877ff559dfb246ce63"
+    assert manifest["files"]["config.yaml"]["sha256"] == "18adf417be3e8f5e2e48e30f7420c719170a6870619436250f360d626877870e"
     assert manifest["modelRepository"] == "IndexTeam/IndexTTS-2.5"
 
 

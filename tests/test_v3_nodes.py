@@ -24,7 +24,7 @@ def _load_plugin():
     return module
 
 
-def test_registers_exactly_five_pure_v3_nodes():
+def test_registers_all_pure_v3_nodes():
     plugin = _load_plugin()
     extension = asyncio.run(plugin.comfy_entrypoint())
     nodes = asyncio.run(extension.get_node_list())
@@ -35,9 +35,15 @@ def test_registers_exactly_five_pure_v3_nodes():
         "T8_IndexTTS25_SamplingConfig",
         "T8_IndexTTS25_Pronunciation",
         "T8_IndexTTS25_Generate",
+        "T8_IndexTTS25_VoiceProfile",
+        "T8_IndexTTS25_RoleLibrary",
+        "T8_IndexTTS25_DialogueScript",
+        "T8_IndexTTS25_DialogueGenerate",
+        "T8_IndexTTS25_Environment",
     ]
     assert all(schema.category == "T8star-Aix/Audio/IndexTTS 2.5" for schema in schemas)
-    assert schemas[-1].outputs[0].io_type == "AUDIO"
+    assert schemas[4].outputs[0].io_type == "AUDIO"
+    assert schemas[8].outputs[0].io_type == "AUDIO"
     assert not hasattr(plugin, "NODE_CLASS_MAPPINGS")
 
 

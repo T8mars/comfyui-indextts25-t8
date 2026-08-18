@@ -5,6 +5,7 @@
       "model_name": "IndexTTS-2.5",
       "device": "auto",
       "precision": "auto",
+      "acceleration_mode": "off",
       "use_cuda_kernel": false,
       "release_after_run": false,
       "verify_hashes": false,

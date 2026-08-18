@@ -1,6 +1,6 @@
 {
-  "last_node_id": 8,
-  "last_link_id": 9,
+  "last_node_id": 9,
+  "last_link_id": 8,
   "nodes": [
     {
       "id": 1,
@@ -88,9 +88,7 @@
           "name": "model",
           "type": "T8_INDEXTTS25_MODEL",
           "links": [
-            1,
-            4,
-            7
+            5
           ]
         },
         {
@@ -144,9 +142,7 @@
           "name": "AUDIO",
           "type": "AUDIO",
           "links": [
-            2,
-            5,
-            8
+            1
           ]
         }
       ],
@@ -156,29 +152,143 @@
         "ver": "0.2.0"
       },
       "widgets_values": [
-        "voice_reference.wav"
+        "role_a.wav"
       ],
-      "title": "音色参考音频"
+      "title": "角色 A 参考音频"
     },
     {
       "id": 3,
-      "type": "T8_IndexTTS25_Generate",
+      "type": "LoadAudio",
       "pos": [
-        900,
-        0
+        0,
+        520
       ],
       "size": [
-        470,
-        390
+        330,
+        130
       ],
       "flags": {},
       "order": 2,
       "mode": 0,
       "inputs": [
         {
-          "name": "model",
-          "type": "T8_INDEXTTS25_MODEL",
+          "name": "audio",
+          "type": "COMBO",
+          "widget": {
+            "name": "audio"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "AUDIO",
+          "type": "AUDIO",
+          "links": [
+            2
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadAudio",
+        "cnr_id": "comfy-core",
+        "ver": "0.2.0"
+      },
+      "widgets_values": [
+        "role_b.wav"
+      ],
+      "title": "角色 B 参考音频"
+    },
+    {
+      "id": 4,
+      "type": "T8_IndexTTS25_VoiceProfile",
+      "pos": [
+        400,
+        0
+      ],
+      "size": [
+        360,
+        240
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "role_name",
+          "type": "STRING",
+          "widget": {
+            "name": "role_name"
+          },
+          "link": null
+        },
+        {
+          "name": "speaker_audio",
+          "type": "AUDIO",
           "link": 1
+        },
+        {
+          "name": "language",
+          "type": "COMBO",
+          "widget": {
+            "name": "language"
+          },
+          "link": null
+        },
+        {
+          "name": "emotion",
+          "type": "T8_INDEXTTS25_EMOTION",
+          "link": null,
+          "shape": 7
+        }
+      ],
+      "outputs": [
+        {
+          "name": "voice",
+          "type": "T8_INDEXTTS25_VOICE",
+          "links": [
+            3
+          ]
+        },
+        {
+          "name": "voice_info",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "T8_IndexTTS25_VoiceProfile",
+        "cnr_id": "comfyui-indextts25-t8",
+        "ver": "0.2.0"
+      },
+      "widgets_values": [
+        "角色A",
+        "ZH"
+      ],
+      "title": "角色音色：角色A"
+    },
+    {
+      "id": 5,
+      "type": "T8_IndexTTS25_VoiceProfile",
+      "pos": [
+        400,
+        300
+      ],
+      "size": [
+        360,
+        240
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "role_name",
+          "type": "STRING",
+          "widget": {
+            "name": "role_name"
+          },
+          "link": null
         },
         {
           "name": "speaker_audio",
@@ -186,14 +296,6 @@
           "link": 2
         },
         {
-          "name": "text",
-          "type": "STRING",
-          "widget": {
-            "name": "text"
-          },
-          "link": null
-        },
-        {
           "name": "language",
           "type": "COMBO",
           "widget": {
@@ -202,259 +304,93 @@
           "link": null
         },
         {
-          "name": "duration_factor",
-          "type": "FLOAT",
-          "widget": {
-            "name": "duration_factor"
-          },
-          "link": null
-        },
-        {
-          "name": "seed",
-          "type": "INT",
-          "widget": {
-            "name": "seed"
-          },
-          "link": null
-        },
-        {
           "name": "emotion",
           "type": "T8_INDEXTTS25_EMOTION",
           "link": null,
           "shape": 7
-        },
-        {
-          "name": "sampling",
-          "type": "T8_INDEXTTS25_SAMPLING",
-          "link": null,
-          "shape": 7
         }
       ],
       "outputs": [
         {
-          "name": "audio",
-          "type": "AUDIO",
+          "name": "voice",
+          "type": "T8_INDEXTTS25_VOICE",
           "links": [
-            3
+            4
           ]
         },
         {
-          "name": "generation_info",
+          "name": "voice_info",
           "type": "STRING",
           "links": []
         }
       ],
       "properties": {
-        "Node name for S&R": "T8_IndexTTS25_Generate",
+        "Node name for S&R": "T8_IndexTTS25_VoiceProfile",
         "cnr_id": "comfyui-indextts25-t8",
         "ver": "0.2.0"
       },
       "widgets_values": [
-        "这是 IndexTTS 二点五官方语速适配功能的对比测试。",
-        "ZH",
-        0.7,
-        20260811,
-        "fixed"
+        "角色B",
+        "ZH"
       ],
-      "title": "时长系数 0.7 · fast"
-    },
-    {
-      "id": 4,
-      "type": "SaveAudio",
-      "pos": [
-        1460,
-        130
-      ],
-      "size": [
-        320,
-        130
-      ],
-      "flags": {},
-      "order": 3,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "audio",
-          "type": "AUDIO",
-          "link": 3
-        },
-        {
-          "name": "filename_prefix",
-          "type": "STRING",
-          "widget": {
-            "name": "filename_prefix"
-          },
-          "link": null
-        }
-      ],
-      "outputs": [
-        {
-          "name": "audio",
-          "type": "AUDIO",
-          "links": []
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "SaveAudio",
-        "cnr_id": "comfy-core",
-        "ver": "0.2.0"
-      },
-      "widgets_values": [
-        "IndexTTS25_T8/speed_0.7"
-      ]
-    },
-    {
-      "id": 5,
-      "type": "T8_IndexTTS25_Generate",
-      "pos": [
-        900,
-        470
-      ],
-      "size": [
-        470,
-        390
-      ],
-      "flags": {},
-      "order": 4,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "model",
-          "type": "T8_INDEXTTS25_MODEL",
-          "link": 4
-        },
-        {
-          "name": "speaker_audio",
-          "type": "AUDIO",
-          "link": 5
-        },
-        {
-          "name": "text",
-          "type": "STRING",
-          "widget": {
-            "name": "text"
-          },
-          "link": null
-        },
-        {
-          "name": "language",
-          "type": "COMBO",
-          "widget": {
-            "name": "language"
-          },
-          "link": null
-        },
-        {
-          "name": "duration_factor",
-          "type": "FLOAT",
-          "widget": {
-            "name": "duration_factor"
-          },
-          "link": null
-        },
-        {
-          "name": "seed",
-          "type": "INT",
-          "widget": {
-            "name": "seed"
-          },
-          "link": null
-        },
-        {
-          "name": "emotion",
-          "type": "T8_INDEXTTS25_EMOTION",
-          "link": null,
-          "shape": 7
-        },
-        {
-          "name": "sampling",
-          "type": "T8_INDEXTTS25_SAMPLING",
-          "link": null,
-          "shape": 7
-        }
-      ],
-      "outputs": [
-        {
-          "name": "audio",
-          "type": "AUDIO",
-          "links": [
-            6
-          ]
-        },
-        {
-          "name": "generation_info",
-          "type": "STRING",
-          "links": []
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "T8_IndexTTS25_Generate",
-        "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.2.0"
-      },
-      "widgets_values": [
-        "这是 IndexTTS 二点五官方语速适配功能的对比测试。",
-        "ZH",
-        1.0,
-        20260811,
-        "fixed"
-      ],
-      "title": "时长系数 1.0 · normal"
+      "title": "角色音色：角色B"
     },
     {
       "id": 6,
-      "type": "SaveAudio",
+      "type": "T8_IndexTTS25_RoleLibrary",
       "pos": [
-        1460,
-        600
+        800,
+        60
       ],
       "size": [
-        320,
-        130
+        360,
+        210
       ],
       "flags": {},
       "order": 5,
       "mode": 0,
       "inputs": [
         {
-          "name": "audio",
-          "type": "AUDIO",
-          "link": 6
+          "name": "voices.voice_0",
+          "type": "T8_INDEXTTS25_VOICE",
+          "link": 3
         },
         {
-          "name": "filename_prefix",
-          "type": "STRING",
-          "widget": {
-            "name": "filename_prefix"
-          },
-          "link": null
+          "name": "voices.voice_1",
+          "type": "T8_INDEXTTS25_VOICE",
+          "link": 4,
+          "shape": 7
         }
       ],
       "outputs": [
         {
-          "name": "audio",
-          "type": "AUDIO",
+          "name": "role_library",
+          "type": "T8_INDEXTTS25_ROLE_LIBRARY",
+          "links": [
+            6
+          ]
+        },
+        {
+          "name": "role_info",
+          "type": "STRING",
           "links": []
         }
       ],
       "properties": {
-        "Node name for S&R": "SaveAudio",
-        "cnr_id": "comfy-core",
+        "Node name for S&R": "T8_IndexTTS25_RoleLibrary",
+        "cnr_id": "comfyui-indextts25-t8",
         "ver": "0.2.0"
-      },
-      "widgets_values": [
-        "IndexTTS25_T8/speed_1.0"
-      ]
+      }
     },
     {
       "id": 7,
-      "type": "T8_IndexTTS25_Generate",
+      "type": "T8_IndexTTS25_DialogueScript",
       "pos": [
-        900,
-        940
+        650,
+        520
       ],
       "size": [
-        470,
+        520,
         390
       ],
       "flags": {},
@@ -462,38 +398,99 @@
       "mode": 0,
       "inputs": [
         {
+          "name": "script_type",
+          "type": "COMBO",
+          "widget": {
+            "name": "script_type"
+          },
+          "link": null
+        },
+        {
+          "name": "script",
+          "type": "STRING",
+          "widget": {
+            "name": "script"
+          },
+          "link": null
+        },
+        {
+          "name": "default_role",
+          "type": "STRING",
+          "widget": {
+            "name": "default_role"
+          },
+          "link": null
+        },
+        {
+          "name": "default_language",
+          "type": "COMBO",
+          "widget": {
+            "name": "default_language"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "dialogue_script",
+          "type": "T8_INDEXTTS25_DIALOGUE_SCRIPT",
+          "links": [
+            7
+          ]
+        },
+        {
+          "name": "script_preview",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "T8_IndexTTS25_DialogueScript",
+        "cnr_id": "comfyui-indextts25-t8",
+        "ver": "0.2.0"
+      },
+      "widgets_values": [
+        "batch",
+        "[\n  {\n    \"role\": \"角色A\",\n    \"text\": \"第一条批量台词。\",\n    \"language\": \"ZH\",\n    \"duration_factor\": 0.9\n  },\n  {\n    \"role\": \"角色A\",\n    \"text\": \"第二条批量台词。\",\n    \"language\": \"ZH\",\n    \"duration_factor\": 1.0\n  },\n  {\n    \"role\": \"角色B\",\n    \"text\": \"最后由另一个角色收尾。\",\n    \"language\": \"ZH\",\n    \"duration_factor\": 1.1\n  }\n]",
+        "角色A",
+        "ZH"
+      ]
+    },
+    {
+      "id": 8,
+      "type": "T8_IndexTTS25_DialogueGenerate",
+      "pos": [
+        1220,
+        220
+      ],
+      "size": [
+        470,
+        450
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
           "name": "model",
           "type": "T8_INDEXTTS25_MODEL",
+          "link": 5
+        },
+        {
+          "name": "role_library",
+          "type": "T8_INDEXTTS25_ROLE_LIBRARY",
+          "link": 6
+        },
+        {
+          "name": "dialogue_script",
+          "type": "T8_INDEXTTS25_DIALOGUE_SCRIPT",
           "link": 7
         },
         {
-          "name": "speaker_audio",
-          "type": "AUDIO",
-          "link": 8
-        },
-        {
-          "name": "text",
-          "type": "STRING",
-          "widget": {
-            "name": "text"
-          },
-          "link": null
-        },
-        {
-          "name": "language",
-          "type": "COMBO",
-          "widget": {
-            "name": "language"
-          },
-          "link": null
-        },
-        {
-          "name": "duration_factor",
-          "type": "FLOAT",
-          "widget": {
-            "name": "duration_factor"
-          },
-          "link": null
+          "name": "sampling",
+          "type": "T8_INDEXTTS25_SAMPLING",
+          "link": null,
+          "shape": 7
         },
         {
           "name": "seed",
@@ -504,16 +501,36 @@
           "link": null
         },
         {
-          "name": "emotion",
-          "type": "T8_INDEXTTS25_EMOTION",
-          "link": null,
-          "shape": 7
+          "name": "timeline_policy",
+          "type": "COMBO",
+          "widget": {
+            "name": "timeline_policy"
+          },
+          "link": null
         },
         {
-          "name": "sampling",
-          "type": "T8_INDEXTTS25_SAMPLING",
-          "link": null,
-          "shape": 7
+          "name": "fit_srt_slots",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "fit_srt_slots"
+          },
+          "link": null
+        },
+        {
+          "name": "fit_tolerance_ms",
+          "type": "INT",
+          "widget": {
+            "name": "fit_tolerance_ms"
+          },
+          "link": null
+        },
+        {
+          "name": "batch_gap_ms",
+          "type": "INT",
+          "widget": {
+            "name": "batch_gap_ms"
+          },
+          "link": null
         }
       ],
       "outputs": [
@@ -521,48 +538,53 @@
           "name": "audio",
           "type": "AUDIO",
           "links": [
-            9
+            8
           ]
         },
         {
-          "name": "generation_info",
+          "name": "line_audios",
+          "type": "AUDIO",
+          "links": []
+        },
+        {
+          "name": "generation_report",
           "type": "STRING",
           "links": []
         }
       ],
       "properties": {
-        "Node name for S&R": "T8_IndexTTS25_Generate",
+        "Node name for S&R": "T8_IndexTTS25_DialogueGenerate",
         "cnr_id": "comfyui-indextts25-t8",
         "ver": "0.2.0"
       },
       "widgets_values": [
-        "这是 IndexTTS 二点五官方语速适配功能的对比测试。",
-        "ZH",
-        1.3,
-        20260811,
-        "fixed"
-      ],
-      "title": "时长系数 1.3 · slow"
+        20260818,
+        "fixed",
+        "shift",
+        false,
+        180,
+        200
+      ]
     },
     {
-      "id": 8,
+      "id": 9,
       "type": "SaveAudio",
       "pos": [
-        1460,
-        1070
+        1760,
+        360
       ],
       "size": [
         320,
         130
       ],
       "flags": {},
-      "order": 7,
+      "order": 8,
       "mode": 0,
       "inputs": [
         {
           "name": "audio",
           "type": "AUDIO",
-          "link": 9
+          "link": 8
         },
         {
           "name": "filename_prefix",
@@ -586,92 +608,84 @@
         "ver": "0.2.0"
       },
       "widgets_values": [
-        "IndexTTS25_T8/speed_1.3"
+        "IndexTTS25_T8/batch_dialogue"
       ]
     }
   ],
   "links": [
     [
       1,
-      1,
-      0,
-      3,
-      0,
-      "T8_INDEXTTS25_MODEL"
-    ],
-    [
       2,
-      2,
-      0,
-      3,
-      1,
-      "AUDIO"
-    ],
-    [
-      3,
-      3,
       0,
       4,
-      0,
+      1,
       "AUDIO"
     ],
     [
-      4,
-      1,
-      0,
-      5,
-      0,
-      "T8_INDEXTTS25_MODEL"
-    ],
-    [
-      5,
       2,
+      3,
       0,
       5,
       1,
       "AUDIO"
     ],
     [
-      6,
-      5,
+      3,
+      4,
       0,
       6,
       0,
-      "AUDIO"
+      "T8_INDEXTTS25_VOICE"
+    ],
+    [
+      4,
+      5,
+      0,
+      6,
+      1,
+      "T8_INDEXTTS25_VOICE"
+    ],
+    [
+      5,
+      1,
+      0,
+      8,
+      0,
+      "T8_INDEXTTS25_MODEL"
+    ],
+    [
+      6,
+      6,
+      0,
+      8,
+      1,
+      "T8_INDEXTTS25_ROLE_LIBRARY"
     ],
     [
       7,
-      1,
-      0,
       7,
       0,
-      "T8_INDEXTTS25_MODEL"
+      8,
+      2,
+      "T8_INDEXTTS25_DIALOGUE_SCRIPT"
     ],
     [
       8,
-      2,
+      8,
       0,
-      7,
-      1,
-      "AUDIO"
-    ],
-    [
       9,
-      7,
-      0,
-      8,
       0,
       "AUDIO"
     ]
   ],
   "groups": [
     {
-      "title": "02 官方语速适配对比 · B站：T8star-Aix",
+      "title": "12 JSON 批量台词 · B站：T8star-Aix",
       "bounding": [
         -40,
         -60,
-        1860,
-        1410
+        2160,
+        990
       ],
       "color": "#3f789e",
       "font_size": 24,

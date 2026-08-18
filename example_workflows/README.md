@@ -19,6 +19,10 @@
 | `08_chinese_pronunciation.json` | 中文多音字词典、长词优先和手工标注优先 | `voice_reference.wav` |
 | `09_english_cmu_pronunciation.json` | 英文同形异音与 CMU 音素校验 | `voice_reference.wav` |
 | `10_japanese_kana_pronunciation.json` | 日语假名发音控制 | `voice_reference.wav` |
+| `11_multi_role_dialogue.json` | 两个角色音色与多轮对话 | `role_a.wav`、`role_b.wav` |
+| `12_batch_dialogue_json.json` | JSON 批量台词、逐句与合并 AUDIO | `role_a.wav`、`role_b.wav` |
+| `13_srt_multi_role.json` | SRT 角色标记、时间轴和槽位适配 | `role_a.wav`、`role_b.wav` |
+| `14_optional_acceleration.json` | `auto_safe` 加速回退与环境诊断 | `voice_reference.wav` |
 
 ## 使用方法
 
@@ -27,6 +31,9 @@
 3. 从 `ui/` 打开工作流并排队运行。
 4. API 用户可直接读取 `api/` 下的同名文件提交；这些文件使用当前 ComfyUI V3 动态输入要求的
    `mode.xxx` 扁平路径格式。
+
+角色音色库同样使用 V3 自动增长扁平路径 `voices.voice_0`、`voices.voice_1`。SRT 示例开启了最多一次
+二次推理的时长适配；最终是否超时请读取生成报告，不应把它当作逐帧精确的字幕对齐器。
 
 重新生成全部示例：
 

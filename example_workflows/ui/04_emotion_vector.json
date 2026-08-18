@@ -42,6 +42,14 @@
           "link": null
         },
         {
+          "name": "acceleration_mode",
+          "type": "COMBO",
+          "widget": {
+            "name": "acceleration_mode"
+          },
+          "link": null
+        },
+        {
           "name": "use_cuda_kernel",
           "type": "BOOLEAN",
           "widget": {
@@ -98,6 +106,7 @@
         "IndexTTS-2.5",
         "auto",
         "auto",
+        "off",
         false,
         false,
         false,

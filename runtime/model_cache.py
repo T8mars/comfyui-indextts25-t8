@@ -26,6 +26,8 @@ class CacheEntry:
     last_used: float = field(default_factory=time.monotonic)
     users: int = 0
     pending_release: bool = False
+    acceleration_effective: str | None = None
+    acceleration_note: str = ""
 
 
 def _load_core_class():
@@ -62,22 +64,53 @@ class ModelCache:
             if entry is not None:
                 entry.last_used = time.monotonic()
                 entry.users += 1
+                if entry.acceleration_effective is not None:
+                    handle.acceleration_effective = entry.acceleration_effective
+                    handle.acceleration_note = entry.acceleration_note
                 return entry
 
             IndexTTS2 = _load_core_class()
             LOGGER.info("Loading IndexTTS 2.5 from %s on %s", handle.model_dir, handle.device)
-            model = IndexTTS2(
-                cfg_path=str(handle.model_dir / "config.yaml"),
-                model_dir=str(handle.model_dir),
-                use_bf16=handle.use_bf16,
-                device=handle.device,
-                use_cuda_kernel=handle.use_cuda_kernel,
-                use_deepspeed=False,
-                use_accel=False,
-                use_torch_compile=False,
-                use_qwen_emo=False,
+            constructor_kwargs = {
+                "cfg_path": str(handle.model_dir / "config.yaml"),
+                "model_dir": str(handle.model_dir),
+                "use_bf16": handle.use_bf16,
+                "device": handle.device,
+                "use_cuda_kernel": handle.use_cuda_kernel,
+                "use_deepspeed": handle.use_deepspeed,
+                "use_accel": handle.use_accel,
+                "use_torch_compile": handle.use_torch_compile,
+                "use_qwen_emo": False,
+            }
+            try:
+                model = IndexTTS2(**constructor_kwargs)
+            except Exception as exc:
+                if handle.acceleration_effective == "off":
+                    raise
+                LOGGER.exception("Optional acceleration initialization failed; reloading normal mode")
+                gc.collect()
+                if handle.device.startswith("cuda") and torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+                constructor_kwargs.update(
+                    use_cuda_kernel=False,
+                    use_deepspeed=False,
+                    use_accel=False,
+                    use_torch_compile=False,
+                )
+                model = IndexTTS2(**constructor_kwargs)
+                handle.acceleration_effective = "off"
+                handle.acceleration_note = (
+                    f"可选加速初始化失败（{type(exc).__name__}: {exc}），已自动回退普通模式"
+                )
+            if handle.use_cuda_kernel and not bool(getattr(model, "use_cuda_kernel", False)):
+                handle.acceleration_effective = "off"
+                handle.acceleration_note = "BigVGAN CUDA 融合核加载失败，上游已自动回退普通实现"
+            entry = CacheEntry(
+                model=model,
+                users=1,
+                acceleration_effective=handle.acceleration_effective,
+                acceleration_note=handle.acceleration_note,
             )
-            entry = CacheEntry(model=model, users=1)
             self._entries[key] = entry
             return entry
 

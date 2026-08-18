@@ -2,11 +2,11 @@
   "codeRepository": "index-tts/index-tts",
   "codeRevision": "ee40fa7d6c6b8a2c7f06105f9f1e65775b74868c",
   "modelRepository": "IndexTeam/IndexTTS-2.5",
-  "modelRevision": "ba2480d9f7f629eb18f6acaebb357679d9ba88a4",
+  "modelRevision": "c39ce5ba981572cb187443877ff559dfb246ce63",
   "files": {
     "config.yaml": {
       "size": 2860,
-      "sha256": "d310ac2d0784e9b1fb093713ea136bd7d6a600c97a0ced89557222191c51ea9f"
+      "sha256": "18adf417be3e8f5e2e48e30f7420c719170a6870619436250f360d626877870e"
     },
     "gpt.pth": {
       "size": 3259599833,

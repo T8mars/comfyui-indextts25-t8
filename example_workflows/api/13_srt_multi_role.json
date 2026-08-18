@@ -1,0 +1,103 @@
+{
+  "1": {
+    "class_type": "T8_IndexTTS25_ModelLoader",
+    "inputs": {
+      "model_name": "IndexTTS-2.5",
+      "device": "auto",
+      "precision": "auto",
+      "acceleration_mode": "off",
+      "use_cuda_kernel": false,
+      "release_after_run": false,
+      "verify_hashes": false,
+      "custom_model_path": ""
+    }
+  },
+  "2": {
+    "class_type": "LoadAudio",
+    "inputs": {
+      "audio": "role_a.wav"
+    }
+  },
+  "3": {
+    "class_type": "LoadAudio",
+    "inputs": {
+      "audio": "role_b.wav"
+    }
+  },
+  "4": {
+    "class_type": "T8_IndexTTS25_VoiceProfile",
+    "inputs": {
+      "role_name": "角色A",
+      "speaker_audio": [
+        "2",
+        0
+      ],
+      "language": "ZH"
+    }
+  },
+  "5": {
+    "class_type": "T8_IndexTTS25_VoiceProfile",
+    "inputs": {
+      "role_name": "角色B",
+      "speaker_audio": [
+        "3",
+        0
+      ],
+      "language": "ZH"
+    }
+  },
+  "6": {
+    "class_type": "T8_IndexTTS25_RoleLibrary",
+    "inputs": {
+      "voices.voice_0": [
+        "4",
+        0
+      ],
+      "voices.voice_1": [
+        "5",
+        0
+      ]
+    }
+  },
+  "7": {
+    "class_type": "T8_IndexTTS25_DialogueScript",
+    "inputs": {
+      "script_type": "srt",
+      "script": "1\n00:00:00,500 --> 00:00:02,600\n[角色A] 这是第一条字幕。\n\n2\n00:00:02,800 --> 00:00:05,000\n角色B：这是第二条字幕，会尝试贴合时间槽位。",
+      "default_role": "角色A",
+      "default_language": "ZH"
+    }
+  },
+  "8": {
+    "class_type": "T8_IndexTTS25_DialogueGenerate",
+    "inputs": {
+      "model": [
+        "1",
+        0
+      ],
+      "role_library": [
+        "6",
+        0
+      ],
+      "dialogue_script": [
+        "7",
+        0
+      ],
+      "seed": 20260818,
+      "timeline_policy": "shift",
+      "fit_srt_slots": true,
+      "fit_tolerance_ms": 180,
+      "batch_gap_ms": 200
+    }
+  },
+  "9": {
+    "class_type": "SaveAudio",
+    "inputs": {
+      "audio": [
+        "8",
+        0
+      ],
+      "filename_prefix": "IndexTTS25_T8/srt_dialogue"
+    }
+  }
+}

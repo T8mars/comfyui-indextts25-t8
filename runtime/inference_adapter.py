@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import gc
+import time
 from typing import Any
 
 import torch
@@ -73,10 +74,28 @@ def run_inference(
 
     entry = MODEL_CACHE.acquire(handle)
     result = None
+    inference_error: Exception | None = None
+    started_at = time.perf_counter()
+    peak_memory_mb = None
     try:
         with entry.lock:
+            if handle.device.startswith("cuda") and torch.cuda.is_available():
+                torch.cuda.reset_peak_memory_stats()
             entry.model.gr_progress = _progress_callback()
+            accel_engine = getattr(getattr(entry.model, "gpt", None), "accel_engine", None)
+            accel_compatible = bool(
+                sampling.do_sample
+                and sampling.top_p == 1.0
+                and sampling.top_k == 0
+                and sampling.num_beams == 1
+                and sampling.repetition_penalty == 1.0
+                and sampling.length_penalty == 0.0
+            )
+            temporarily_disabled_accel = accel_engine is not None and not accel_compatible
             try:
+                if temporarily_disabled_accel:
+                    entry.model.gpt.accel_engine = None
+                    notes.append("当前采样参数与 GPT 加速语义不兼容，本次自动使用普通 GPT 路径")
                 if use_emo_text:
                     entry.model.ensure_qwen_emotion()
                     if handle.low_vram:
@@ -110,18 +129,63 @@ def run_inference(
                         **sampling.generation_kwargs(),
                     )
             finally:
+                if temporarily_disabled_accel:
+                    entry.model.gpt.accel_engine = accel_engine
                 entry.model.gr_progress = None
+                if handle.device.startswith("cuda") and torch.cuda.is_available():
+                    peak_memory_mb = torch.cuda.max_memory_allocated() / (1024 ** 2)
+    except Exception as exc:
+        inference_error = exc
     finally:
-        MODEL_CACHE.done(handle, entry, release=handle.release_after_run)
+        MODEL_CACHE.done(
+            handle,
+            entry,
+            release=handle.release_after_run
+            or bool(inference_error is not None and handle.acceleration_effective != "off"),
+        )
+
+    if inference_error is not None:
+        if handle.acceleration_effective != "off":
+            handle.use_cuda_kernel = False
+            handle.use_torch_compile = False
+            handle.use_accel = False
+            handle.use_deepspeed = False
+            handle.acceleration_effective = "off"
+            handle.acceleration_note = (
+                f"可选加速运行失败（{type(inference_error).__name__}: {inference_error}），"
+                "已自动重载普通模式"
+            )
+            try:
+                return run_inference(
+                    handle,
+                    speaker_audio,
+                    text,
+                    language,
+                    duration_factor,
+                    seed,
+                    emotion,
+                    sampling,
+                )
+            except Exception as fallback_error:
+                raise fallback_error from inference_error
+        raise inference_error
 
     if result is None:
         raise RuntimeError("IndexTTS 2.5 未生成音频。请缩短文本或提高 max_mel_tokens 后重试。")
     audio = indextts_result_to_audio(result)
+    elapsed = time.perf_counter() - started_at
     duration = audio["waveform"].shape[-1] / audio["sample_rate"]
+    rtf = elapsed / duration if duration > 0 else 0.0
     status = (
         f"IndexTTS 2.5 | {language.upper()} | {duration:.2f}s | "
-        f"duration_factor={float(duration_factor):.2f} | seed={int(seed)}"
+        f"耗时={elapsed:.2f}s | RTF={rtf:.3f} | "
+        f"duration_factor={float(duration_factor):.2f} | seed={int(seed)} | "
+        f"accel={handle.acceleration_effective}"
     )
+    if peak_memory_mb is not None:
+        status += f" | CUDA峰值={peak_memory_mb:.0f}MiB"
+    if handle.acceleration_note:
+        notes.append(handle.acceleration_note)
     if notes:
         status += " | " + "；".join(dict.fromkeys(notes))
     return audio, status

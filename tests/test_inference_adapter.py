@@ -111,3 +111,66 @@ def test_low_vram_adapter_releases_qwen_before_speech_generation(tmp_path: Path,
     assert fake.kwargs["emo_vector"][0] == 1.0
     assert fake.qwen_emo is None
     assert "释放 QwenEmotion" in status
+
+
+def test_optional_runtime_failure_reloads_normal_mode(tmp_path: Path, monkeypatch):
+    failing = FakeModel()
+    normal = FakeModel()
+    failing_calls = []
+
+    def failing_infer(**kwargs):
+        failing_calls.append(kwargs)
+        raise RuntimeError("optional kernel failed")
+
+    failing.infer = failing_infer
+    monkeypatch.setattr(inference_adapter, "_progress_callback", lambda: (lambda value, desc="": None))
+    monkeypatch.setattr(
+        inference_adapter.MODEL_CACHE,
+        "acquire",
+        lambda handle: SimpleNamespace(
+            model=failing if handle.acceleration_effective != "off" else normal,
+            lock=__import__("threading").RLock(),
+        ),
+    )
+    releases = []
+    monkeypatch.setattr(
+        inference_adapter.MODEL_CACHE,
+        "done",
+        lambda handle, entry, release=False: releases.append((handle.acceleration_effective, release)),
+    )
+    monkeypatch.setattr(
+        inference_adapter,
+        "comfy_audio_to_reference_wav",
+        lambda audio, kind: (tmp_path / f"{kind}.wav", ()),
+    )
+    handle = ModelHandle(
+        tmp_path,
+        "cpu",
+        False,
+        use_torch_compile=True,
+        acceleration_requested="torch_compile",
+        acceleration_effective="torch_compile",
+    )
+    _audio, status = inference_adapter.run_inference(
+        handle,
+        {"waveform": torch.zeros(1, 1, 100), "sample_rate": 22050},
+        "hello",
+        "EN",
+        1.0,
+        7,
+    )
+    assert normal.kwargs is not None
+    assert releases[0] == ("torch_compile", True)
+    assert "自动重载普通模式" in status
+    assert handle.acceleration_effective == "off"
+    assert handle.use_torch_compile is False
+
+    inference_adapter.run_inference(
+        handle,
+        {"waveform": torch.zeros(1, 1, 100), "sample_rate": 22050},
+        "second line",
+        "EN",
+        1.0,
+        8,
+    )
+    assert len(failing_calls) == 1

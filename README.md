@@ -32,6 +32,19 @@ IndexTTS 2.5 的 ComfyUI V3 原生节点集成。节点菜单位于：
    - 标准 ComfyUI `AUDIO` 输入/输出
    - 中、英、日、西、阿五种语言入口
    - 音色克隆、seed、官方 `duration_factor=0.5~2.0` 语速/时长适配
+6. `IndexTTS 2.5 角色音色 · T8star-Aix`
+   - 将角色名、标准 AUDIO、默认语言和可选情感封装成工作流内音色
+7. `IndexTTS 2.5 角色音色库 · T8star-Aix`
+   - 自动增长输入，可连接 1–16 个角色；重复角色名会在排队前报错
+8. `IndexTTS 2.5 批量台词 / SRT · T8star-Aix`
+   - 解析 `角色|台词|语言|时长系数`、JSON 数组和标准 SRT
+   - SRT 支持 `[角色] 台词` 与 `角色：台词`，输出结构化预览
+9. `IndexTTS 2.5 多角色 / SRT 生成 · T8star-Aix`
+   - 逐句推理、逐句 AUDIO 列表、合并 AUDIO 和 JSON 报告
+   - `shift` 顺延或 `overlay` 时间轴混音；可选二次推理贴合字幕槽位
+10. `IndexTTS 2.5 环境与可选加速 · T8star-Aix`
+   - 不加载模型即可检查 BF16、CUDA 工具链、Triton、FlashAttention、DeepSpeed
+   - 只报告能力，不安装任何附加依赖
 
 输出固定为 `22050 Hz`、`float32`、`[1,1,T]` 的标准 ComfyUI AUDIO，可直接连接 Save Audio、
 音频合并、视频等原生节点。
@@ -67,6 +80,9 @@ Windows 便携版通常应从 ComfyUI 目录执行：
 CUDA/PyTorch 组合。若缺少 torchaudio，请安装与现有 torch 完全对应的版本，不要直接执行上游项目的
 完整 torch 锁定安装。基础依赖仅列出 ComfyUI 之外的必要运行项；除 `transformers<5` 的上游兼容边界外，
 不限制最高版本。
+
+DeepSpeed、FlashAttention、Triton 和 BigVGAN CUDA 编译工具链均为**可选加速**，没有写入
+`requirements.txt`。不安装它们时模型加载器和全部普通推理功能仍可使用。
 
 当前固定核心已在 Windows、Python 3.10、PyTorch 2.8 环境验证。其他 ComfyUI Python 版本请先运行
 环境检查脚本；上游对新版本 Python 的兼容范围可能更窄。
@@ -149,6 +165,63 @@ MaskGCT、CAMPPlus 和 BigVGAN 辅助模型。下载结束后重启 ComfyUI，�
 5. 可选连接情感控制和采样设置。
 6. 将生成 AUDIO 连接到 `Save Audio` 或 `Preview Audio`。
 
+### 多角色、批量台词与 SRT
+
+1. 每个角色添加一个“角色音色”节点，连接对应的 `Load Audio`。
+2. 把这些音色连接到“角色音色库”的自动增长输入。
+3. 添加“批量台词 / SRT”节点并选择格式。
+4. 把模型、角色库、脚本连接到“多角色 / SRT 生成”。
+
+批量文本每行格式如下；语言和时长系数可省略：
+
+```text
+角色A|你终于来了。|ZH|1.0
+角色B|好，我们开始吧。|ZH|0.9
+```
+
+也支持 JSON：
+
+```json
+[
+  {"role": "角色A", "text": "第一句。", "language": "ZH", "duration_factor": 1.0},
+  {"role": "角色B", "text": "Second line.", "language": "EN", "duration_factor": 0.9}
+]
+```
+
+SRT 示例：
+
+```srt
+1
+00:00:00,500 --> 00:00:02,600
+[角色A] 这是第一条字幕。
+
+2
+00:00:02,800 --> 00:00:05,000
+角色B：这是第二条字幕。
+```
+
+`shift` 会把发生冲突的语音顺延，避免重叠；`overlay` 保留原始 SRT 起点并对重叠部分安全混音。
+“适配字幕槽位”会根据第一次生成的时长计算 0.5–2.0 范围内的新 `duration_factor`，最多再推理一次。
+它只能尽量贴合，报告中的 `overrun_ms` 才是最终超时依据，不承诺逐帧精确同步。
+
+### 可选加速模式
+
+模型加载器默认 `off`，这是零附加依赖、兼容性最高的模式：
+
+- `auto_safe`：仅当本机已有 Ninja 和 CUDA/C++ 编译工具链时启用 BigVGAN CUDA 融合核。
+- `bigvgan_cuda`：显式请求 BigVGAN 融合核；首次可能编译，失败自动回退。
+- `torch_compile`：需要与当前 PyTorch 匹配的 Triton；首次推理有编译开销。
+- `gpt_accel`：需要 FlashAttention 和 Triton。该路径不能完整表达所有 beam/top-p/top-k 参数，节点发现
+  不兼容采样组合时会临时使用普通 GPT，避免静默改变结果语义。
+- `deepspeed`：只在用户显式选择且环境已安装 DeepSpeed 时启用。节点不会替用户安装，也不会把它
+  作为必需依赖；不同硬件上可能加速，也可能更慢。
+
+缺依赖或初始化失败时，模型信息会显示 `effective=off` 和回退原因。先用“环境与可选加速”节点检查，
+再决定是否维护独立的加速环境。不要为了节点加速覆盖 ComfyUI 的 torch/CUDA 组合。
+
+vLLM-Omni 更适合 Linux 服务端吞吐场景，后续会作为隔离 sidecar 评估；当前不会塞入 Windows/ComfyUI
+基础环境。官方 TensorRT 后端目前只提供 IndexTTS 2.0 引擎，因此本节点不会虚假宣称 2.5 TensorRT。
+
 超过 15 秒的参考音频会被截取并提示。节点会把参考音频按内容哈希缓存到 ComfyUI 的临时目录，
 不会污染 input/output。相同模型的并发推理会串行化，防止上游内部音色/情感缓存互相覆盖。
 
@@ -182,9 +255,9 @@ Bilibili|B IY1 . L IY1 . B IY1 . L IY1|EN
 不会改写 `<文字|读音>` 内部。严格校验默认开启，错误会在排队前给出；关闭后无效词条保持原文并
 写入报告。该节点不依赖额外 G2P 模型，也不会修改已缓存模型的全局 glossary。
 
-完整示例见 `example_workflows/README.md`，包含 10 组可直接打开的 UI 工作流和 10 组 API prompt：
+完整示例见 `example_workflows/README.md`，包含 14 组可直接打开的 UI 工作流和 14 组 API prompt：
 基础克隆、语速对比、情感参考音频、八维情感、文本情感、随机采样长文本、五语种生成，以及中文
-多音字、英文 CMU 音素、日语假名发音控制。使用前把
+多音字、英文 CMU 音素、日语假名发音控制、多角色、JSON 批量台词、SRT 和可选加速诊断。使用前把
 `voice_reference.wav`（情感音频示例还需 `emotion_reference.wav`）上传到 ComfyUI input。
 
 ## 环境与模型检查
@@ -200,7 +273,7 @@ python scripts/download_models.py --target "D:\ComfyUI\models\TTS\IndexTTS-2.5" 
 ## 固定版本
 
 - IndexTTS 代码：`ee40fa7d6c6b8a2c7f06105f9f1e65775b74868c`
-- IndexTTS 2.5 模型：`ba2480d9f7f629eb18f6acaebb357679d9ba88a4`
+- IndexTTS 2.5 模型：`c39ce5ba981572cb187443877ff559dfb246ce63`
 - 模型清单：`manifests/model_2_5.json`
 
 ## 官方项目、模型下载与致谢
