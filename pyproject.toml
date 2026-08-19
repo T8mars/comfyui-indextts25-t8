@@ -1,5 +1,5 @@
 [project]
-name = "comfyui-indextts25-t8"
+name = "indextts25-t8"
 version = "0.5.1"
 description = "ComfyUI V3 nodes for the official IndexTTS 2.5 model, by T8star-Aix"
 readme = "README.md"
@@ -7,6 +7,16 @@ requires-python = ">=3.10"
 license = { file = "LICENSE" }
 authors = [{ name = "T8star-Aix" }]
 keywords = ["comfyui", "indextts", "tts", "audio", "voice-cloning"]
+dependencies = [
+  "accelerate>=1.8.1",
+  "fugashi>=1.2.0",
+  "librosa>=0.10.2",
+  "munch>=4.0.0",
+  "omegaconf>=2.3.0",
+  "tiktoken>=0.7.0",
+  "transformers>=4.52.1,<5",
+  "unidic-lite>=1.0",
+]
 classifiers = [
   "Programming Language :: Python :: 3",
   "Operating System :: OS Independent",
@@ -15,6 +25,8 @@ classifiers = [
 
 [project.urls]
 Repository = "https://github.com/T8mars/comfyui-indextts25-t8"
+Documentation = "https://github.com/T8mars/comfyui-indextts25-t8#readme"
+Issues = "https://github.com/T8mars/comfyui-indextts25-t8/issues"
 Upstream = "https://github.com/index-tts/index-tts"
 Model = "https://huggingface.co/IndexTeam/IndexTTS-2.5"
 ModelScope = "https://modelscope.cn/models/IndexTeam/IndexTTS-2.5"
