@@ -655,8 +655,12 @@ class T8IndexTTS25DialogueScript(io.ComfyNode):
                     "script",
                     display_name="批量台词或 SRT",
                     multiline=True,
-                    dynamic_prompts=True,
+                    dynamic_prompts=False,
                     default="旁白|欢迎使用多角色批量配音。|ZH|1.0\n角色A|这是第二句。|ZH|0.9",
+                    tooltip=(
+                        "支持 角色|台词|语言|时长系数、JSON 数组或 SRT。"
+                        "此输入已关闭 ComfyUI 动态提示词解析，JSON 的大括号不会被改写。"
+                    ),
                 ),
                 io.String.Input("default_role", display_name="默认角色", default="旁白"),
                 io.Combo.Input("default_language", display_name="默认语言", options=["ZH", "EN", "JA", "ES", "AR"], default="ZH"),

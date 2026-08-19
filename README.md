@@ -39,6 +39,7 @@ IndexTTS 2.5 的 ComfyUI V3 原生节点集成。节点菜单位于：
 8. `IndexTTS 2.5 批量台词 / SRT · T8star-Aix`
    - 解析 `角色|台词|语言|时长系数`、JSON 数组和标准 SRT
    - SRT 支持 `[角色] 台词` 与 `角色：台词`，输出结构化预览
+   - 台词输入关闭 ComfyUI 动态提示词解析，JSON 大括号不会在排队时被改写
 9. `IndexTTS 2.5 多角色 / SRT 生成 · T8star-Aix`
    - 逐句推理、逐句 AUDIO 列表、合并 AUDIO 和 JSON 报告
    - `shift` 顺延或 `overlay` 时间轴混音；可选二次推理贴合字幕槽位
@@ -187,6 +188,9 @@ MaskGCT、CAMPPlus 和 BigVGAN 辅助模型。下载结束后重启 ComfyUI，�
   {"role": "角色B", "text": "Second line.", "language": "EN", "duration_factor": 0.9}
 ]
 ```
+
+JSON 可直接粘贴或随示例工作流载入。v0.5.1 起该输入明确关闭 ComfyUI 的动态提示词解析；
+旧版把 JSON 大括号误当作动态提示词，可能在排队时出现 `Expecting ',' delimiter`。
 
 SRT 示例：
 

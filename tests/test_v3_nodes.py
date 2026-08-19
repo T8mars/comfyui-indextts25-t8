@@ -44,6 +44,9 @@ def test_registers_all_pure_v3_nodes():
     assert all(schema.category == "T8star-Aix/Audio/IndexTTS 2.5" for schema in schemas)
     assert schemas[4].outputs[0].io_type == "AUDIO"
     assert schemas[8].outputs[0].io_type == "AUDIO"
+    dialogue_script_input = next(item for item in schemas[7].inputs if item.id == "script")
+    assert dialogue_script_input.dynamic_prompts is False
+    assert dialogue_script_input.as_dict()["dynamicPrompts"] is False
     assert not hasattr(plugin, "NODE_CLASS_MAPPINGS")
 
 
