@@ -7,6 +7,8 @@ from pathlib import Path
 
 import pytest
 
+from runtime.dialogue import parse_batch_script, parse_srt
+
 
 PLUGIN_ROOT = Path(__file__).resolve().parents[1]
 EXAMPLES = (
@@ -45,6 +47,26 @@ def test_all_ui_and_api_examples_are_present_and_valid():
         assert workflow["last_link_id"] == len(workflow["links"])
         assert any(node["type"] in {"T8_IndexTTS25_Generate", "T8_IndexTTS25_DialogueGenerate"} for node in workflow["nodes"])
         assert any(node["class_type"] in {"T8_IndexTTS25_Generate", "T8_IndexTTS25_DialogueGenerate"} for node in prompt.values())
+
+
+def test_embedded_dialogue_scripts_are_parsed_not_just_outer_workflow_json():
+    ui_root = PLUGIN_ROOT / "example_workflows" / "ui"
+    api_root = PLUGIN_ROOT / "example_workflows" / "api"
+    for name in ("11_multi_role_dialogue", "12_batch_dialogue_json", "13_srt_multi_role"):
+        workflow = _load(ui_root / f"{name}.json")
+        ui_node = next(node for node in workflow["nodes"] if node["type"] == "T8_IndexTTS25_DialogueScript")
+        script_type, script, default_role, default_language = ui_node["widgets_values"]
+        parser = parse_srt if script_type == "srt" else parse_batch_script
+        assert parser(script, default_role, default_language)
+
+        prompt = _load(api_root / f"{name}.json")
+        api_inputs = next(
+            node["inputs"]
+            for node in prompt.values()
+            if node["class_type"] == "T8_IndexTTS25_DialogueScript"
+        )
+        parser = parse_srt if api_inputs["script_type"] == "srt" else parse_batch_script
+        assert parser(api_inputs["script"], api_inputs["default_role"], api_inputs["default_language"])
 
 
 def test_examples_cover_every_emotion_mode_speed_sampling_and_language():
