@@ -298,6 +298,18 @@ ComfyUI 集成；请支持并关注官方项目。
 torchaudio 2.9+ WAV 防削波修复。低于 10GB 显存时会自动使用低显存策略：长文本分段，
 文本情感分析完成后先释放 QwenEmotion，再执行语音生成。
 
+## 发布维护
+
+推送 GitHub 前，使用仓库脚本自动更新 `pyproject.toml` 的语义化版本：
+
+```powershell
+python scripts/bump_version.py patch
+```
+
+修复和维护使用 `patch`，向后兼容的新功能使用 `minor`，破坏性变更使用 `major`。仓库级
+`AGENTS.md` 已要求后续自动化代理在每次推送前检查并更新版本，避免重复使用 Comfy Registry
+中不可变的版本号。
+
 ## 许可证与免责声明
 
 分发或使用前必须阅读 `LICENSE`、`LICENSE_ZH.txt`、`DISCLAIMER` 和 `THIRD_PARTY_NOTICES.md`。

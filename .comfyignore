@@ -1,5 +1,6 @@
 # Development-only files are kept in GitHub but omitted from Registry archives.
 .github/
+AGENTS.md
 tests/
 scripts/
 roadmap.md
