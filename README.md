@@ -52,6 +52,11 @@ IndexTTS 2.5 的 ComfyUI V3 原生节点集成。节点菜单位于：
 
 ## 安装
 
+发布到官方 Comfy Registry 后，可在 **ComfyUI Manager** 中搜索 `IndexTTS 2.5 · T8star-Aix`
+或节点 ID `indextts25-t8`，点击安装并重启 ComfyUI。模型权重仍需按“模型位置”一节单独下载。
+
+也可以手动安装：
+
 将整个目录放入：
 
 ```text
