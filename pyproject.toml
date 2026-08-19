@@ -32,7 +32,7 @@ Model = "https://huggingface.co/IndexTeam/IndexTTS-2.5"
 ModelScope = "https://modelscope.cn/models/IndexTeam/IndexTTS-2.5"
 
 [tool.comfy]
-PublisherId = "t8star-aix"
+PublisherId = "t8star"
 DisplayName = "IndexTTS 2.5 · T8star-Aix"
 
 [tool.pytest.ini_options]
