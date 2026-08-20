@@ -6,6 +6,16 @@ IndexTTS 2.5 的 ComfyUI V3 原生节点集成。节点菜单位于：
 
 作者标识：**B 站：T8star-Aix**。
 
+## 作者与资源链接
+
+- B 站：[T8star-Aix](https://space.bilibili.com/385085361)
+- YouTube：[T8star-Aix](https://www.youtube.com/@T8star-Aix/)
+- Hugging Face：[t8star](https://huggingface.co/t8star)
+- API 注册（推广链接）：[api.seedance.nz](https://api.seedance.nz/sign-up?aff=5f4w)
+- 在线 AI 应用（RunningHub）：[T8star-Aix 用户主页](https://www.runninghub.ai/zh-cn/user-center/1907375370302308353/userPost?inviteCode=rh-v1121)
+- ComfyUI 整合包：[夸克网盘下载](https://pan.quark.cn/s/264edb7e36bd)
+- IndexTTS 2.5 模型网盘：[夸克网盘下载](https://pan.quark.cn/s/c9c267081fbf)
+
 本目录固定使用 IndexTTS 2.5 推理核心和正式 2.5 模型清单，不会回退或误载 IndexTTS 2.0。
 
 ## 已实现节点
