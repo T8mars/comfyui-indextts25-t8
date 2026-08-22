@@ -33,18 +33,21 @@ def test_registers_all_pure_v3_nodes():
         "T8_IndexTTS25_ModelLoader",
         "T8_IndexTTS25_EmotionControl",
         "T8_IndexTTS25_SamplingConfig",
+        "T8_IndexTTS25_TextPreview",
         "T8_IndexTTS25_Pronunciation",
         "T8_IndexTTS25_Generate",
         "T8_IndexTTS25_VoiceProfile",
         "T8_IndexTTS25_RoleLibrary",
         "T8_IndexTTS25_DialogueScript",
         "T8_IndexTTS25_DialogueGenerate",
+        "T8_IndexTTS25_AudioPostProcess",
         "T8_IndexTTS25_Environment",
     ]
     assert all(schema.category == "T8star-Aix/Audio/IndexTTS 2.5" for schema in schemas)
-    assert schemas[4].outputs[0].io_type == "AUDIO"
-    assert schemas[8].outputs[0].io_type == "AUDIO"
-    dialogue_script_input = next(item for item in schemas[7].inputs if item.id == "script")
+    assert schemas[5].outputs[0].io_type == "AUDIO"
+    assert schemas[9].outputs[0].io_type == "AUDIO"
+    assert schemas[10].outputs[0].io_type == "AUDIO"
+    dialogue_script_input = next(item for item in schemas[8].inputs if item.id == "script")
     assert dialogue_script_input.dynamic_prompts is False
     assert dialogue_script_input.as_dict()["dynamicPrompts"] is False
     assert not hasattr(plugin, "NODE_CLASS_MAPPINGS")
@@ -86,3 +89,17 @@ def test_emotion_vector_is_safely_normalized():
     emotion = result[0]
     assert sum(emotion.vector) == pytest.approx(0.8)
     assert emotion.notes
+
+
+def test_sampling_exposes_auto_segmentation_and_real_pause_controls():
+    _load_plugin()
+    from comfyui_indextts25_t8_test.nodes_v3 import T8IndexTTS25SamplingConfig
+
+    result = T8IndexTTS25SamplingConfig.execute(
+        False, 0.8, 0.8, 30, 3, 10.0, 0.0, 1500,
+        "auto", 120, 200, "narration", 100, 300, 600, True,
+    )
+    config = result[0]
+    assert config.effective_segment_tokens("EN") == 60
+    assert config.effective_segment_tokens("ZH") == 120
+    assert config.pause_preset == "narration"

@@ -26,6 +26,10 @@ EXAMPLES = (
     "12_batch_dialogue_json",
     "13_srt_multi_role",
     "14_optional_acceleration",
+    "15_auto_segment_preview",
+    "16_pause_control",
+    "17_target_duration",
+    "18_audio_postprocess",
 )
 
 
@@ -45,8 +49,8 @@ def test_all_ui_and_api_examples_are_present_and_valid():
         assert workflow["version"] == 0.4
         assert workflow["last_node_id"] == max(node["id"] for node in workflow["nodes"])
         assert workflow["last_link_id"] == len(workflow["links"])
-        assert any(node["type"] in {"T8_IndexTTS25_Generate", "T8_IndexTTS25_DialogueGenerate"} for node in workflow["nodes"])
-        assert any(node["class_type"] in {"T8_IndexTTS25_Generate", "T8_IndexTTS25_DialogueGenerate"} for node in prompt.values())
+        assert any(node["type"] in {"T8_IndexTTS25_Generate", "T8_IndexTTS25_DialogueGenerate", "T8_IndexTTS25_AudioPostProcess"} for node in workflow["nodes"])
+        assert any(node["class_type"] in {"T8_IndexTTS25_Generate", "T8_IndexTTS25_DialogueGenerate", "T8_IndexTTS25_AudioPostProcess"} for node in prompt.values())
 
 
 def test_embedded_dialogue_scripts_are_parsed_not_just_outer_workflow_json():
@@ -132,12 +136,14 @@ def test_api_prompts_expand_with_the_current_comfyui_v3_schema():
         "T8_IndexTTS25_ModelLoader": nodes_module.T8IndexTTS25ModelLoader,
         "T8_IndexTTS25_EmotionControl": nodes_module.T8IndexTTS25EmotionControl,
         "T8_IndexTTS25_SamplingConfig": nodes_module.T8IndexTTS25SamplingConfig,
+        "T8_IndexTTS25_TextPreview": nodes_module.T8IndexTTS25TextPreview,
         "T8_IndexTTS25_Pronunciation": nodes_module.T8IndexTTS25Pronunciation,
         "T8_IndexTTS25_Generate": nodes_module.T8IndexTTS25Generate,
         "T8_IndexTTS25_VoiceProfile": nodes_module.T8IndexTTS25VoiceProfile,
         "T8_IndexTTS25_RoleLibrary": nodes_module.T8IndexTTS25RoleLibrary,
         "T8_IndexTTS25_DialogueScript": nodes_module.T8IndexTTS25DialogueScript,
         "T8_IndexTTS25_DialogueGenerate": nodes_module.T8IndexTTS25DialogueGenerate,
+        "T8_IndexTTS25_AudioPostProcess": nodes_module.T8IndexTTS25AudioPostProcess,
         "T8_IndexTTS25_Environment": nodes_module.T8IndexTTS25Environment,
     }
     api_root = PLUGIN_ROOT / "example_workflows" / "api"

@@ -100,7 +100,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_ModelLoader",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.2.0"
+        "ver": "0.6.0"
       },
       "widgets_values": [
         "IndexTTS-2.5",
@@ -149,7 +149,7 @@
       "properties": {
         "Node name for S&R": "LoadAudio",
         "cnr_id": "comfy-core",
-        "ver": "0.2.0"
+        "ver": "0.6.0"
       },
       "widgets_values": [
         "voice_reference.wav"
@@ -213,7 +213,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_EmotionControl",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.2.0"
+        "ver": "0.6.0"
       },
       "widgets_values": [
         "text",
@@ -230,7 +230,7 @@
       ],
       "size": [
         470,
-        390
+        560
       ],
       "flags": {},
       "order": 3,
@@ -267,6 +267,38 @@
           "type": "FLOAT",
           "widget": {
             "name": "duration_factor"
+          },
+          "link": null
+        },
+        {
+          "name": "target_duration_mode",
+          "type": "COMBO",
+          "widget": {
+            "name": "target_duration_mode"
+          },
+          "link": null
+        },
+        {
+          "name": "target_duration_seconds",
+          "type": "FLOAT",
+          "widget": {
+            "name": "target_duration_seconds"
+          },
+          "link": null
+        },
+        {
+          "name": "postprocess_preset",
+          "type": "COMBO",
+          "widget": {
+            "name": "postprocess_preset"
+          },
+          "link": null
+        },
+        {
+          "name": "postprocess_strength",
+          "type": "FLOAT",
+          "widget": {
+            "name": "postprocess_strength"
           },
           "link": null
         },
@@ -308,12 +340,16 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_Generate",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.2.0"
+        "ver": "0.6.0"
       },
       "widgets_values": [
         "等了这么久，我们终于可以一起出发了。",
         "ZH",
         1.05,
+        "off",
+        0.0,
+        "off",
+        1.0,
         20260811,
         "fixed"
       ]
@@ -357,7 +393,7 @@
       "properties": {
         "Node name for S&R": "SaveAudio",
         "cnr_id": "comfy-core",
-        "ver": "0.2.0"
+        "ver": "0.6.0"
       },
       "widgets_values": [
         "IndexTTS25_T8/emotion_text"
@@ -386,7 +422,7 @@
       3,
       0,
       4,
-      6,
+      10,
       "T8_INDEXTTS25_EMOTION"
     ],
     [
@@ -405,7 +441,7 @@
         -40,
         -60,
         1860,
-        570
+        740
       ],
       "color": "#3f789e",
       "font_size": 24,

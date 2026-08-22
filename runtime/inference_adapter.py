@@ -7,9 +7,11 @@ from typing import Any
 import torch
 
 from .audio_adapter import indextts_result_to_audio
+from .audio_processing import concatenate_with_pauses
 from .model_cache import MODEL_CACHE
 from .reference_cache import comfy_audio_to_reference_wav
 from .seed_scope import scoped_seed
+from .text_planner import build_generation_plan, gpt_accel_risk
 from .types import DEFAULT_EMOTION, DEFAULT_SAMPLING, EmotionConfig, ModelHandle, SamplingConfig
 
 
@@ -49,6 +51,17 @@ def run_inference(
 
     emotion = emotion or DEFAULT_EMOTION
     sampling = sampling or DEFAULT_SAMPLING
+    plan = build_generation_plan(
+        text,
+        language,
+        handle.model_dir,
+        segmentation_mode=sampling.segmentation_mode,
+        max_text_tokens_per_segment=sampling.max_text_tokens_per_segment,
+        pause_preset=sampling.pause_preset,
+        comma_pause_ms=sampling.comma_pause_ms,
+        sentence_pause_ms=sampling.sentence_pause_ms,
+        paragraph_pause_ms=sampling.paragraph_pause_ms,
+    )
     speaker_path, speaker_notes = comfy_audio_to_reference_wav(speaker_audio, kind="speaker")
     notes = list(speaker_notes) + list(emotion.notes)
 
@@ -73,7 +86,7 @@ def run_inference(
         raise ValueError(f"未知情感模式：{emotion.mode}")
 
     entry = MODEL_CACHE.acquire(handle)
-    result = None
+    results: list[Any] = []
     inference_error: Exception | None = None
     started_at = time.perf_counter()
     peak_memory_mb = None
@@ -91,11 +104,17 @@ def run_inference(
                 and sampling.repetition_penalty == 1.0
                 and sampling.length_penalty == 0.0
             )
-            temporarily_disabled_accel = accel_engine is not None and not accel_compatible
+            accel_cache_risk = gpt_accel_risk(plan)
+            temporarily_disabled_accel = accel_engine is not None and (
+                not accel_compatible or accel_cache_risk
+            )
             try:
                 if temporarily_disabled_accel:
                     entry.model.gpt.accel_engine = None
-                    notes.append("当前采样参数与 GPT 加速语义不兼容，本次自动使用普通 GPT 路径")
+                    if not accel_compatible:
+                        notes.append("当前采样参数与 GPT 加速语义不兼容，本次自动使用普通 GPT 路径")
+                    if accel_cache_risk:
+                        notes.append("检测到长文本/显式停顿的 KV Cache 风险，本次已保护性关闭 GPT 加速")
                 if use_emo_text:
                     entry.model.ensure_qwen_emotion()
                     if handle.low_vram:
@@ -109,25 +128,26 @@ def run_inference(
                             if handle.device.startswith("cuda") and torch.cuda.is_available():
                                 torch.cuda.empty_cache()
                         notes.append("低显存模式已在生成前释放 QwenEmotion")
-                with scoped_seed(seed, handle.device):
-                    result = entry.model.infer(
-                        spk_audio_prompt=str(speaker_path),
-                        text=text,
-                        output_path=None,
-                        lang=language.upper(),
-                        emo_audio_prompt=emo_audio_prompt,
-                        emo_alpha=float(emotion.strength),
-                        emo_vector=emo_vector,
-                        use_emo_text=use_emo_text,
-                        emo_text=emo_text,
-                        use_random=bool(emotion.use_random),
-                        interval_silence=int(sampling.segment_silence_ms),
-                        verbose=False,
-                        max_text_tokens_per_segment=int(sampling.max_text_tokens_per_segment),
-                        duration_factor=float(duration_factor),
-                        text_normalization=bool(sampling.text_normalization),
-                        **sampling.generation_kwargs(),
-                    )
+                for block_index, chunk in enumerate(plan.chunks):
+                    with scoped_seed(int(seed) + block_index, handle.device):
+                        results.append(entry.model.infer(
+                            spk_audio_prompt=str(speaker_path),
+                            text=chunk.text,
+                            output_path=None,
+                            lang=language.upper(),
+                            emo_audio_prompt=emo_audio_prompt,
+                            emo_alpha=float(emotion.strength),
+                            emo_vector=emo_vector,
+                            use_emo_text=use_emo_text,
+                            emo_text=emo_text,
+                            use_random=bool(emotion.use_random),
+                            interval_silence=int(sampling.segment_silence_ms),
+                            verbose=False,
+                            max_text_tokens_per_segment=int(plan.max_tokens),
+                            duration_factor=float(duration_factor),
+                            text_normalization=bool(sampling.text_normalization),
+                            **sampling.generation_kwargs(),
+                        ))
             finally:
                 if temporarily_disabled_accel:
                     entry.model.gpt.accel_engine = accel_engine
@@ -170,9 +190,14 @@ def run_inference(
                 raise fallback_error from inference_error
         raise inference_error
 
-    if result is None:
+    if not results or any(result is None for result in results):
         raise RuntimeError("IndexTTS 2.5 未生成音频。请缩短文本或提高 max_mel_tokens 后重试。")
-    audio = indextts_result_to_audio(result)
+    block_audios = [indextts_result_to_audio(result) for result in results]
+    audio = concatenate_with_pauses(
+        block_audios,
+        [chunk.pause_after_ms for chunk in plan.chunks],
+        getattr(plan.chunks[0], "pause_before_ms", 0),
+    )
     elapsed = time.perf_counter() - started_at
     duration = audio["waveform"].shape[-1] / audio["sample_rate"]
     rtf = elapsed / duration if duration > 0 else 0.0
@@ -180,7 +205,8 @@ def run_inference(
         f"IndexTTS 2.5 | {language.upper()} | {duration:.2f}s | "
         f"耗时={elapsed:.2f}s | RTF={rtf:.3f} | "
         f"duration_factor={float(duration_factor):.2f} | seed={int(seed)} | "
-        f"accel={handle.acceleration_effective}"
+        f"segments={len(plan.segments)}@{plan.max_tokens}token | "
+        f"pause={plan.total_pause_ms}ms | accel={handle.acceleration_effective}"
     )
     if peak_memory_mb is not None:
         status += f" | CUDA峰值={peak_memory_mb:.0f}MiB"

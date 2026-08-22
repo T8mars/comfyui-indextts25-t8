@@ -104,7 +104,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_ModelLoader",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.2.0"
+        "ver": "0.6.0"
       },
       "widgets_values": [
         "IndexTTS-2.5",
@@ -157,7 +157,7 @@
       "properties": {
         "Node name for S&R": "LoadAudio",
         "cnr_id": "comfy-core",
-        "ver": "0.2.0"
+        "ver": "0.6.0"
       },
       "widgets_values": [
         "voice_reference.wav"
@@ -173,7 +173,7 @@
       ],
       "size": [
         470,
-        390
+        560
       ],
       "flags": {},
       "order": 2,
@@ -210,6 +210,38 @@
           "type": "FLOAT",
           "widget": {
             "name": "duration_factor"
+          },
+          "link": null
+        },
+        {
+          "name": "target_duration_mode",
+          "type": "COMBO",
+          "widget": {
+            "name": "target_duration_mode"
+          },
+          "link": null
+        },
+        {
+          "name": "target_duration_seconds",
+          "type": "FLOAT",
+          "widget": {
+            "name": "target_duration_seconds"
+          },
+          "link": null
+        },
+        {
+          "name": "postprocess_preset",
+          "type": "COMBO",
+          "widget": {
+            "name": "postprocess_preset"
+          },
+          "link": null
+        },
+        {
+          "name": "postprocess_strength",
+          "type": "FLOAT",
+          "widget": {
+            "name": "postprocess_strength"
           },
           "link": null
         },
@@ -251,11 +283,15 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_Generate",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.2.0"
+        "ver": "0.6.0"
       },
       "widgets_values": [
         "这是中文语音生成示例。",
         "ZH",
+        1.0,
+        "off",
+        0.0,
+        "off",
         1.0,
         20260811,
         "fixed"
@@ -301,7 +337,7 @@
       "properties": {
         "Node name for S&R": "SaveAudio",
         "cnr_id": "comfy-core",
-        "ver": "0.2.0"
+        "ver": "0.6.0"
       },
       "widgets_values": [
         "IndexTTS25_T8/zh"
@@ -316,7 +352,7 @@
       ],
       "size": [
         470,
-        390
+        560
       ],
       "flags": {},
       "order": 4,
@@ -353,6 +389,38 @@
           "type": "FLOAT",
           "widget": {
             "name": "duration_factor"
+          },
+          "link": null
+        },
+        {
+          "name": "target_duration_mode",
+          "type": "COMBO",
+          "widget": {
+            "name": "target_duration_mode"
+          },
+          "link": null
+        },
+        {
+          "name": "target_duration_seconds",
+          "type": "FLOAT",
+          "widget": {
+            "name": "target_duration_seconds"
+          },
+          "link": null
+        },
+        {
+          "name": "postprocess_preset",
+          "type": "COMBO",
+          "widget": {
+            "name": "postprocess_preset"
+          },
+          "link": null
+        },
+        {
+          "name": "postprocess_strength",
+          "type": "FLOAT",
+          "widget": {
+            "name": "postprocess_strength"
           },
           "link": null
         },
@@ -394,11 +462,15 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_Generate",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.2.0"
+        "ver": "0.6.0"
       },
       "widgets_values": [
         "This is an English speech generation example.",
         "EN",
+        1.0,
+        "off",
+        0.0,
+        "off",
         1.0,
         20260811,
         "fixed"
@@ -444,7 +516,7 @@
       "properties": {
         "Node name for S&R": "SaveAudio",
         "cnr_id": "comfy-core",
-        "ver": "0.2.0"
+        "ver": "0.6.0"
       },
       "widgets_values": [
         "IndexTTS25_T8/en"
@@ -459,7 +531,7 @@
       ],
       "size": [
         470,
-        390
+        560
       ],
       "flags": {},
       "order": 6,
@@ -496,6 +568,38 @@
           "type": "FLOAT",
           "widget": {
             "name": "duration_factor"
+          },
+          "link": null
+        },
+        {
+          "name": "target_duration_mode",
+          "type": "COMBO",
+          "widget": {
+            "name": "target_duration_mode"
+          },
+          "link": null
+        },
+        {
+          "name": "target_duration_seconds",
+          "type": "FLOAT",
+          "widget": {
+            "name": "target_duration_seconds"
+          },
+          "link": null
+        },
+        {
+          "name": "postprocess_preset",
+          "type": "COMBO",
+          "widget": {
+            "name": "postprocess_preset"
+          },
+          "link": null
+        },
+        {
+          "name": "postprocess_strength",
+          "type": "FLOAT",
+          "widget": {
+            "name": "postprocess_strength"
           },
           "link": null
         },
@@ -537,11 +641,15 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_Generate",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.2.0"
+        "ver": "0.6.0"
       },
       "widgets_values": [
         "これは日本語の音声生成サンプルです。",
         "JA",
+        1.0,
+        "off",
+        0.0,
+        "off",
         1.0,
         20260811,
         "fixed"
@@ -587,7 +695,7 @@
       "properties": {
         "Node name for S&R": "SaveAudio",
         "cnr_id": "comfy-core",
-        "ver": "0.2.0"
+        "ver": "0.6.0"
       },
       "widgets_values": [
         "IndexTTS25_T8/ja"
@@ -602,7 +710,7 @@
       ],
       "size": [
         470,
-        390
+        560
       ],
       "flags": {},
       "order": 8,
@@ -639,6 +747,38 @@
           "type": "FLOAT",
           "widget": {
             "name": "duration_factor"
+          },
+          "link": null
+        },
+        {
+          "name": "target_duration_mode",
+          "type": "COMBO",
+          "widget": {
+            "name": "target_duration_mode"
+          },
+          "link": null
+        },
+        {
+          "name": "target_duration_seconds",
+          "type": "FLOAT",
+          "widget": {
+            "name": "target_duration_seconds"
+          },
+          "link": null
+        },
+        {
+          "name": "postprocess_preset",
+          "type": "COMBO",
+          "widget": {
+            "name": "postprocess_preset"
+          },
+          "link": null
+        },
+        {
+          "name": "postprocess_strength",
+          "type": "FLOAT",
+          "widget": {
+            "name": "postprocess_strength"
           },
           "link": null
         },
@@ -680,11 +820,15 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_Generate",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.2.0"
+        "ver": "0.6.0"
       },
       "widgets_values": [
         "Este es un ejemplo de generación de voz en español.",
         "ES",
+        1.0,
+        "off",
+        0.0,
+        "off",
         1.0,
         20260811,
         "fixed"
@@ -730,7 +874,7 @@
       "properties": {
         "Node name for S&R": "SaveAudio",
         "cnr_id": "comfy-core",
-        "ver": "0.2.0"
+        "ver": "0.6.0"
       },
       "widgets_values": [
         "IndexTTS25_T8/es"
@@ -745,7 +889,7 @@
       ],
       "size": [
         470,
-        390
+        560
       ],
       "flags": {},
       "order": 10,
@@ -782,6 +926,38 @@
           "type": "FLOAT",
           "widget": {
             "name": "duration_factor"
+          },
+          "link": null
+        },
+        {
+          "name": "target_duration_mode",
+          "type": "COMBO",
+          "widget": {
+            "name": "target_duration_mode"
+          },
+          "link": null
+        },
+        {
+          "name": "target_duration_seconds",
+          "type": "FLOAT",
+          "widget": {
+            "name": "target_duration_seconds"
+          },
+          "link": null
+        },
+        {
+          "name": "postprocess_preset",
+          "type": "COMBO",
+          "widget": {
+            "name": "postprocess_preset"
+          },
+          "link": null
+        },
+        {
+          "name": "postprocess_strength",
+          "type": "FLOAT",
+          "widget": {
+            "name": "postprocess_strength"
           },
           "link": null
         },
@@ -823,11 +999,15 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_Generate",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.2.0"
+        "ver": "0.6.0"
       },
       "widgets_values": [
         "هذا مثال على توليد الكلام باللغة العربية.",
         "AR",
+        1.0,
+        "off",
+        0.0,
+        "off",
         1.0,
         20260811,
         "fixed"
@@ -873,7 +1053,7 @@
       "properties": {
         "Node name for S&R": "SaveAudio",
         "cnr_id": "comfy-core",
-        "ver": "0.2.0"
+        "ver": "0.6.0"
       },
       "widgets_values": [
         "IndexTTS25_T8/ar"
@@ -1009,7 +1189,7 @@
         -40,
         -60,
         1860,
-        2190
+        2360
       ],
       "color": "#3f789e",
       "font_size": 24,

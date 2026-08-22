@@ -14,12 +14,14 @@ API_ROOT = EXAMPLES_ROOT / "api"
 MODEL_NODE = "T8_IndexTTS25_ModelLoader"
 EMOTION_NODE = "T8_IndexTTS25_EmotionControl"
 SAMPLING_NODE = "T8_IndexTTS25_SamplingConfig"
+TEXT_PREVIEW_NODE = "T8_IndexTTS25_TextPreview"
 PRONUNCIATION_NODE = "T8_IndexTTS25_Pronunciation"
 GENERATE_NODE = "T8_IndexTTS25_Generate"
 VOICE_NODE = "T8_IndexTTS25_VoiceProfile"
 ROLE_LIBRARY_NODE = "T8_IndexTTS25_RoleLibrary"
 DIALOGUE_SCRIPT_NODE = "T8_IndexTTS25_DialogueScript"
 DIALOGUE_GENERATE_NODE = "T8_IndexTTS25_DialogueGenerate"
+AUDIO_POSTPROCESS_NODE = "T8_IndexTTS25_AudioPostProcess"
 ENVIRONMENT_NODE = "T8_IndexTTS25_Environment"
 
 
@@ -50,7 +52,7 @@ def properties(node_type: str, *, core: bool = False) -> dict[str, str]:
     return {
         "Node name for S&R": node_type,
         "cnr_id": "comfy-core" if core else "comfyui-indextts25-t8",
-        "ver": "0.2.0",
+        "ver": "0.6.0",
     }
 
 
@@ -211,8 +213,13 @@ def sampling_values(**overrides: Any) -> dict[str, Any]:
         "repetition_penalty": 10.0,
         "length_penalty": 0.0,
         "max_mel_tokens": 1500,
+        "segmentation_mode": "auto",
         "max_text_tokens_per_segment": 120,
         "segment_silence_ms": 200,
+        "pause_preset": "off",
+        "comma_pause_ms": 100,
+        "sentence_pause_ms": 300,
+        "paragraph_pause_ms": 600,
         "text_normalization": True,
     }
     values.update(overrides)
@@ -230,14 +237,19 @@ def add_sampling(workflow: Workflow, pos=(440, 330), **overrides: Any) -> int:
         ("repetition_penalty", "FLOAT"),
         ("length_penalty", "FLOAT"),
         ("max_mel_tokens", "INT"),
+        ("segmentation_mode", "COMBO"),
         ("max_text_tokens_per_segment", "INT"),
         ("segment_silence_ms", "INT"),
+        ("pause_preset", "COMBO"),
+        ("comma_pause_ms", "INT"),
+        ("sentence_pause_ms", "INT"),
+        ("paragraph_pause_ms", "INT"),
         ("text_normalization", "BOOLEAN"),
     )
     return workflow.add(
         SAMPLING_NODE,
         pos,
-        (390, 490),
+        (390, 650),
         [widget_input(name, data_type) for name, data_type in names_types],
         [output("sampling", "T8_INDEXTTS25_SAMPLING"), output("sampling_info", "STRING")],
         [values[name] for name, _ in names_types],
@@ -253,23 +265,41 @@ def add_generate(
     pos=(900, 100),
     *,
     title: str | None = None,
+    target_duration_mode: str = "off",
+    target_duration_seconds: float = 0.0,
+    postprocess_preset: str = "off",
+    postprocess_strength: float = 1.0,
 ) -> int:
     return workflow.add(
         GENERATE_NODE,
         pos,
-        (470, 390),
+        (470, 560),
         [
             slot_input("model", "T8_INDEXTTS25_MODEL"),
             slot_input("speaker_audio", "AUDIO"),
             widget_input("text", "STRING"),
             widget_input("language", "COMBO"),
             widget_input("duration_factor", "FLOAT"),
+            widget_input("target_duration_mode", "COMBO"),
+            widget_input("target_duration_seconds", "FLOAT"),
+            widget_input("postprocess_preset", "COMBO"),
+            widget_input("postprocess_strength", "FLOAT"),
             widget_input("seed", "INT"),
             slot_input("emotion", "T8_INDEXTTS25_EMOTION", optional=True),
             slot_input("sampling", "T8_INDEXTTS25_SAMPLING", optional=True),
         ],
         [output("audio", "AUDIO"), output("generation_info", "STRING")],
-        [text, language, duration_factor, seed, "fixed"],
+        [
+            text,
+            language,
+            duration_factor,
+            target_duration_mode,
+            target_duration_seconds,
+            postprocess_preset,
+            postprocess_strength,
+            seed,
+            "fixed",
+        ],
         title=title,
     )
 
@@ -295,6 +325,48 @@ def add_pronunciation(
         ],
         [output("annotated_text", "STRING"), output("pronunciation_report", "STRING")],
         [text, language, dictionary, strict],
+    )
+
+
+def add_text_preview(
+    workflow: Workflow,
+    text: str,
+    language: str,
+    pos=(880, 0),
+) -> int:
+    return workflow.add(
+        TEXT_PREVIEW_NODE,
+        pos,
+        (460, 300),
+        [
+            slot_input("model", "T8_INDEXTTS25_MODEL"),
+            widget_input("text", "STRING"),
+            widget_input("language", "COMBO"),
+            slot_input("sampling", "T8_INDEXTTS25_SAMPLING", optional=True),
+        ],
+        [output("text", "STRING"), output("plan_json", "STRING")],
+        [text, language],
+    )
+
+
+def add_audio_postprocess(
+    workflow: Workflow,
+    preset: str,
+    strength: float,
+    pos=(1420, 160),
+) -> int:
+    return workflow.add(
+        AUDIO_POSTPROCESS_NODE,
+        pos,
+        (410, 260),
+        [
+            slot_input("audio", "AUDIO"),
+            widget_input("preset", "COMBO"),
+            widget_input("strength", "FLOAT"),
+            widget_input("target_peak_db", "FLOAT"),
+        ],
+        [output("audio", "AUDIO"), output("report", "STRING")],
+        [preset, strength, -1.0],
     )
 
 
@@ -358,7 +430,7 @@ def add_dialogue_generate(workflow: Workflow, pos=(1220, 240), *, policy="shift"
     return workflow.add(
         DIALOGUE_GENERATE_NODE,
         pos,
-        (470, 450),
+        (470, 570),
         [
             slot_input("model", "T8_INDEXTTS25_MODEL"),
             slot_input("role_library", "T8_INDEXTTS25_ROLE_LIBRARY"),
@@ -367,15 +439,18 @@ def add_dialogue_generate(workflow: Workflow, pos=(1220, 240), *, policy="shift"
             widget_input("seed", "INT"),
             widget_input("timeline_policy", "COMBO"),
             widget_input("fit_srt_slots", "BOOLEAN"),
+            widget_input("slot_duration_mode", "COMBO"),
             widget_input("fit_tolerance_ms", "INT"),
             widget_input("batch_gap_ms", "INT"),
+            widget_input("postprocess_preset", "COMBO"),
+            widget_input("postprocess_strength", "FLOAT"),
         ],
         [
             output("audio", "AUDIO"),
             output("line_audios", "AUDIO"),
             output("generation_report", "STRING"),
         ],
-        [20260818, "fixed", policy, fit, 180, 200],
+        [20260818, "fixed", policy, fit, "natural", 180, 200, "off", 1.0],
     )
 
 
@@ -428,6 +503,10 @@ def api_generate(
     *,
     emotion_id: str | None = None,
     sampling_id: str | None = None,
+    target_duration_mode: str = "off",
+    target_duration_seconds: float = 0.0,
+    postprocess_preset: str = "off",
+    postprocess_strength: float = 1.0,
 ) -> dict[str, Any]:
     inputs: dict[str, Any] = {
         "model": [model_id, 0],
@@ -435,6 +514,10 @@ def api_generate(
         "text": text,
         "language": language,
         "duration_factor": duration_factor,
+        "target_duration_mode": target_duration_mode,
+        "target_duration_seconds": target_duration_seconds,
+        "postprocess_preset": postprocess_preset,
+        "postprocess_strength": postprocess_strength,
         "seed": seed,
     }
     if emotion_id:
@@ -452,6 +535,29 @@ def api_pronunciation(text: str, language: str, dictionary: str, *, strict: bool
             "language": language,
             "dictionary": dictionary,
             "strict": strict,
+        },
+    }
+
+
+def api_text_preview(model_id: str, text: str, language: str, sampling_id: str | None = None) -> dict[str, Any]:
+    inputs: dict[str, Any] = {
+        "model": [model_id, 0],
+        "text": text,
+        "language": language,
+    }
+    if sampling_id:
+        inputs["sampling"] = [sampling_id, 0]
+    return {"class_type": TEXT_PREVIEW_NODE, "inputs": inputs}
+
+
+def api_audio_postprocess(audio_id: str, preset: str, strength: float = 1.0) -> dict[str, Any]:
+    return {
+        "class_type": AUDIO_POSTPROCESS_NODE,
+        "inputs": {
+            "audio": [audio_id, 0],
+            "preset": preset,
+            "strength": strength,
+            "target_peak_db": -1.0,
         },
     }
 
@@ -521,8 +627,11 @@ def api_dialogue_generate(model_id: str, library_id: str, script_id: str, *, pol
             "seed": 20260818,
             "timeline_policy": policy,
             "fit_srt_slots": fit,
+            "slot_duration_mode": "natural",
             "fit_tolerance_ms": 180,
             "batch_gap_ms": 200,
+            "postprocess_preset": "off",
+            "postprocess_strength": 1.0,
         },
     }
 
@@ -839,6 +948,102 @@ def acceleration_pair() -> tuple[dict[str, Any], dict[str, Any]]:
     return workflow.as_dict(), api
 
 
+def auto_segment_preview_pair() -> tuple[dict[str, Any], dict[str, Any]]:
+    text = (
+        "This is a deliberately longer English paragraph used to demonstrate language-aware automatic "
+        "segmentation. The preview node shows every token segment before synthesis and protects the GPT "
+        "acceleration path when a risky long-text cache pattern is detected."
+    )
+    workflow = Workflow("15 英文自动分段与预览")
+    model = add_model(workflow)
+    speaker = add_load_audio(workflow, "voice_reference.wav", title="音色参考音频")
+    sampling = add_sampling(workflow, pos=(420, 300), segmentation_mode="auto")
+    preview = add_text_preview(workflow, text, "EN", pos=(840, 0))
+    generate = add_generate(workflow, text, "EN", 1.0, 20260822, pos=(1360, 80))
+    save = add_save(workflow, "IndexTTS25_T8/auto_segment", pos=(1900, 240))
+    workflow.connect(model, "model", preview, "model")
+    workflow.connect(sampling, "sampling", preview, "sampling")
+    workflow.connect(preview, "text", generate, "text")
+    wire_generation(workflow, model, speaker, generate, save, sampling=sampling)
+    api = {
+        "1": api_model(),
+        "2": api_audio("voice_reference.wav"),
+        "3": api_sampling(segmentation_mode="auto"),
+        "4": api_text_preview("1", text, "EN", "3"),
+        "5": api_generate("1", "2", ["4", 0], "EN", 1.0, 20260822, sampling_id="3"),
+        "6": api_save("5", "IndexTTS25_T8/auto_segment"),
+    }
+    return workflow.as_dict(), api
+
+
+def pause_control_pair() -> tuple[dict[str, Any], dict[str, Any]]:
+    text = "第一句结束。这里会自然停顿，接着说<pause=0.8>这一句前有八百毫秒显式停顿。"
+    workflow = Workflow("16 标点与显式停顿")
+    model = add_model(workflow)
+    speaker = add_load_audio(workflow, "voice_reference.wav", title="音色参考音频")
+    sampling = add_sampling(workflow, pause_preset="narration")
+    generate = add_generate(workflow, text, "ZH", 1.0, 20260822, pos=(900, 120))
+    save = add_save(workflow, "IndexTTS25_T8/pause_control", pos=(1460, 280))
+    wire_generation(workflow, model, speaker, generate, save, sampling=sampling)
+    api = {
+        "1": api_model(),
+        "2": api_audio("voice_reference.wav"),
+        "3": api_sampling(pause_preset="narration"),
+        "4": api_generate("1", "2", text, "ZH", 1.0, 20260822, sampling_id="3"),
+        "5": api_save("4", "IndexTTS25_T8/pause_control"),
+    }
+    return workflow.as_dict(), api
+
+
+def target_duration_pair() -> tuple[dict[str, Any], dict[str, Any]]:
+    text = "这段语音会先用官方时长系数进行二次适配，再严格补齐到五秒。"
+    workflow = Workflow("17 目标时长秒数")
+    model = add_model(workflow)
+    speaker = add_load_audio(workflow, "voice_reference.wav", title="音色参考音频")
+    generate = add_generate(
+        workflow,
+        text,
+        "ZH",
+        1.0,
+        20260822,
+        target_duration_mode="pad",
+        target_duration_seconds=5.0,
+    )
+    save = add_save(workflow, "IndexTTS25_T8/target_5s")
+    wire_generation(workflow, model, speaker, generate, save)
+    api = {
+        "1": api_model(),
+        "2": api_audio("voice_reference.wav"),
+        "3": api_generate(
+            "1", "2", text, "ZH", 1.0, 20260822,
+            target_duration_mode="pad", target_duration_seconds=5.0,
+        ),
+        "4": api_save("3", "IndexTTS25_T8/target_5s"),
+    }
+    return workflow.as_dict(), api
+
+
+def audio_postprocess_pair() -> tuple[dict[str, Any], dict[str, Any]]:
+    workflow = Workflow("18 独立人声后处理")
+    model = add_model(workflow)
+    speaker = add_load_audio(workflow, "voice_reference.wav", title="音色参考音频")
+    generate = add_generate(workflow, "这是清晰旁白后处理的真实节点连接示例。", "ZH", 1.0, 20260822)
+    post = add_audio_postprocess(workflow, "clear_narration", 0.8)
+    save = add_save(workflow, "IndexTTS25_T8/clear_narration", pos=(1900, 240))
+    workflow.connect(model, "model", generate, "model")
+    workflow.connect(speaker, "AUDIO", generate, "speaker_audio")
+    workflow.connect(generate, "audio", post, "audio")
+    workflow.connect(post, "audio", save, "audio")
+    api = {
+        "1": api_model(),
+        "2": api_audio("voice_reference.wav"),
+        "3": api_generate("1", "2", "这是清晰旁白后处理的真实节点连接示例。", "ZH", 1.0, 20260822),
+        "4": api_audio_postprocess("3", "clear_narration", 0.8),
+        "5": api_save("4", "IndexTTS25_T8/clear_narration"),
+    }
+    return workflow.as_dict(), api
+
+
 EXAMPLES = {
     "01_basic_voice_clone": basic_pair,
     "02_speed_comparison": speed_pair,
@@ -854,6 +1059,10 @@ EXAMPLES = {
     "12_batch_dialogue_json": batch_dialogue_pair,
     "13_srt_multi_role": srt_dialogue_pair,
     "14_optional_acceleration": acceleration_pair,
+    "15_auto_segment_preview": auto_segment_preview_pair,
+    "16_pause_control": pause_control_pair,
+    "17_target_duration": target_duration_pair,
+    "18_audio_postprocess": audio_postprocess_pair,
 }
 
 

@@ -10,6 +10,13 @@ from comfy_api.latest import ComfyExtension, io
 from typing_extensions import override
 
 from .runtime.inference_adapter import run_inference
+from .runtime.audio_processing import (
+    DURATION_MODES,
+    POSTPROCESS_PRESETS,
+    apply_duration_policy,
+    audio_duration_ms,
+    postprocess_audio,
+)
 from .runtime.model_cache import MODEL_CACHE
 from .runtime.acceleration import MODES, probe_acceleration, resolve_acceleration
 from .runtime.dialogue import (
@@ -25,6 +32,7 @@ from .runtime.pronunciation import (
     parse_dictionary_text,
     process_pronunciation_text,
 )
+from .runtime.text_planner import build_generation_plan
 from .runtime.types import (
     DialogueScript,
     EmotionConfig,
@@ -392,7 +400,7 @@ class T8IndexTTS25SamplingConfig(io.ComfyNode):
             display_name="IndexTTS 2.5 采样设置 · T8star-Aix",
             category=CATEGORY,
             search_aliases=["IndexTTS sampling", "TTS sampling config"],
-            description="集中配置确定性、采样、长文本分段、停顿和文本归一化参数。",
+            description="集中配置确定性、采样、语言感知长文本分段、标点/显式停顿和文本归一化参数。",
             inputs=[
                 io.Boolean.Input(
                     "do_sample",
@@ -415,6 +423,13 @@ class T8IndexTTS25SamplingConfig(io.ComfyNode):
                 ),
                 io.Float.Input("length_penalty", display_name="length_penalty", default=0.0, min=-2.0, max=2.0, step=0.05, advanced=True),
                 io.Int.Input("max_mel_tokens", display_name="最大语音 token", default=1500, min=256, max=4096, step=16, advanced=True),
+                io.Combo.Input(
+                    "segmentation_mode",
+                    display_name="长文本分段模式",
+                    options=["auto", "custom"],
+                    default="auto",
+                    tooltip="auto：EN/ES=60、AR=80、JA=100、ZH=120 Token；custom 使用下方数值。",
+                ),
                 io.Int.Input(
                     "max_text_tokens_per_segment",
                     display_name="每段最大文本 token",
@@ -424,6 +439,16 @@ class T8IndexTTS25SamplingConfig(io.ComfyNode):
                     step=5,
                 ),
                 io.Int.Input("segment_silence_ms", display_name="段间静音（毫秒）", default=200, min=0, max=3000, step=10),
+                io.Combo.Input(
+                    "pause_preset",
+                    display_name="标点停顿预设",
+                    options=["off", "natural", "narration", "dialogue", "custom"],
+                    default="off",
+                    tooltip="显式 <pause=0.5> 或 <pause=500ms> 在任意预设下都有效。",
+                ),
+                io.Int.Input("comma_pause_ms", display_name="逗号停顿（毫秒）", default=100, min=0, max=5000, step=10, advanced=True),
+                io.Int.Input("sentence_pause_ms", display_name="句末停顿（毫秒）", default=300, min=0, max=5000, step=10, advanced=True),
+                io.Int.Input("paragraph_pause_ms", display_name="段落停顿（毫秒）", default=600, min=0, max=5000, step=10, advanced=True),
                 io.Boolean.Input("text_normalization", display_name="文本归一化", default=True),
             ],
             outputs=[
@@ -443,8 +468,13 @@ class T8IndexTTS25SamplingConfig(io.ComfyNode):
         repetition_penalty: float,
         length_penalty: float,
         max_mel_tokens: int,
+        segmentation_mode: str,
         max_text_tokens_per_segment: int,
         segment_silence_ms: int,
+        pause_preset: str,
+        comma_pause_ms: int,
+        sentence_pause_ms: int,
+        paragraph_pause_ms: int,
         text_normalization: bool,
     ) -> io.NodeOutput:
         config = SamplingConfig(
@@ -456,16 +486,70 @@ class T8IndexTTS25SamplingConfig(io.ComfyNode):
             repetition_penalty=float(repetition_penalty),
             length_penalty=float(length_penalty),
             max_mel_tokens=int(max_mel_tokens),
+            segmentation_mode=str(segmentation_mode),
             max_text_tokens_per_segment=int(max_text_tokens_per_segment),
             segment_silence_ms=int(segment_silence_ms),
+            pause_preset=str(pause_preset),
+            comma_pause_ms=int(comma_pause_ms),
+            sentence_pause_ms=int(sentence_pause_ms),
+            paragraph_pause_ms=int(paragraph_pause_ms),
             text_normalization=bool(text_normalization),
         )
         mode = "随机采样" if config.do_sample else "确定性/束搜索"
         info = (
             f"{mode} | beams={config.num_beams} | max_mel={config.max_mel_tokens} | "
-            f"segment_tokens={config.max_text_tokens_per_segment} | silence={config.segment_silence_ms}ms"
+            f"segment={config.segmentation_mode}/{config.max_text_tokens_per_segment} | "
+            f"pause={config.pause_preset} | internal_silence={config.segment_silence_ms}ms"
         )
         return io.NodeOutput(config, info)
+
+
+class T8IndexTTS25TextPreview(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="T8_IndexTTS25_TextPreview",
+            display_name="IndexTTS 2.5 分段与停顿预览 · T8star-Aix",
+            category=CATEGORY,
+            search_aliases=["text segment preview", "长文本分段", "pause preview", "停顿预览"],
+            description="仅加载官方轻量 Token 词表，预览模型输入前的 Token 分段、外部停顿和 GPT 加速风险；文本原样透传。",
+            inputs=[
+                ModelType.Input("model", display_name="IndexTTS 2.5 模型"),
+                io.String.Input("text", display_name="待预览文本", multiline=True, dynamic_prompts=True),
+                io.Combo.Input("language", display_name="语言", options=["ZH", "EN", "JA", "ES", "AR"], default="ZH"),
+                SamplingType.Input("sampling", display_name="采样/分段设置", optional=True),
+            ],
+            outputs=[
+                io.String.Output("text", display_name="原样文本"),
+                io.String.Output("plan_json", display_name="分段与停顿预览 JSON"),
+            ],
+        )
+
+    @classmethod
+    def validate_inputs(cls, text: str, **kwargs) -> bool | str:
+        return True if str(text).strip() else "待预览文本不能为空。"
+
+    @classmethod
+    def execute(
+        cls,
+        model: ModelHandle,
+        text: str,
+        language: str,
+        sampling: SamplingConfig | None = None,
+    ) -> io.NodeOutput:
+        config = sampling or SamplingConfig()
+        plan = build_generation_plan(
+            text,
+            language,
+            model.model_dir,
+            segmentation_mode=config.segmentation_mode,
+            max_text_tokens_per_segment=config.max_text_tokens_per_segment,
+            pause_preset=config.pause_preset,
+            comma_pause_ms=config.comma_pause_ms,
+            sentence_pause_ms=config.sentence_pause_ms,
+            paragraph_pause_ms=config.paragraph_pause_ms,
+        )
+        return io.NodeOutput(str(text), plan.to_json())
 
 
 class T8IndexTTS25Pronunciation(io.ComfyNode):
@@ -704,8 +788,17 @@ class T8IndexTTS25DialogueGenerate(io.ComfyNode):
                 io.Int.Input("seed", display_name="起始 seed", default=0, min=0, max=0xFFFFFFFFFFFFFFFF, control_after_generate=True),
                 io.Combo.Input("timeline_policy", display_name="时间冲突策略", options=["shift", "overlay"], default="shift", tooltip="shift 顺延避免重叠；overlay 保留 SRT 起点并安全混音。"),
                 io.Boolean.Input("fit_srt_slots", display_name="二次推理适配字幕槽位", default=False, tooltip="仅 SRT 有效；不保证逐帧精确，超时会写入报告。"),
+                io.Combo.Input(
+                    "slot_duration_mode",
+                    display_name="字幕槽位收尾模式",
+                    options=["natural", "pad", "exact"],
+                    default="natural",
+                    tooltip="natural 只二次适配；pad 不足补静音且保留超长；exact 会补静音或强制裁剪。",
+                ),
                 io.Int.Input("fit_tolerance_ms", display_name="允许时长误差（毫秒）", default=180, min=0, max=2000, step=10, advanced=True),
                 io.Int.Input("batch_gap_ms", display_name="批量句间静音（毫秒）", default=200, min=0, max=5000, step=10),
+                io.Combo.Input("postprocess_preset", display_name="合并音频后处理", options=list(POSTPROCESS_PRESETS), default="off"),
+                io.Float.Input("postprocess_strength", display_name="后处理强度", default=1.0, min=0.0, max=1.0, step=0.05, advanced=True),
             ],
             outputs=[
                 io.Audio.Output("audio", display_name="合并音频"),
@@ -730,8 +823,11 @@ class T8IndexTTS25DialogueGenerate(io.ComfyNode):
         seed: int,
         timeline_policy: str,
         fit_srt_slots: bool,
+        slot_duration_mode: str,
         fit_tolerance_ms: int,
         batch_gap_ms: int,
+        postprocess_preset: str,
+        postprocess_strength: float,
         sampling: SamplingConfig | None = None,
     ) -> io.NodeOutput:
         missing = missing_roles(dialogue_script.lines, role_library.profiles)
@@ -758,6 +854,7 @@ class T8IndexTTS25DialogueGenerate(io.ComfyNode):
                 actual_ms = audio["waveform"].shape[-1] * 1000 / audio["sample_rate"]
                 used_factor = line.duration_factor
                 regenerated = False
+                duration_adjustment = {"mode": "off", "action": "unchanged"}
                 if fit_srt_slots and line.slot_ms and abs(actual_ms - line.slot_ms) > int(fit_tolerance_ms):
                     fitted = fit_duration_factor(used_factor, actual_ms, line.slot_ms)
                     if abs(fitted - used_factor) >= 0.02:
@@ -774,6 +871,11 @@ class T8IndexTTS25DialogueGenerate(io.ComfyNode):
                         used_factor = fitted
                         actual_ms = audio["waveform"].shape[-1] * 1000 / audio["sample_rate"]
                         regenerated = True
+                if fit_srt_slots and line.slot_ms and slot_duration_mode in {"pad", "exact"}:
+                    audio, duration_adjustment = apply_duration_policy(
+                        audio, line.slot_ms / 1000.0, slot_duration_mode
+                    )
+                    actual_ms = audio_duration_ms(audio)
                 if sample_rate is None:
                     sample_rate = int(audio["sample_rate"])
                 elif sample_rate != int(audio["sample_rate"]):
@@ -784,6 +886,7 @@ class T8IndexTTS25DialogueGenerate(io.ComfyNode):
                     "actual_duration_ms": round(actual_ms),
                     "used_duration_factor": round(used_factor, 4),
                     "regenerated_for_slot": regenerated,
+                    "duration_adjustment": duration_adjustment,
                     "status": status,
                 })
         finally:
@@ -799,10 +902,18 @@ class T8IndexTTS25DialogueGenerate(io.ComfyNode):
         )
         for line_report, placement in zip(line_reports, placements):
             line_report["timeline"] = placement.to_dict()
+        combined_audio, postprocess_report = postprocess_audio(
+            {"waveform": waveform, "sample_rate": sample_rate},
+            postprocess_preset,
+            postprocess_strength,
+        )
+        waveform = combined_audio["waveform"]
         report = {
             "script_type": dialogue_script.script_type,
             "timeline_policy": timeline_policy,
             "fit_srt_slots": bool(fit_srt_slots),
+            "slot_duration_mode": slot_duration_mode,
+            "postprocess": postprocess_report,
             "sample_rate": sample_rate,
             "duration_ms": round(waveform.shape[-1] * 1000 / sample_rate),
             "lines": line_reports,
@@ -886,6 +997,28 @@ class T8IndexTTS25Generate(io.ComfyNode):
                     display_mode=io.NumberDisplay.slider,
                     tooltip="官方语速适配：0.5 更快、1.0 原速、2.0 更慢。",
                 ),
+                io.Combo.Input(
+                    "target_duration_mode",
+                    display_name="目标时长模式",
+                    options=list(DURATION_MODES),
+                    default="off",
+                    tooltip="natural 二次推理；pad 不足补静音且不裁剪；exact 会补静音或强制裁剪。",
+                ),
+                io.Float.Input(
+                    "target_duration_seconds",
+                    display_name="目标时长（秒）",
+                    default=0.0,
+                    min=0.0,
+                    max=3600.0,
+                    step=0.1,
+                ),
+                io.Combo.Input(
+                    "postprocess_preset",
+                    display_name="音频后处理",
+                    options=list(POSTPROCESS_PRESETS),
+                    default="off",
+                ),
+                io.Float.Input("postprocess_strength", display_name="后处理强度", default=1.0, min=0.0, max=1.0, step=0.05, advanced=True),
                 io.Int.Input(
                     "seed",
                     display_name="seed",
@@ -914,11 +1047,20 @@ class T8IndexTTS25Generate(io.ComfyNode):
         )
 
     @classmethod
-    def validate_inputs(cls, text: str, duration_factor: float, **kwargs) -> bool | str:
+    def validate_inputs(
+        cls,
+        text: str,
+        duration_factor: float,
+        target_duration_mode: str = "off",
+        target_duration_seconds: float = 0.0,
+        **kwargs,
+    ) -> bool | str:
         if not str(text).strip():
             return "待合成文本不能为空。"
         if not 0.5 <= float(duration_factor) <= 2.0:
             return "时长系数必须在 0.5 到 2.0 之间。"
+        if target_duration_mode != "off" and not 0.1 <= float(target_duration_seconds) <= 3600:
+            return "启用目标时长时，目标时长必须在 0.1–3600 秒。"
         return True
 
     @classmethod
@@ -929,6 +1071,10 @@ class T8IndexTTS25Generate(io.ComfyNode):
         text: str,
         language: str,
         duration_factor: float,
+        target_duration_mode: str,
+        target_duration_seconds: float,
+        postprocess_preset: str,
+        postprocess_strength: float,
         seed: int,
         emotion: EmotionConfig | None = None,
         sampling: SamplingConfig | None = None,
@@ -943,7 +1089,77 @@ class T8IndexTTS25Generate(io.ComfyNode):
             emotion=emotion,
             sampling=sampling,
         )
+        duration_report: dict = {"mode": "off", "action": "unchanged"}
+        used_factor = float(duration_factor)
+        if target_duration_mode != "off" and float(target_duration_seconds) > 0:
+            actual_ms = audio_duration_ms(audio)
+            fitted = fit_duration_factor(
+                used_factor, actual_ms, float(target_duration_seconds) * 1000.0
+            )
+            if abs(fitted - used_factor) >= 0.02:
+                audio, status = run_inference(
+                    handle=model,
+                    speaker_audio=speaker_audio,
+                    text=text,
+                    language=language,
+                    duration_factor=fitted,
+                    seed=seed,
+                    emotion=emotion,
+                    sampling=sampling,
+                )
+                used_factor = fitted
+            if target_duration_mode in {"pad", "exact"}:
+                audio, duration_report = apply_duration_policy(
+                    audio, target_duration_seconds, target_duration_mode
+                )
+            else:
+                duration_report = {
+                    "mode": "natural",
+                    "target_ms": round(float(target_duration_seconds) * 1000),
+                    "final_ms": round(audio_duration_ms(audio)),
+                    "action": "regenerated" if used_factor != float(duration_factor) else "unchanged",
+                }
+            status += f" | target={float(target_duration_seconds):.2f}s/{target_duration_mode} | fitted_factor={used_factor:.3f}"
+        audio, postprocess_report = postprocess_audio(
+            audio, postprocess_preset, postprocess_strength
+        )
+        status += " | duration=" + json.dumps(duration_report, ensure_ascii=False, separators=(",", ":"))
+        status += " | post=" + json.dumps(postprocess_report, ensure_ascii=False, separators=(",", ":"))
         return io.NodeOutput(audio, status)
+
+
+class T8IndexTTS25AudioPostProcess(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="T8_IndexTTS25_AudioPostProcess",
+            display_name="IndexTTS 2.5 人声后处理 · T8star-Aix",
+            category=CATEGORY,
+            essentials_category="Audio",
+            search_aliases=["voice clarity", "人声清晰", "温暖", "去刺耳", "normalize"],
+            description="对任意 ComfyUI AUDIO 应用可选、可混合强度的人声预设；off 时原样输出。",
+            inputs=[
+                io.Audio.Input("audio", display_name="输入音频"),
+                io.Combo.Input("preset", display_name="预设", options=list(POSTPROCESS_PRESETS), default="voice_clarity"),
+                io.Float.Input("strength", display_name="强度", default=1.0, min=0.0, max=1.0, step=0.05),
+                io.Float.Input("target_peak_db", display_name="目标峰值（dBFS）", default=-1.0, min=-12.0, max=-0.1, step=0.1, advanced=True),
+            ],
+            outputs=[
+                io.Audio.Output("audio", display_name="处理后音频"),
+                io.String.Output("report", display_name="后处理报告 JSON"),
+            ],
+        )
+
+    @classmethod
+    def execute(
+        cls,
+        audio: dict,
+        preset: str,
+        strength: float,
+        target_peak_db: float,
+    ) -> io.NodeOutput:
+        result, report = postprocess_audio(audio, preset, strength, target_peak_db)
+        return io.NodeOutput(result, json.dumps(report, ensure_ascii=False, indent=2))
 
 
 class T8IndexTTS25Extension(ComfyExtension):
@@ -958,12 +1174,14 @@ class T8IndexTTS25Extension(ComfyExtension):
             T8IndexTTS25ModelLoader,
             T8IndexTTS25EmotionControl,
             T8IndexTTS25SamplingConfig,
+            T8IndexTTS25TextPreview,
             T8IndexTTS25Pronunciation,
             T8IndexTTS25Generate,
             T8IndexTTS25VoiceProfile,
             T8IndexTTS25RoleLibrary,
             T8IndexTTS25DialogueScript,
             T8IndexTTS25DialogueGenerate,
+            T8IndexTTS25AudioPostProcess,
             T8IndexTTS25Environment,
         ]
 
@@ -976,12 +1194,14 @@ __all__ = [
     "T8IndexTTS25ModelLoader",
     "T8IndexTTS25EmotionControl",
     "T8IndexTTS25SamplingConfig",
+    "T8IndexTTS25TextPreview",
     "T8IndexTTS25Pronunciation",
     "T8IndexTTS25Generate",
     "T8IndexTTS25VoiceProfile",
     "T8IndexTTS25RoleLibrary",
     "T8IndexTTS25DialogueScript",
     "T8IndexTTS25DialogueGenerate",
+    "T8IndexTTS25AudioPostProcess",
     "T8IndexTTS25Environment",
     "T8IndexTTS25Extension",
     "comfy_entrypoint",

@@ -100,7 +100,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_ModelLoader",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.2.0"
+        "ver": "0.6.0"
       },
       "widgets_values": [
         "IndexTTS-2.5",
@@ -149,7 +149,7 @@
       "properties": {
         "Node name for S&R": "LoadAudio",
         "cnr_id": "comfy-core",
-        "ver": "0.2.0"
+        "ver": "0.6.0"
       },
       "widgets_values": [
         "voice_reference.wav"
@@ -165,7 +165,7 @@
       ],
       "size": [
         470,
-        390
+        560
       ],
       "flags": {},
       "order": 2,
@@ -202,6 +202,38 @@
           "type": "FLOAT",
           "widget": {
             "name": "duration_factor"
+          },
+          "link": null
+        },
+        {
+          "name": "target_duration_mode",
+          "type": "COMBO",
+          "widget": {
+            "name": "target_duration_mode"
+          },
+          "link": null
+        },
+        {
+          "name": "target_duration_seconds",
+          "type": "FLOAT",
+          "widget": {
+            "name": "target_duration_seconds"
+          },
+          "link": null
+        },
+        {
+          "name": "postprocess_preset",
+          "type": "COMBO",
+          "widget": {
+            "name": "postprocess_preset"
+          },
+          "link": null
+        },
+        {
+          "name": "postprocess_strength",
+          "type": "FLOAT",
+          "widget": {
+            "name": "postprocess_strength"
           },
           "link": null
         },
@@ -243,11 +275,15 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_Generate",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.2.0"
+        "ver": "0.6.0"
       },
       "widgets_values": [
         "欢迎使用 IndexTTS 2.5，来自 B 站：T8star-Aix。",
         "ZH",
+        1.0,
+        "off",
+        0.0,
+        "off",
         1.0,
         20260811,
         "fixed"
@@ -292,7 +328,7 @@
       "properties": {
         "Node name for S&R": "SaveAudio",
         "cnr_id": "comfy-core",
-        "ver": "0.2.0"
+        "ver": "0.6.0"
       },
       "widgets_values": [
         "IndexTTS25_T8/basic"
@@ -332,7 +368,7 @@
         -40,
         -60,
         1860,
-        570
+        740
       ],
       "color": "#3f789e",
       "font_size": 24,

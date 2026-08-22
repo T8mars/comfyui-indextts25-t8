@@ -19,22 +19,6 @@
     }
   },
   "3": {
-    "class_type": "T8_IndexTTS25_EmotionControl",
-    "inputs": {
-      "mode": "vector",
-      "mode.happy": 0.55,
-      "mode.angry": 0.0,
-      "mode.sad": 0.0,
-      "mode.afraid": 0.0,
-      "mode.disgusted": 0.0,
-      "mode.melancholic": 0.0,
-      "mode.surprised": 0.1,
-      "mode.calm": 0.15,
-      "mode.strength": 1.0,
-      "mode.use_random": false
-    }
-  },
-  "4": {
     "class_type": "T8_IndexTTS25_Generate",
     "inputs": {
       "model": [
@@ -45,18 +29,26 @@
         "2",
         0
       ],
-      "text": "太好了，这个版本终于加入了真正可控的语速适配功能！",
+      "text": "这是清晰旁白后处理的真实节点连接示例。",
       "language": "ZH",
-      "duration_factor": 0.95,
+      "duration_factor": 1.0,
       "target_duration_mode": "off",
       "target_duration_seconds": 0.0,
       "postprocess_preset": "off",
       "postprocess_strength": 1.0,
-      "seed": 20260811,
-      "emotion": [
+      "seed": 20260822
+    }
+  },
+  "4": {
+    "class_type": "T8_IndexTTS25_AudioPostProcess",
+    "inputs": {
+      "audio": [
         "3",
         0
-      ]
+      ],
+      "preset": "clear_narration",
+      "strength": 0.8,
+      "target_peak_db": -1.0
     }
   },
   "5": {
@@ -66,7 +58,7 @@
         "4",
         0
       ],
-      "filename_prefix": "IndexTTS25_T8/emotion_vector"
+      "filename_prefix": "IndexTTS25_T8/clear_narration"
     }
   }
 }

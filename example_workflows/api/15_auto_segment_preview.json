@@ -21,17 +21,17 @@
   "3": {
     "class_type": "T8_IndexTTS25_SamplingConfig",
     "inputs": {
-      "do_sample": true,
-      "temperature": 0.85,
-      "top_p": 0.9,
-      "top_k": 40,
-      "num_beams": 1,
+      "do_sample": false,
+      "temperature": 0.8,
+      "top_p": 0.8,
+      "top_k": 30,
+      "num_beams": 3,
       "repetition_penalty": 10.0,
       "length_penalty": 0.0,
       "max_mel_tokens": 1500,
       "segmentation_mode": "auto",
-      "max_text_tokens_per_segment": 80,
-      "segment_silence_ms": 350,
+      "max_text_tokens_per_segment": 120,
+      "segment_silence_ms": 200,
       "pause_preset": "off",
       "comma_pause_ms": 100,
       "sentence_pause_ms": 300,
@@ -40,6 +40,21 @@
     }
   },
   "4": {
+    "class_type": "T8_IndexTTS25_TextPreview",
+    "inputs": {
+      "model": [
+        "1",
+        0
+      ],
+      "text": "This is a deliberately longer English paragraph used to demonstrate language-aware automatic segmentation. The preview node shows every token segment before synthesis and protects the GPT acceleration path when a risky long-text cache pattern is detected.",
+      "language": "EN",
+      "sampling": [
+        "3",
+        0
+      ]
+    }
+  },
+  "5": {
     "class_type": "T8_IndexTTS25_Generate",
     "inputs": {
       "model": [
@@ -50,28 +65,31 @@
         "2",
         0
       ],
-      "text": "第一段用于演示随机采样，并通过固定种子保持结果可复现。第二段用于演示长文本自动分段，以及段落之间的静音控制。你可以修改温度、顶部概率和顶部候选数量，观察语气细节的变化。",
-      "language": "ZH",
+      "text": [
+        "4",
+        0
+      ],
+      "language": "EN",
       "duration_factor": 1.0,
       "target_duration_mode": "off",
       "target_duration_seconds": 0.0,
       "postprocess_preset": "off",
       "postprocess_strength": 1.0,
-      "seed": 998877,
+      "seed": 20260822,
       "sampling": [
         "3",
         0
       ]
     }
   },
-  "5": {
+  "6": {
     "class_type": "SaveAudio",
     "inputs": {
       "audio": [
-        "4",
+        "5",
         0
       ],
-      "filename_prefix": "IndexTTS25_T8/random_long_text"
+      "filename_prefix": "IndexTTS25_T8/auto_segment"
     }
   }
 }

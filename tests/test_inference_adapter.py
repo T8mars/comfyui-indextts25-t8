@@ -26,7 +26,19 @@ class FakeModel:
         return 22050, np.array([[0], [1000], [-1000]], dtype=np.int16)
 
 
+def _patch_plan(monkeypatch, text="hello"):
+    plan = SimpleNamespace(
+        chunks=(SimpleNamespace(text=text, pause_after_ms=0),),
+        segments=(SimpleNamespace(),),
+        max_tokens=60,
+        total_pause_ms=0,
+    )
+    monkeypatch.setattr(inference_adapter, "build_generation_plan", lambda *args, **kwargs: plan)
+    monkeypatch.setattr(inference_adapter, "gpt_accel_risk", lambda _plan: False)
+
+
 def test_adapter_maps_all_controls_without_global_side_effects(tmp_path: Path, monkeypatch):
+    _patch_plan(monkeypatch)
     fake = FakeModel()
     monkeypatch.setattr(inference_adapter, "_progress_callback", lambda: (lambda value, desc="": None))
     monkeypatch.setattr(inference_adapter.MODEL_CACHE, "acquire", lambda handle: SimpleNamespace(model=fake, lock=__import__("threading").RLock()))
@@ -64,6 +76,7 @@ def test_adapter_maps_all_controls_without_global_side_effects(tmp_path: Path, m
 
 
 def test_low_vram_adapter_releases_qwen_before_speech_generation(tmp_path: Path, monkeypatch):
+    _patch_plan(monkeypatch)
     fake = FakeModel()
 
     def ensure_qwen():
@@ -114,6 +127,7 @@ def test_low_vram_adapter_releases_qwen_before_speech_generation(tmp_path: Path,
 
 
 def test_optional_runtime_failure_reloads_normal_mode(tmp_path: Path, monkeypatch):
+    _patch_plan(monkeypatch)
     failing = FakeModel()
     normal = FakeModel()
     failing_calls = []

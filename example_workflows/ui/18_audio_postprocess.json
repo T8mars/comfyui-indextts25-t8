@@ -88,7 +88,7 @@
           "name": "model",
           "type": "T8_INDEXTTS25_MODEL",
           "links": [
-            2
+            1
           ]
         },
         {
@@ -142,7 +142,7 @@
           "name": "AUDIO",
           "type": "AUDIO",
           "links": [
-            3
+            2
           ]
         }
       ],
@@ -158,102 +158,28 @@
     },
     {
       "id": 3,
-      "type": "T8_IndexTTS25_Pronunciation",
-      "pos": [
-        440,
-        0
-      ],
-      "size": [
-        430,
-        360
-      ],
-      "flags": {},
-      "order": 2,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "text",
-          "type": "STRING",
-          "widget": {
-            "name": "text"
-          },
-          "link": null
-        },
-        {
-          "name": "language",
-          "type": "COMBO",
-          "widget": {
-            "name": "language"
-          },
-          "link": null
-        },
-        {
-          "name": "dictionary",
-          "type": "STRING",
-          "widget": {
-            "name": "dictionary"
-          },
-          "link": null
-        },
-        {
-          "name": "strict",
-          "type": "BOOLEAN",
-          "widget": {
-            "name": "strict"
-          },
-          "link": null
-        }
-      ],
-      "outputs": [
-        {
-          "name": "annotated_text",
-          "type": "STRING",
-          "links": [
-            1
-          ]
-        },
-        {
-          "name": "pronunciation_report",
-          "type": "STRING",
-          "links": []
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "T8_IndexTTS25_Pronunciation",
-        "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.6.0"
-      },
-      "widgets_values": [
-        "He had a <minute|M IH1 . N AH0 T> to examine the <minute|M AY0 . N UW1 T> details.",
-        "EN",
-        "Bilibili|B IY1 . L IY1 . B IY1 . L IY1|EN",
-        true
-      ]
-    },
-    {
-      "id": 4,
       "type": "T8_IndexTTS25_Generate",
       "pos": [
-        950,
-        60
+        900,
+        100
       ],
       "size": [
         470,
         560
       ],
       "flags": {},
-      "order": 3,
+      "order": 2,
       "mode": 0,
       "inputs": [
         {
           "name": "model",
           "type": "T8_INDEXTTS25_MODEL",
-          "link": 2
+          "link": 1
         },
         {
           "name": "speaker_audio",
           "type": "AUDIO",
-          "link": 3
+          "link": 2
         },
         {
           "name": "text",
@@ -261,7 +187,7 @@
           "widget": {
             "name": "text"
           },
-          "link": 1
+          "link": null
         },
         {
           "name": "language",
@@ -337,7 +263,7 @@
           "name": "audio",
           "type": "AUDIO",
           "links": [
-            4
+            3
           ]
         },
         {
@@ -352,23 +278,93 @@
         "ver": "0.6.0"
       },
       "widgets_values": [
-        "He had a <minute|M IH1 . N AH0 T> to examine the <minute|M AY0 . N UW1 T> details.",
-        "EN",
+        "这是清晰旁白后处理的真实节点连接示例。",
+        "ZH",
         1.0,
         "off",
         0.0,
         "off",
         1.0,
-        20260811,
+        20260822,
         "fixed"
+      ]
+    },
+    {
+      "id": 4,
+      "type": "T8_IndexTTS25_AudioPostProcess",
+      "pos": [
+        1420,
+        160
+      ],
+      "size": [
+        410,
+        260
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "link": 3
+        },
+        {
+          "name": "preset",
+          "type": "COMBO",
+          "widget": {
+            "name": "preset"
+          },
+          "link": null
+        },
+        {
+          "name": "strength",
+          "type": "FLOAT",
+          "widget": {
+            "name": "strength"
+          },
+          "link": null
+        },
+        {
+          "name": "target_peak_db",
+          "type": "FLOAT",
+          "widget": {
+            "name": "target_peak_db"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "links": [
+            4
+          ]
+        },
+        {
+          "name": "report",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "T8_IndexTTS25_AudioPostProcess",
+        "cnr_id": "comfyui-indextts25-t8",
+        "ver": "0.6.0"
+      },
+      "widgets_values": [
+        "clear_narration",
+        0.8,
+        -1.0
       ]
     },
     {
       "id": 5,
       "type": "SaveAudio",
       "pos": [
-        1510,
-        170
+        1900,
+        240
       ],
       "size": [
         320,
@@ -405,33 +401,33 @@
         "ver": "0.6.0"
       },
       "widgets_values": [
-        "IndexTTS25_T8/pronunciation_en"
+        "IndexTTS25_T8/clear_narration"
       ]
     }
   ],
   "links": [
     [
       1,
-      3,
-      0,
-      4,
-      2,
-      "STRING"
-    ],
-    [
-      2,
       1,
       0,
-      4,
+      3,
       0,
       "T8_INDEXTTS25_MODEL"
     ],
     [
-      3,
+      2,
       2,
       0,
-      4,
+      3,
       1,
+      "AUDIO"
+    ],
+    [
+      3,
+      3,
+      0,
+      4,
+      0,
       "AUDIO"
     ],
     [
@@ -445,12 +441,12 @@
   ],
   "groups": [
     {
-      "title": "09 英文 CMU 音素 · B站：T8star-Aix",
+      "title": "18 独立人声后处理 · B站：T8star-Aix",
       "bounding": [
         -40,
         -60,
-        1910,
-        700
+        2300,
+        740
       ],
       "color": "#3f789e",
       "font_size": 24,

@@ -84,9 +84,21 @@ class SamplingConfig:
     repetition_penalty: float = 10.0
     length_penalty: float = 0.0
     max_mel_tokens: int = 1500
+    segmentation_mode: str = "auto"
     max_text_tokens_per_segment: int = 120
     segment_silence_ms: int = 200
+    pause_preset: str = "off"
+    comma_pause_ms: int = 0
+    sentence_pause_ms: int = 0
+    paragraph_pause_ms: int = 0
     text_normalization: bool = True
+
+    def effective_segment_tokens(self, language: str) -> int:
+        from .text_planner import effective_segment_limit
+
+        return effective_segment_limit(
+            language, self.segmentation_mode, self.max_text_tokens_per_segment
+        )
 
     def generation_kwargs(self) -> dict[str, Any]:
         return {

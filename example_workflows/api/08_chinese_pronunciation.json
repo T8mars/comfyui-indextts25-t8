@@ -44,6 +44,10 @@
       ],
       "language": "ZH",
       "duration_factor": 1.0,
+      "target_duration_mode": "off",
+      "target_duration_seconds": 0.0,
+      "postprocess_preset": "off",
+      "postprocess_strength": 1.0,
       "seed": 20260811
     }
   },

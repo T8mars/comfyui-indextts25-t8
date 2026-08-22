@@ -32,28 +32,36 @@ IndexTTS 2.5 的 ComfyUI V3 原生节点集成。节点菜单位于：
    - 文本情感描述；Qwen 情感模型按需加载到同一推理设备
 3. `IndexTTS 2.5 采样设置 · T8star-Aix`
    - 稳定默认值、随机采样、beam、temperature、top-p/top-k
-   - 长文本分段、段间停顿、最大语音 token、文本归一化
-4. `IndexTTS 2.5 发音控制 · T8star-Aix`
+   - 按语言自动分段（EN/ES 60、AR 80、JA 100、ZH 120 Token）或手动上限
+   - 标点停顿预设、自定义毫秒数、显式 `<pause=0.5>`、段间停顿与文本归一化
+4. `IndexTTS 2.5 分段与停顿预览 · T8star-Aix`
+   - 不加载神经网络权重，只读取正式模型 Token 词表
+   - 输出每段 Token 数、语音块、段后停顿和 GPT 加速风险；文本可直接透传给生成节点
+5. `IndexTTS 2.5 发音控制 · T8star-Aix`
    - 官方 `<文字|读音>` 标注格式
    - 中文数字声调拼音、英文 CMU 音素、日语假名校验
    - 工作流内嵌发音词典、长词优先、手工标注优先
    - 输出处理后文本和完整替换/校验报告，不修改模型全局状态
-5. `IndexTTS 2.5 语音生成 · T8star-Aix`
+6. `IndexTTS 2.5 语音生成 · T8star-Aix`
    - 标准 ComfyUI `AUDIO` 输入/输出
    - 中、英、日、西、阿五种语言入口
    - 音色克隆、seed、官方 `duration_factor=0.5~2.0` 语速/时长适配
-6. `IndexTTS 2.5 角色音色 · T8star-Aix`
+   - 目标秒数的自然适配、严格补静音、强制精确裁剪三种模式
+   - 可选人声清晰、清晰旁白、去刺耳、温暖、峰值归一化后处理
+7. `IndexTTS 2.5 角色音色 · T8star-Aix`
    - 将角色名、标准 AUDIO、默认语言和可选情感封装成工作流内音色
-7. `IndexTTS 2.5 角色音色库 · T8star-Aix`
+8. `IndexTTS 2.5 角色音色库 · T8star-Aix`
    - 自动增长输入，可连接 1–16 个角色；重复角色名会在排队前报错
-8. `IndexTTS 2.5 批量台词 / SRT · T8star-Aix`
+9. `IndexTTS 2.5 批量台词 / SRT · T8star-Aix`
    - 解析 `角色|台词|语言|时长系数`、JSON 数组和标准 SRT
    - SRT 支持 `[角色] 台词` 与 `角色：台词`，输出结构化预览
    - 台词输入关闭 ComfyUI 动态提示词解析，JSON 大括号不会在排队时被改写
-9. `IndexTTS 2.5 多角色 / SRT 生成 · T8star-Aix`
+10. `IndexTTS 2.5 多角色 / SRT 生成 · T8star-Aix`
    - 逐句推理、逐句 AUDIO 列表、合并 AUDIO 和 JSON 报告
-   - `shift` 顺延或 `overlay` 时间轴混音；可选二次推理贴合字幕槽位
-10. `IndexTTS 2.5 环境与可选加速 · T8star-Aix`
+   - `shift` 顺延或 `overlay` 时间轴混音；二次推理后可自然保留、补静音或强制精确槽位
+11. `IndexTTS 2.5 人声后处理 · T8star-Aix`
+   - 独立处理任意 ComfyUI AUDIO，支持强度混合和目标峰值，不依赖 FFmpeg
+12. `IndexTTS 2.5 环境与可选加速 · T8star-Aix`
    - 不加载模型即可检查 BF16、CUDA 工具链、Triton、FlashAttention、DeepSpeed
    - 只报告能力，不安装任何附加依赖
 
@@ -178,8 +186,8 @@ MaskGCT、CAMPPlus 和 BigVGAN 辅助模型。下载结束后重启 ComfyUI，�
 2. 添加模型加载器并选择 `IndexTTS-2.5`。
 3. 添加语音生成节点，连接模型和参考音频，填写文本与语言。
 4. 需要多音字或专有词发音时，添加发音控制节点，将其文本输出连接到语音生成节点。
-5. 可选连接情感控制和采样设置。
-6. 将生成 AUDIO 连接到 `Save Audio` 或 `Preview Audio`。
+5. 可选连接情感控制和采样设置；长文本建议先经过“分段与停顿预览”。
+6. 将生成 AUDIO 连接到 `Save Audio`，也可再连接独立“人声后处理”节点。
 
 ### 多角色、批量台词与 SRT
 
@@ -223,6 +231,33 @@ SRT 示例：
 “适配字幕槽位”会根据第一次生成的时长计算 0.5–2.0 范围内的新 `duration_factor`，最多再推理一次。
 它只能尽量贴合，报告中的 `overrun_ms` 才是最终超时依据，不承诺逐帧精确同步。
 
+### 自动分段、停顿与目标秒数
+
+采样设置默认使用 `auto` 分段：英语和西班牙语按 60 Token、阿拉伯语按 80 Token、日语按
+100 Token、中文按 120 Token。需要复现实验参数时可切换 `custom`。连接“分段与停顿预览”后，
+JSON 会列出模型输入前的 Token 分段，以及每段前后的外加静音。
+
+停顿预设包括 `off / natural / narration / dialogue / custom`。无论选择哪个预设，都能在正文中写：
+
+```text
+第一句结束。<pause=0.8>八百毫秒后继续。
+也可以写成<pause=500ms>五百毫秒。
+```
+
+标点预设会把句子拆成独立语音块，因此比只调整“段间静音”更精确，但推理次数也会增加。
+`gpt_accel` 遇到多个停顿语音块或高风险长段时会自动临时关闭，避开上游尚未合并的 KV Cache
+边界问题；其它加速模式不受影响。
+
+语音生成的“目标时长（秒）”提供四种模式：
+
+- `off`：只使用原始 `duration_factor`。
+- `natural`：根据首轮实测时长自动计算 0.5–2.0 的新系数并再推理一次，不裁剪。
+- `pad`：自然适配后，不足补静音；超长语音完整保留并在报告中标记。
+- `exact`：自然适配后补静音或强制裁剪到精确采样点；裁剪可能切掉尾音，字幕硬槽位才建议使用。
+
+内置后处理预设为 `voice_clarity / clear_narration / deharsh / warm / normalize`。生成节点可直接选择，
+也可以用独立“人声后处理”节点比较原音和处理音；`off` 时不会改变波形。
+
 ### 可选加速模式
 
 模型加载器默认 `off`，这是零附加依赖、兼容性最高的模式：
@@ -231,7 +266,7 @@ SRT 示例：
 - `bigvgan_cuda`：显式请求 BigVGAN 融合核；首次可能编译，失败自动回退。
 - `torch_compile`：需要与当前 PyTorch 匹配的 Triton；首次推理有编译开销。
 - `gpt_accel`：需要 FlashAttention 和 Triton。该路径不能完整表达所有 beam/top-p/top-k 参数，节点发现
-  不兼容采样组合时会临时使用普通 GPT，避免静默改变结果语义。
+  不兼容采样组合或长文本 KV Cache 风险时会临时使用普通 GPT，避免静默改变结果语义或触发断言。
 - `deepspeed`：只在用户显式选择且环境已安装 DeepSpeed 时启用。节点不会替用户安装，也不会把它
   作为必需依赖；不同硬件上可能加速，也可能更慢。
 
@@ -274,9 +309,10 @@ Bilibili|B IY1 . L IY1 . B IY1 . L IY1|EN
 不会改写 `<文字|读音>` 内部。严格校验默认开启，错误会在排队前给出；关闭后无效词条保持原文并
 写入报告。该节点不依赖额外 G2P 模型，也不会修改已缓存模型的全局 glossary。
 
-完整示例见 `example_workflows/README.md`，包含 14 组可直接打开的 UI 工作流和 14 组 API prompt：
+完整示例见 `example_workflows/README.md`，包含 18 组可直接打开的 UI 工作流和 18 组 API prompt：
 基础克隆、语速对比、情感参考音频、八维情感、文本情感、随机采样长文本、五语种生成，以及中文
-多音字、英文 CMU 音素、日语假名发音控制、多角色、JSON 批量台词、SRT 和可选加速诊断。使用前把
+多音字、英文 CMU 音素、日语假名发音控制、多角色、JSON 批量台词、SRT、可选加速诊断、自动分段
+预览、显式停顿、目标秒数和独立音频后处理。使用前把
 `voice_reference.wav`（情感音频示例还需 `emotion_reference.wav`）上传到 ComfyUI input。
 
 ## 环境与模型检查

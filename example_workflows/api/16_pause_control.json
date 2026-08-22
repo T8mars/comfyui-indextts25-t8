@@ -19,19 +19,24 @@
     }
   },
   "3": {
-    "class_type": "T8_IndexTTS25_EmotionControl",
+    "class_type": "T8_IndexTTS25_SamplingConfig",
     "inputs": {
-      "mode": "vector",
-      "mode.happy": 0.55,
-      "mode.angry": 0.0,
-      "mode.sad": 0.0,
-      "mode.afraid": 0.0,
-      "mode.disgusted": 0.0,
-      "mode.melancholic": 0.0,
-      "mode.surprised": 0.1,
-      "mode.calm": 0.15,
-      "mode.strength": 1.0,
-      "mode.use_random": false
+      "do_sample": false,
+      "temperature": 0.8,
+      "top_p": 0.8,
+      "top_k": 30,
+      "num_beams": 3,
+      "repetition_penalty": 10.0,
+      "length_penalty": 0.0,
+      "max_mel_tokens": 1500,
+      "segmentation_mode": "auto",
+      "max_text_tokens_per_segment": 120,
+      "segment_silence_ms": 200,
+      "pause_preset": "narration",
+      "comma_pause_ms": 100,
+      "sentence_pause_ms": 300,
+      "paragraph_pause_ms": 600,
+      "text_normalization": true
     }
   },
   "4": {
@@ -45,15 +50,15 @@
         "2",
         0
       ],
-      "text": "太好了，这个版本终于加入了真正可控的语速适配功能！",
+      "text": "第一句结束。这里会自然停顿，接着说<pause=0.8>这一句前有八百毫秒显式停顿。",
       "language": "ZH",
-      "duration_factor": 0.95,
+      "duration_factor": 1.0,
       "target_duration_mode": "off",
       "target_duration_seconds": 0.0,
       "postprocess_preset": "off",
       "postprocess_strength": 1.0,
-      "seed": 20260811,
-      "emotion": [
+      "seed": 20260822,
+      "sampling": [
         "3",
         0
       ]
@@ -66,7 +71,7 @@
         "4",
         0
       ],
-      "filename_prefix": "IndexTTS25_T8/emotion_vector"
+      "filename_prefix": "IndexTTS25_T8/pause_control"
     }
   }
 }

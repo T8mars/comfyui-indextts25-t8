@@ -100,7 +100,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_ModelLoader",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.2.0"
+        "ver": "0.6.0"
       },
       "widgets_values": [
         "IndexTTS-2.5",
@@ -149,7 +149,7 @@
       "properties": {
         "Node name for S&R": "LoadAudio",
         "cnr_id": "comfy-core",
-        "ver": "0.2.0"
+        "ver": "0.6.0"
       },
       "widgets_values": [
         "voice_reference.wav"
@@ -190,7 +190,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_Environment",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.2.0"
+        "ver": "0.6.0"
       },
       "widgets_values": [
         "auto"
@@ -205,7 +205,7 @@
       ],
       "size": [
         470,
-        390
+        560
       ],
       "flags": {},
       "order": 3,
@@ -242,6 +242,38 @@
           "type": "FLOAT",
           "widget": {
             "name": "duration_factor"
+          },
+          "link": null
+        },
+        {
+          "name": "target_duration_mode",
+          "type": "COMBO",
+          "widget": {
+            "name": "target_duration_mode"
+          },
+          "link": null
+        },
+        {
+          "name": "target_duration_seconds",
+          "type": "FLOAT",
+          "widget": {
+            "name": "target_duration_seconds"
+          },
+          "link": null
+        },
+        {
+          "name": "postprocess_preset",
+          "type": "COMBO",
+          "widget": {
+            "name": "postprocess_preset"
+          },
+          "link": null
+        },
+        {
+          "name": "postprocess_strength",
+          "type": "FLOAT",
+          "widget": {
+            "name": "postprocess_strength"
           },
           "link": null
         },
@@ -283,11 +315,15 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_Generate",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.2.0"
+        "ver": "0.6.0"
       },
       "widgets_values": [
         "这是可选加速模式的安全回退测试。",
         "ZH",
+        1.0,
+        "off",
+        0.0,
+        "off",
         1.0,
         20260818,
         "fixed"
@@ -332,7 +368,7 @@
       "properties": {
         "Node name for S&R": "SaveAudio",
         "cnr_id": "comfy-core",
-        "ver": "0.2.0"
+        "ver": "0.6.0"
       },
       "widgets_values": [
         "IndexTTS25_T8/optional_acceleration"
@@ -372,7 +408,7 @@
         -40,
         -60,
         1860,
-        650
+        820
       ],
       "color": "#3f789e",
       "font_size": 24,
