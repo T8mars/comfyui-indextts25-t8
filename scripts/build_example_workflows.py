@@ -20,7 +20,10 @@ GENERATE_NODE = "T8_IndexTTS25_Generate"
 VOICE_NODE = "T8_IndexTTS25_VoiceProfile"
 ROLE_LIBRARY_NODE = "T8_IndexTTS25_RoleLibrary"
 DIALOGUE_SCRIPT_NODE = "T8_IndexTTS25_DialogueScript"
+TIMELINE_EDITOR_NODE = "T8_IndexTTS25_TimelineEditor"
 DIALOGUE_GENERATE_NODE = "T8_IndexTTS25_DialogueGenerate"
+ASR_PROOFREAD_NODE = "T8_IndexTTS25_ASRProofread"
+SUBTITLE_REWRITE_NODE = "T8_IndexTTS25_SubtitleRewrite"
 AUDIO_POSTPROCESS_NODE = "T8_IndexTTS25_AudioPostProcess"
 ENVIRONMENT_NODE = "T8_IndexTTS25_Environment"
 
@@ -52,7 +55,7 @@ def properties(node_type: str, *, core: bool = False) -> dict[str, str]:
     return {
         "Node name for S&R": node_type,
         "cnr_id": "comfy-core" if core else "comfyui-indextts25-t8",
-        "ver": "0.7.0",
+        "ver": "0.8.0",
     }
 
 
@@ -436,7 +439,7 @@ def add_dialogue_generate(workflow: Workflow, pos=(1220, 240), *, policy="shift"
     return workflow.add(
         DIALOGUE_GENERATE_NODE,
         pos,
-        (470, 570),
+        (500, 850),
         [
             slot_input("model", "T8_INDEXTTS25_MODEL"),
             slot_input("role_library", "T8_INDEXTTS25_ROLE_LIBRARY"),
@@ -450,13 +453,93 @@ def add_dialogue_generate(workflow: Workflow, pos=(1220, 240), *, policy="shift"
             widget_input("batch_gap_ms", "INT"),
             widget_input("postprocess_preset", "COMBO"),
             widget_input("postprocess_strength", "FLOAT"),
+            widget_input("asr_enabled", "BOOLEAN"),
+            widget_input("asr_model", "COMBO"),
+            widget_input("asr_device", "COMBO"),
+            widget_input("asr_threshold", "FLOAT"),
+            widget_input("subtitle_timing_mode", "COMBO"),
+            widget_input("subtitle_text_mode", "COMBO"),
+            widget_input("subtitle_include_role", "BOOLEAN"),
         ],
         [
             output("audio", "AUDIO"),
             output("line_audios", "AUDIO"),
             output("generation_report", "STRING"),
+            output("rewritten_srt", "STRING"),
+            output("timeline_report", "STRING"),
         ],
-        [20260818, "fixed", policy, fit, "native", 180, 200, "off", 1.0],
+        [20260818, "fixed", policy, fit, "native", 180, 200, "off", 1.0, False, "base", "auto", 0.82, "actual", "asr_passed", True],
+    )
+
+
+def add_timeline_editor(workflow: Workflow, edits_json: str = "", pos=(1040, 620)) -> int:
+    return workflow.add(
+        TIMELINE_EDITOR_NODE,
+        pos,
+        (520, 330),
+        [
+            slot_input("dialogue_script", "T8_INDEXTTS25_DIALOGUE_SCRIPT"),
+            widget_input("timeline_edits_json", "STRING"),
+        ],
+        [
+            output("dialogue_script", "T8_INDEXTTS25_DIALOGUE_SCRIPT"),
+            output("timeline_preview", "STRING"),
+            output("timeline_image", "IMAGE"),
+        ],
+        [edits_json],
+    )
+
+
+def add_preview_image(workflow: Workflow, pos=(1760, 650), *, title="可视化时间轴预览") -> int:
+    return workflow.add(
+        "PreviewImage",
+        pos,
+        (420, 360),
+        [slot_input("images", "IMAGE")],
+        [],
+        [],
+        title=title,
+        core=True,
+    )
+
+
+def add_asr_proofread(workflow: Workflow, expected_text: str, language: str = "ZH", pos=(1460, 40)) -> int:
+    return workflow.add(
+        ASR_PROOFREAD_NODE,
+        pos,
+        (430, 420),
+        [
+            slot_input("audio", "AUDIO"),
+            widget_input("expected_text", "STRING"),
+            widget_input("language", "COMBO"),
+            widget_input("model_name", "COMBO"),
+            widget_input("device", "COMBO"),
+            widget_input("threshold", "FLOAT"),
+        ],
+        [
+            output("recognized_text", "STRING"),
+            output("passed", "BOOLEAN"),
+            output("similarity", "FLOAT"),
+            output("review_report", "STRING"),
+        ],
+        [expected_text, language, "base", "auto", 0.82],
+    )
+
+
+def add_subtitle_rewrite(workflow: Workflow, pos=(1800, 560)) -> int:
+    return workflow.add(
+        SUBTITLE_REWRITE_NODE,
+        pos,
+        (460, 390),
+        [
+            slot_input("dialogue_script", "T8_INDEXTTS25_DIALOGUE_SCRIPT"),
+            slot_input("generation_report", "STRING"),
+            widget_input("timing_mode", "COMBO"),
+            widget_input("text_mode", "COMBO"),
+            widget_input("include_role", "BOOLEAN"),
+        ],
+        [output("srt", "STRING"), output("rewrite_report", "STRING")],
+        ["actual", "asr_passed", True],
     )
 
 
@@ -623,6 +706,16 @@ def api_dialogue_script(script_type: str, script: str, default_role: str) -> dic
     }
 
 
+def api_timeline_editor(script_id: str, edits_json: str = "") -> dict[str, Any]:
+    return {
+        "class_type": TIMELINE_EDITOR_NODE,
+        "inputs": {
+            "dialogue_script": [script_id, 0],
+            "timeline_edits_json": edits_json,
+        },
+    }
+
+
 def api_dialogue_generate(model_id: str, library_id: str, script_id: str, *, policy="shift", fit=False) -> dict[str, Any]:
     return {
         "class_type": DIALOGUE_GENERATE_NODE,
@@ -638,6 +731,40 @@ def api_dialogue_generate(model_id: str, library_id: str, script_id: str, *, pol
             "batch_gap_ms": 200,
             "postprocess_preset": "off",
             "postprocess_strength": 1.0,
+            "asr_enabled": False,
+            "asr_model": "base",
+            "asr_device": "auto",
+            "asr_threshold": 0.82,
+            "subtitle_timing_mode": "actual",
+            "subtitle_text_mode": "asr_passed",
+            "subtitle_include_role": True,
+        },
+    }
+
+
+def api_asr(audio_id: str, expected_text: str, language: str = "ZH") -> dict[str, Any]:
+    return {
+        "class_type": ASR_PROOFREAD_NODE,
+        "inputs": {
+            "audio": [audio_id, 0],
+            "expected_text": expected_text,
+            "language": language,
+            "model_name": "base",
+            "device": "auto",
+            "threshold": 0.82,
+        },
+    }
+
+
+def api_subtitle_rewrite(script_id: str, generate_id: str) -> dict[str, Any]:
+    return {
+        "class_type": SUBTITLE_REWRITE_NODE,
+        "inputs": {
+            "dialogue_script": [script_id, 0],
+            "generation_report": [generate_id, 2],
+            "timing_mode": "actual",
+            "text_mode": "asr_passed",
+            "include_role": True,
         },
     }
 
@@ -1078,6 +1205,114 @@ def cfm_advanced_pair() -> tuple[dict[str, Any], dict[str, Any]]:
     return workflow.as_dict(), api
 
 
+def asr_proofread_pair() -> tuple[dict[str, Any], dict[str, Any]]:
+    text = "这是 ASR 自动校对示例，节点会识别生成音频并计算相似度和字符错误率。"
+    workflow = Workflow("20 ASR 自动校对")
+    model = add_model(workflow)
+    speaker = add_load_audio(workflow, "voice_reference.wav", title="音色参考音频")
+    generate = add_generate(workflow, text, "ZH", 1.0, 20260825, pos=(900, 40))
+    asr = add_asr_proofread(workflow, text, "ZH", pos=(1460, 20))
+    save = add_save(workflow, "IndexTTS25_T8/asr_proofread", pos=(1960, 300))
+    workflow.connect(model, "model", generate, "model")
+    workflow.connect(speaker, "AUDIO", generate, "speaker_audio")
+    workflow.connect(generate, "audio", asr, "audio")
+    workflow.connect(generate, "audio", save, "audio")
+    api = {
+        "1": api_model(),
+        "2": api_audio("voice_reference.wav"),
+        "3": api_generate("1", "2", text, "ZH", 1.0, 20260825),
+        "4": api_asr("3", text, "ZH"),
+        "5": api_save("3", "IndexTTS25_T8/asr_proofread"),
+    }
+    return workflow.as_dict(), api
+
+
+def timeline_editor_pair() -> tuple[dict[str, Any], dict[str, Any]]:
+    script = (
+        "1\n00:00:00,000 --> 00:00:02,000\n[角色A] 第一条编辑后从零点二秒开始。\n\n"
+        "2\n00:00:02,200 --> 00:00:04,500\n[角色B] 第二条保留独立时间槽位。"
+    )
+    edits = json.dumps(
+        [
+            {"index": 1, "role": "角色A", "language": "ZH", "start_ms": 200, "end_ms": 2000, "duration_factor": 1.0, "text": "第一条编辑后从零点二秒开始。"},
+            {"index": 2, "role": "角色B", "language": "ZH", "start_ms": 2300, "end_ms": 4600, "duration_factor": 0.95, "text": "第二条保留独立时间槽位。"},
+        ],
+        ensure_ascii=False,
+        indent=2,
+    )
+    workflow = Workflow("21 可视化时间轴编辑")
+    model = add_model(workflow, pos=(0, 0))
+    audio_a = add_load_audio(workflow, "role_a.wav", pos=(0, 340), title="角色 A 参考音频")
+    audio_b = add_load_audio(workflow, "role_b.wav", pos=(0, 520), title="角色 B 参考音频")
+    voice_a = add_voice_profile(workflow, "角色A", "ZH", pos=(400, 0))
+    voice_b = add_voice_profile(workflow, "角色B", "ZH", pos=(400, 300))
+    library = add_role_library(workflow, 2, pos=(800, 60))
+    script_node = add_dialogue_script(workflow, "srt", script, "角色A", pos=(650, 520))
+    editor = add_timeline_editor(workflow, edits, pos=(1200, 650))
+    preview = add_preview_image(workflow, pos=(1760, 650))
+    generate = add_dialogue_generate(workflow, pos=(1760, 80), policy="overlay", fit=True)
+    save = add_save(workflow, "IndexTTS25_T8/timeline_edited", pos=(2320, 920))
+    workflow.connect(audio_a, "AUDIO", voice_a, "speaker_audio")
+    workflow.connect(audio_b, "AUDIO", voice_b, "speaker_audio")
+    workflow.connect(voice_a, "voice", library, "voices.voice_0")
+    workflow.connect(voice_b, "voice", library, "voices.voice_1")
+    workflow.connect(script_node, "dialogue_script", editor, "dialogue_script")
+    workflow.connect(editor, "timeline_image", preview, "images")
+    workflow.connect(model, "model", generate, "model")
+    workflow.connect(library, "role_library", generate, "role_library")
+    workflow.connect(editor, "dialogue_script", generate, "dialogue_script")
+    workflow.connect(generate, "audio", save, "audio")
+    api = {
+        "1": api_model(), "2": api_audio("role_a.wav"), "3": api_audio("role_b.wav"),
+        "4": api_voice("角色A", "2"), "5": api_voice("角色B", "3"),
+        "6": api_role_library(["4", "5"]), "7": api_dialogue_script("srt", script, "角色A"),
+        "8": api_timeline_editor("7", edits),
+        "9": api_dialogue_generate("1", "6", "8", policy="overlay", fit=True),
+        "10": api_save("9", "IndexTTS25_T8/timeline_edited"),
+        "11": {"class_type": "PreviewImage", "inputs": {"images": ["8", 2]}},
+    }
+    return workflow.as_dict(), api
+
+
+def subtitle_rewrite_pair() -> tuple[dict[str, Any], dict[str, Any]]:
+    script = (
+        "1\n00:00:00,000 --> 00:00:02,500\n[角色A] 自动校对第一条字幕。\n\n"
+        "2\n00:00:02,700 --> 00:00:05,000\n[角色B] 识别通过后自动回写文本。"
+    )
+    workflow = Workflow("22 ASR 字幕自动回写")
+    model = add_model(workflow, pos=(0, 0))
+    audio_a = add_load_audio(workflow, "role_a.wav", pos=(0, 340), title="角色 A 参考音频")
+    audio_b = add_load_audio(workflow, "role_b.wav", pos=(0, 520), title="角色 B 参考音频")
+    voice_a = add_voice_profile(workflow, "角色A", "ZH", pos=(400, 0))
+    voice_b = add_voice_profile(workflow, "角色B", "ZH", pos=(400, 300))
+    library = add_role_library(workflow, 2, pos=(800, 60))
+    script_node = add_dialogue_script(workflow, "srt", script, "角色A", pos=(650, 520))
+    generate = add_dialogue_generate(workflow, pos=(1220, 100), policy="shift", fit=True)
+    workflow.nodes[generate - 1]["widgets_values"][9] = True
+    subtitle = add_subtitle_rewrite(workflow, pos=(1780, 520))
+    save = add_save(workflow, "IndexTTS25_T8/subtitle_rewrite", pos=(2300, 120))
+    workflow.connect(audio_a, "AUDIO", voice_a, "speaker_audio")
+    workflow.connect(audio_b, "AUDIO", voice_b, "speaker_audio")
+    workflow.connect(voice_a, "voice", library, "voices.voice_0")
+    workflow.connect(voice_b, "voice", library, "voices.voice_1")
+    workflow.connect(model, "model", generate, "model")
+    workflow.connect(library, "role_library", generate, "role_library")
+    workflow.connect(script_node, "dialogue_script", generate, "dialogue_script")
+    workflow.connect(script_node, "dialogue_script", subtitle, "dialogue_script")
+    workflow.connect(generate, "generation_report", subtitle, "generation_report")
+    workflow.connect(generate, "audio", save, "audio")
+    generate_api = api_dialogue_generate("1", "6", "7", policy="shift", fit=True)
+    generate_api["inputs"]["asr_enabled"] = True
+    api = {
+        "1": api_model(), "2": api_audio("role_a.wav"), "3": api_audio("role_b.wav"),
+        "4": api_voice("角色A", "2"), "5": api_voice("角色B", "3"),
+        "6": api_role_library(["4", "5"]), "7": api_dialogue_script("srt", script, "角色A"),
+        "8": generate_api, "9": api_subtitle_rewrite("7", "8"),
+        "10": api_save("8", "IndexTTS25_T8/subtitle_rewrite"),
+    }
+    return workflow.as_dict(), api
+
+
 EXAMPLES = {
     "01_basic_voice_clone": basic_pair,
     "02_speed_comparison": speed_pair,
@@ -1098,6 +1333,9 @@ EXAMPLES = {
     "17_target_duration": target_duration_pair,
     "18_audio_postprocess": audio_postprocess_pair,
     "19_cfm_advanced": cfm_advanced_pair,
+    "20_asr_proofread": asr_proofread_pair,
+    "21_timeline_editor": timeline_editor_pair,
+    "22_subtitle_rewrite": subtitle_rewrite_pair,
 }
 
 

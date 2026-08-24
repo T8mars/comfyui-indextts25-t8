@@ -62,8 +62,8 @@
   "7": {
     "class_type": "T8_IndexTTS25_DialogueScript",
     "inputs": {
-      "script_type": "batch",
-      "script": "角色A|你终于来了，我们开始吧。|ZH|1.0\n角色B|好，我已经准备好了。|ZH|0.95\n角色A|第一幕，现在开始。|ZH|1.05",
+      "script_type": "srt",
+      "script": "1\n00:00:00,000 --> 00:00:02,500\n[角色A] 自动校对第一条字幕。\n\n2\n00:00:02,700 --> 00:00:05,000\n[角色B] 识别通过后自动回写文本。",
       "default_role": "角色A",
       "default_language": "ZH"
     }
@@ -85,13 +85,13 @@
       ],
       "seed": 20260818,
       "timeline_policy": "shift",
-      "fit_srt_slots": false,
+      "fit_srt_slots": true,
       "slot_duration_mode": "native",
       "fit_tolerance_ms": 180,
       "batch_gap_ms": 200,
       "postprocess_preset": "off",
       "postprocess_strength": 1.0,
-      "asr_enabled": false,
+      "asr_enabled": true,
       "asr_model": "base",
       "asr_device": "auto",
       "asr_threshold": 0.82,
@@ -101,13 +101,29 @@
     }
   },
   "9": {
+    "class_type": "T8_IndexTTS25_SubtitleRewrite",
+    "inputs": {
+      "dialogue_script": [
+        "7",
+        0
+      ],
+      "generation_report": [
+        "8",
+        2
+      ],
+      "timing_mode": "actual",
+      "text_mode": "asr_passed",
+      "include_role": true
+    }
+  },
+  "10": {
     "class_type": "SaveAudio",
     "inputs": {
       "audio": [
         "8",
         0
       ],
-      "filename_prefix": "IndexTTS25_T8/batch_dialogue"
+      "filename_prefix": "IndexTTS25_T8/subtitle_rewrite"
     }
   }
 }

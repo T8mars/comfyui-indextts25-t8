@@ -65,6 +65,15 @@ IndexTTS 2.5 的 ComfyUI V3 原生节点集成。节点菜单位于：
 12. `IndexTTS 2.5 环境与可选加速 · T8star-Aix`
    - 不加载模型即可检查 BF16、CUDA 工具链、Triton、FlashAttention、DeepSpeed
    - 只报告能力，不安装任何附加依赖
+13. `IndexTTS 2.5 时间轴编辑 · T8star-Aix`
+   - 接收批量/SRT 脚本和可编辑 JSON，按毫秒修改逐句开始、结束、角色、语言与时长系数
+   - 输出严格校验后的脚本、结构化 JSON 和标准 `IMAGE` 彩色轨道预览
+14. `IndexTTS 2.5 ASR 自动校对 · T8star-Aix`
+   - 使用可选的本地 Whisper 对 AUDIO 识别并与目标文本比较
+   - 输出识别文本、相似度、CER、阈值判定和完整 JSON 报告
+15. `IndexTTS 2.5 字幕自动回写 · T8star-Aix`
+   - 可保留原 SRT 时间或使用生成音频真实时间轴
+   - 可写回原文、全部 ASR 识别结果或仅校对通过的识别结果
 
 输出固定为 `22050 Hz`、`float32`、`[1,1,T]` 的标准 ComfyUI AUDIO，可直接连接 Save Audio、
 音频合并、视频等原生节点。
@@ -108,6 +117,21 @@ CUDA/PyTorch 组合。若缺少 torchaudio，请安装与现有 torch 完全对�
 
 DeepSpeed、FlashAttention、Triton 和 BigVGAN CUDA 编译工具链均为**可选加速**，没有写入
 `requirements.txt`。不安装它们时模型加载器和全部普通推理功能仍可使用。
+
+ASR 自动校对也是可选功能。需要使用时，以 ComfyUI 自己的 Python 安装：
+
+```powershell
+python -m pip install "openai-whisper>=20250625"
+```
+
+Windows 便携版：
+
+```powershell
+..\python_embeded\python.exe -m pip install "openai-whisper>=20250625"
+```
+
+首次校对会把所选 Whisper 模型下载到 `ComfyUI/models/TTS/Whisper/`。不安装 Whisper 时，已有的
+IndexTTS 生成、时间轴编辑和原文字幕回写仍然正常使用。
 
 当前固定核心已在 Windows、Python 3.10、PyTorch 2.8 环境验证。其他 ComfyUI Python 版本请先运行
 环境检查脚本；上游对新版本 Python 的兼容范围可能更窄。
@@ -301,6 +325,37 @@ vLLM-Omni 更适合 Linux 服务端吞吐场景，后续会作为隔离 sidecar 
 
 它是模型内的长度调节，不是简单的后处理拉伸；仍不承诺逐字或字幕级精确时长。
 
+### ASR 自动校对、字幕回写与时间轴编辑
+
+ASR 校对节点接收标准 ComfyUI `AUDIO` 和目标文本，在本机运行 Whisper。语言可选
+`AUTO / ZH / EN / JA / ES / AR`，模型可选 `tiny / base / small / medium / turbo`，设备可选
+`auto / CUDA / CPU`。输出包含识别文本、字符错误率（CER）、相似度和是否达到阈值；`tiny` 下载快，
+较大模型通常更准确，但占用更多磁盘、显存和时间。音频以波形直接送入 Whisper，不依赖系统 FFmpeg。
+
+多角色/SRT 生成节点可在每句生成后自动校对，同时输出 `rewritten_srt` 和 `timeline_report`。字幕时间有：
+
+- `original`：保留原始 SRT 起止时间；批量台词没有原始时段时使用实际时间轴。
+- `actual`：使用最终合并音频中的真实开始/结束时间。
+
+字幕文本有：
+
+- `original`：始终使用输入台词。
+- `asr_all`：有识别结果时全部替换。
+- `asr_passed`：仅相似度达到阈值时替换，其余保留原文。
+
+“时间轴编辑”节点的 JSON 数组每行使用毫秒，真实示例如下；行号必须完整且不重复：
+
+```json
+[
+  {"line": 1, "role": "角色A", "text": "第一句。", "language": "ZH", "duration_factor": 1.0, "start_ms": 500, "end_ms": 2100},
+  {"line": 2, "role": "角色B", "text": "Second line.", "language": "EN", "duration_factor": 0.9, "start_ms": 2300, "end_ms": 4500}
+]
+```
+
+把 `可视化时间轴` 连接到 ComfyUI 原生 `Preview Image` 即可看到每句彩色轨道。把编辑后的
+`台词脚本` 连接到“多角色 / SRT 生成”，即可按新时间轴混音；ASR 报告也可单独连接
+“字幕自动回写”节点，在不重新推理的情况下尝试不同的时间和文本回写策略。
+
 ### 多音字与精确发音
 
 不连接发音控制节点时，也可以在语音生成正文中直接使用官方格式：
@@ -323,10 +378,11 @@ Bilibili|B IY1 . L IY1 . B IY1 . L IY1|EN
 不会改写 `<文字|读音>` 内部。严格校验默认开启，错误会在排队前给出；关闭后无效词条保持原文并
 写入报告。该节点不依赖额外 G2P 模型，也不会修改已缓存模型的全局 glossary。
 
-完整示例见 `example_workflows/README.md`，包含 19 组可直接打开的 UI 工作流和 19 组 API prompt：
+完整示例见 `example_workflows/README.md`，包含 22 组可直接打开的 UI 工作流和 22 组 API prompt：
 基础克隆、语速对比、情感参考音频、八维情感、文本情感、随机采样长文本、五语种生成，以及中文
 多音字、英文 CMU 音素、日语假名发音控制、多角色、JSON 批量台词、SRT、可选加速诊断、自动分段
-预览、显式停顿、原生目标秒数、CFM 高级参数和独立音频后处理。使用前把
+预览、显式停顿、原生目标秒数、CFM 高级参数、独立音频后处理、ASR 自动校对、时间轴编辑和字幕
+回写。使用前把
 `voice_reference.wav`（情感音频示例还需 `emotion_reference.wav`）上传到 ComfyUI input。
 
 ## 环境与模型检查

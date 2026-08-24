@@ -28,6 +28,9 @@
 | `17_target_duration.json` | 原生长度调节器单次适配到目标 5 秒 | `voice_reference.wav` |
 | `18_audio_postprocess.json` | 独立“清晰旁白”人声后处理节点 | `voice_reference.wav` |
 | `19_cfm_advanced.json` | CFM 扩散步数、CFG 引导强度和温度调节 | `voice_reference.wav` |
+| `20_asr_proofread.json` | 本地 Whisper 识别、CER/相似度校对与阈值判定 | `voice_reference.wav` |
+| `21_timeline_editor.json` | 以毫秒编辑起止时间，并用 Preview Image 显示彩色轨道 | `role_a.wav`、`role_b.wav` |
+| `22_subtitle_rewrite.json` | 根据生成报告回写实际时间轴和校对通过的 ASR 文本 | 无 |
 
 ## 使用方法
 
@@ -39,6 +42,10 @@
 
 角色音色库同样使用 V3 自动增长扁平路径 `voices.voice_0`、`voices.voice_1`。SRT 示例默认使用
 原生长度调节器单次适配字幕槽位，并在最终输出做采样点级收尾；目标时长与自然语速差异过大时仍可能影响听感。
+
+示例 20 需要可选的 `openai-whisper`，首次运行会从网络下载所选模型到
+`ComfyUI/models/TTS/Whisper/`。示例 21 的 `start_ms / end_ms` 单位均为毫秒；示例 22 内置的是可直接
+运行的真实报告结构示例，用于演示无需重新生成语音的字幕回写。
 
 重新生成全部示例：
 

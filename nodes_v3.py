@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import tempfile
 from dataclasses import replace
 from pathlib import Path
 
@@ -32,6 +33,8 @@ from .runtime.pronunciation import (
     process_pronunciation_text,
 )
 from .runtime.text_planner import build_generation_plan
+from .runtime.speech_review import ASR_MODELS, asr_available, review_transcript, transcribe_waveform
+from .runtime.timeline import apply_timeline_edits, render_timeline_image, rewrite_srt, timeline_json, timeline_rows
 from .runtime.types import (
     DialogueScript,
     EmotionConfig,
@@ -59,6 +62,15 @@ SamplingType = io.Custom("T8_INDEXTTS25_SAMPLING")
 VoiceType = io.Custom("T8_INDEXTTS25_VOICE")
 RoleLibraryType = io.Custom("T8_INDEXTTS25_ROLE_LIBRARY")
 DialogueScriptType = io.Custom("T8_INDEXTTS25_DIALOGUE_SCRIPT")
+
+
+def _asr_download_root() -> Path:
+    try:
+        import folder_paths
+
+        return Path(folder_paths.models_dir) / "TTS" / "Whisper"
+    except Exception:
+        return Path(tempfile.gettempdir()) / "t8_indextts25_whisper"
 
 
 def _device_options() -> list[str]:
@@ -806,6 +818,52 @@ class T8IndexTTS25DialogueScript(io.ComfyNode):
         return io.NodeOutput(DialogueScript(lines, script_type), json.dumps(payload, ensure_ascii=False, indent=2))
 
 
+class T8IndexTTS25TimelineEditor(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="T8_IndexTTS25_TimelineEditor",
+            display_name="IndexTTS 2.5 可视化时间轴编辑 · T8star-Aix",
+            category=CATEGORY,
+            search_aliases=["timeline", "时间轴", "字幕编辑", "SRT editor"],
+            description=(
+                "用 JSON 编辑每句角色、语言、开始/结束毫秒、语速和文本；输出仍是可连接的台词脚本，"
+                "预览 JSON 可直接复制修改。"
+            ),
+            inputs=[
+                DialogueScriptType.Input("dialogue_script", display_name="台词脚本"),
+                io.String.Input(
+                    "timeline_edits_json",
+                    display_name="时间轴编辑 JSON（留空保持原样）",
+                    multiline=True,
+                    default="",
+                    dynamic_prompts=False,
+                    tooltip="先运行节点取得预览 JSON；复制 lines 数组后修改并填回。时间单位为毫秒。",
+                ),
+            ],
+            outputs=[
+                DialogueScriptType.Output("dialogue_script", display_name="编辑后的台词脚本"),
+                io.String.Output("timeline_preview", display_name="时间轴预览 JSON"),
+                io.Image.Output("timeline_image", display_name="可视化时间轴"),
+            ],
+        )
+
+    @classmethod
+    def execute(cls, dialogue_script: DialogueScript, timeline_edits_json: str) -> io.NodeOutput:
+        raw = str(timeline_edits_json or "").strip()
+        lines = apply_timeline_edits(dialogue_script.lines, raw) if raw else list(dialogue_script.lines)
+        payload = {
+            "unit": "milliseconds",
+            "columns": ["index", "role", "language", "start_ms", "end_ms", "duration_factor", "text"],
+            "lines": [line.to_dict() for line in lines],
+        }
+        return io.NodeOutput(
+            DialogueScript(lines, dialogue_script.script_type),
+            json.dumps(payload, ensure_ascii=False, indent=2),
+            render_timeline_image(lines),
+        )
+
+
 class T8IndexTTS25DialogueGenerate(io.ComfyNode):
     @classmethod
     def define_schema(cls) -> io.Schema:
@@ -835,11 +893,20 @@ class T8IndexTTS25DialogueGenerate(io.ComfyNode):
                 io.Int.Input("batch_gap_ms", display_name="批量句间静音（毫秒）", default=200, min=0, max=5000, step=10),
                 io.Combo.Input("postprocess_preset", display_name="合并音频后处理", options=list(POSTPROCESS_PRESETS), default="off"),
                 io.Float.Input("postprocess_strength", display_name="后处理强度", default=1.0, min=0.0, max=1.0, step=0.05, advanced=True),
+                io.Boolean.Input("asr_enabled", display_name="逐句自动 ASR 校对", default=False),
+                io.Combo.Input("asr_model", display_name="ASR 模型", options=list(ASR_MODELS), default="base"),
+                io.Combo.Input("asr_device", display_name="ASR 设备", options=["auto", "cuda", "cpu"], default="auto", advanced=True),
+                io.Float.Input("asr_threshold", display_name="ASR 通过阈值", default=0.82, min=0.0, max=1.0, step=0.01),
+                io.Combo.Input("subtitle_timing_mode", display_name="回写字幕时间", options=["actual", "original"], default="actual"),
+                io.Combo.Input("subtitle_text_mode", display_name="回写字幕文本", options=["asr_passed", "asr_all", "original"], default="asr_passed"),
+                io.Boolean.Input("subtitle_include_role", display_name="字幕保留角色前缀", default=True),
             ],
             outputs=[
                 io.Audio.Output("audio", display_name="合并音频"),
                 io.Audio.Output("line_audios", display_name="逐句音频", is_output_list=True),
                 io.String.Output("generation_report", display_name="生成报告 JSON"),
+                io.String.Output("rewritten_srt", display_name="自动回写 SRT"),
+                io.String.Output("timeline_report", display_name="可视化时间轴 JSON"),
             ],
         )
 
@@ -864,11 +931,22 @@ class T8IndexTTS25DialogueGenerate(io.ComfyNode):
         batch_gap_ms: int,
         postprocess_preset: str,
         postprocess_strength: float,
+        asr_enabled: bool,
+        asr_model: str,
+        asr_device: str,
+        asr_threshold: float,
+        subtitle_timing_mode: str,
+        subtitle_text_mode: str,
+        subtitle_include_role: bool,
         sampling: SamplingConfig | None = None,
     ) -> io.NodeOutput:
         missing = missing_roles(dialogue_script.lines, role_library.profiles)
         if missing:
             raise ValueError("以下角色没有连接音色：" + "、".join(missing))
+        if asr_enabled and not asr_available():
+            raise RuntimeError(
+                "自动 ASR 校对需要可选依赖 openai-whisper；请在 ComfyUI Python 环境中手动安装。"
+            )
         work_handle = replace(model, release_after_run=False)
         clips: list[dict] = []
         line_reports: list[dict] = []
@@ -942,7 +1020,7 @@ class T8IndexTTS25DialogueGenerate(io.ComfyNode):
                 elif sample_rate != int(audio["sample_rate"]):
                     raise RuntimeError("逐句输出采样率不一致，无法合并。")
                 clips.append(audio)
-                line_reports.append({
+                line_report = {
                     **line.to_dict(),
                     "actual_duration_ms": round(actual_ms),
                     "used_duration_factor": round(used_factor, 4),
@@ -951,7 +1029,33 @@ class T8IndexTTS25DialogueGenerate(io.ComfyNode):
                     "native_duration_fallback": native_fallback,
                     "duration_adjustment": duration_adjustment,
                     "status": status,
-                })
+                }
+                if asr_enabled:
+                    try:
+                        transcript = transcribe_waveform(
+                            audio["waveform"],
+                            int(audio["sample_rate"]),
+                            language=language,
+                            model_name=asr_model,
+                            device=asr_device,
+                            download_root=_asr_download_root(),
+                        )
+                        line_report["asr"] = {
+                            **transcript,
+                            **review_transcript(line.text, transcript["text"], language, asr_threshold),
+                        }
+                    except Exception as exc:
+                        line_report["asr"] = {
+                            "expected_text": line.text,
+                            "recognized_text": "",
+                            "passed": False,
+                            "similarity": 0.0,
+                            "threshold": float(asr_threshold),
+                            "language": language,
+                            "model": asr_model,
+                            "error": str(exc).strip() or type(exc).__name__,
+                        }
+                line_reports.append(line_report)
         finally:
             if model.release_after_run:
                 MODEL_CACHE.release(work_handle)
@@ -971,12 +1075,28 @@ class T8IndexTTS25DialogueGenerate(io.ComfyNode):
             postprocess_strength,
         )
         waveform = combined_audio["waveform"]
+        rewritten_srt, subtitle_report = rewrite_srt(
+            dialogue_script.lines,
+            line_reports,
+            timing_mode=subtitle_timing_mode,
+            text_mode=subtitle_text_mode,
+            include_role=subtitle_include_role,
+        )
         report = {
             "script_type": dialogue_script.script_type,
             "timeline_policy": timeline_policy,
             "fit_srt_slots": bool(fit_srt_slots),
             "slot_duration_mode": slot_duration_mode,
             "postprocess": postprocess_report,
+            "asr": {
+                "enabled": bool(asr_enabled),
+                "model": asr_model,
+                "device": asr_device,
+                "threshold": float(asr_threshold),
+                "reviewed": sum("asr" in item for item in line_reports),
+                "passed": sum(bool((item.get("asr") or {}).get("passed")) for item in line_reports),
+            },
+            "subtitle_rewrite": subtitle_report,
             "sample_rate": sample_rate,
             "duration_ms": round(waveform.shape[-1] * 1000 / sample_rate),
             "lines": line_reports,
@@ -985,7 +1105,100 @@ class T8IndexTTS25DialogueGenerate(io.ComfyNode):
             {"waveform": waveform, "sample_rate": sample_rate},
             clips,
             json.dumps(report, ensure_ascii=False, indent=2),
+            rewritten_srt,
+            timeline_json(dialogue_script.lines, line_reports),
         )
+
+
+class T8IndexTTS25ASRProofread(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="T8_IndexTTS25_ASRProofread",
+            display_name="IndexTTS 2.5 ASR 自动校对 · T8star-Aix",
+            category=CATEGORY,
+            essentials_category="Audio",
+            search_aliases=["Whisper", "ASR", "语音校对", "CER"],
+            description=(
+                "使用可选的本地 OpenAI Whisper 识别 AUDIO，并与原文计算相似度和字符错误率；"
+                "不安装时只影响本节点。"
+            ),
+            inputs=[
+                io.Audio.Input("audio", display_name="待校对音频"),
+                io.String.Input("expected_text", display_name="原始文本", multiline=True, dynamic_prompts=False),
+                io.Combo.Input("language", display_name="语言", options=["AUTO", "ZH", "EN", "JA", "ES", "AR"], default="AUTO"),
+                io.Combo.Input("model_name", display_name="ASR 模型", options=list(ASR_MODELS), default="base"),
+                io.Combo.Input("device", display_name="ASR 设备", options=["auto", "cuda", "cpu"], default="auto", advanced=True),
+                io.Float.Input("threshold", display_name="通过阈值", default=0.82, min=0.0, max=1.0, step=0.01),
+            ],
+            outputs=[
+                io.String.Output("recognized_text", display_name="识别文本"),
+                io.Boolean.Output("passed", display_name="是否通过"),
+                io.Float.Output("similarity", display_name="相似度"),
+                io.String.Output("review_report", display_name="校对报告 JSON"),
+            ],
+        )
+
+    @classmethod
+    def execute(cls, audio: dict, expected_text: str, language: str, model_name: str, device: str, threshold: float) -> io.NodeOutput:
+        if not asr_available():
+            raise RuntimeError("缺少可选依赖 openai-whisper；请在 ComfyUI Python 环境中手动安装。")
+        transcript = transcribe_waveform(
+            audio["waveform"],
+            int(audio["sample_rate"]),
+            language=language,
+            model_name=model_name,
+            device=device,
+            download_root=_asr_download_root(),
+        )
+        review = {**transcript, **review_transcript(expected_text, transcript["text"], language, threshold)}
+        return io.NodeOutput(
+            transcript["text"],
+            bool(review["passed"]),
+            float(review["similarity"]),
+            json.dumps(review, ensure_ascii=False, indent=2),
+        )
+
+
+class T8IndexTTS25SubtitleRewrite(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="T8_IndexTTS25_SubtitleRewrite",
+            display_name="IndexTTS 2.5 字幕自动回写 · T8star-Aix",
+            category=CATEGORY,
+            search_aliases=["SRT rewrite", "字幕回写", "ASR subtitle"],
+            description="根据多角色生成报告中的实际时间和 ASR 结果生成可保存的 SRT 文本。",
+            inputs=[
+                DialogueScriptType.Input("dialogue_script", display_name="台词脚本"),
+                io.String.Input("generation_report", display_name="多角色生成报告 JSON", multiline=True, dynamic_prompts=False),
+                io.Combo.Input("timing_mode", display_name="字幕时间", options=["actual", "original"], default="actual"),
+                io.Combo.Input("text_mode", display_name="字幕文本", options=["asr_passed", "asr_all", "original"], default="asr_passed"),
+                io.Boolean.Input("include_role", display_name="保留角色前缀", default=True),
+            ],
+            outputs=[
+                io.String.Output("srt", display_name="回写 SRT"),
+                io.String.Output("rewrite_report", display_name="回写报告 JSON"),
+            ],
+        )
+
+    @classmethod
+    def execute(cls, dialogue_script: DialogueScript, generation_report: str, timing_mode: str, text_mode: str, include_role: bool) -> io.NodeOutput:
+        try:
+            payload = json.loads(str(generation_report or "{}"))
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"生成报告 JSON 格式错误：{exc.msg}（第 {exc.lineno} 行）") from exc
+        reports = payload.get("lines") if isinstance(payload, dict) else None
+        if not isinstance(reports, list):
+            raise ValueError("生成报告中缺少 lines 数组。")
+        content, report = rewrite_srt(
+            dialogue_script.lines,
+            reports,
+            timing_mode=timing_mode,
+            text_mode=text_mode,
+            include_role=include_role,
+        )
+        return io.NodeOutput(content, json.dumps(report, ensure_ascii=False, indent=2))
 
 
 class T8IndexTTS25Environment(io.ComfyNode):
@@ -1268,7 +1481,10 @@ class T8IndexTTS25Extension(ComfyExtension):
             T8IndexTTS25VoiceProfile,
             T8IndexTTS25RoleLibrary,
             T8IndexTTS25DialogueScript,
+            T8IndexTTS25TimelineEditor,
             T8IndexTTS25DialogueGenerate,
+            T8IndexTTS25ASRProofread,
+            T8IndexTTS25SubtitleRewrite,
             T8IndexTTS25AudioPostProcess,
             T8IndexTTS25Environment,
         ]
@@ -1288,7 +1504,10 @@ __all__ = [
     "T8IndexTTS25VoiceProfile",
     "T8IndexTTS25RoleLibrary",
     "T8IndexTTS25DialogueScript",
+    "T8IndexTTS25TimelineEditor",
     "T8IndexTTS25DialogueGenerate",
+    "T8IndexTTS25ASRProofread",
+    "T8IndexTTS25SubtitleRewrite",
     "T8IndexTTS25AudioPostProcess",
     "T8IndexTTS25Environment",
     "T8IndexTTS25Extension",

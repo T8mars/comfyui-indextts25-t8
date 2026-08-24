@@ -1,6 +1,6 @@
 {
-  "last_node_id": 9,
-  "last_link_id": 8,
+  "last_node_id": 10,
+  "last_link_id": 10,
   "nodes": [
     {
       "id": 1,
@@ -435,7 +435,8 @@
           "name": "dialogue_script",
           "type": "T8_INDEXTTS25_DIALOGUE_SCRIPT",
           "links": [
-            7
+            7,
+            8
           ]
         },
         {
@@ -450,8 +451,8 @@
         "ver": "0.8.0"
       },
       "widgets_values": [
-        "batch",
-        "角色A|你终于来了，我们开始吧。|ZH|1.0\n角色B|好，我已经准备好了。|ZH|0.95\n角色A|第一幕，现在开始。|ZH|1.05",
+        "srt",
+        "1\n00:00:00,000 --> 00:00:02,500\n[角色A] 自动校对第一条字幕。\n\n2\n00:00:02,700 --> 00:00:05,000\n[角色B] 识别通过后自动回写文本。",
         "角色A",
         "ZH"
       ]
@@ -461,7 +462,7 @@
       "type": "T8_IndexTTS25_DialogueGenerate",
       "pos": [
         1220,
-        220
+        100
       ],
       "size": [
         500,
@@ -618,7 +619,7 @@
           "name": "audio",
           "type": "AUDIO",
           "links": [
-            8
+            10
           ]
         },
         {
@@ -629,7 +630,9 @@
         {
           "name": "generation_report",
           "type": "STRING",
-          "links": []
+          "links": [
+            9
+          ]
         },
         {
           "name": "rewritten_srt",
@@ -651,13 +654,13 @@
         20260818,
         "fixed",
         "shift",
-        false,
+        true,
         "native",
         180,
         200,
         "off",
         1.0,
-        false,
+        true,
         "base",
         "auto",
         0.82,
@@ -668,23 +671,96 @@
     },
     {
       "id": 9,
-      "type": "SaveAudio",
+      "type": "T8_IndexTTS25_SubtitleRewrite",
       "pos": [
-        1760,
-        360
+        1780,
+        520
       ],
       "size": [
-        320,
-        130
+        460,
+        390
       ],
       "flags": {},
       "order": 8,
       "mode": 0,
       "inputs": [
         {
+          "name": "dialogue_script",
+          "type": "T8_INDEXTTS25_DIALOGUE_SCRIPT",
+          "link": 8
+        },
+        {
+          "name": "generation_report",
+          "type": "STRING",
+          "link": 9
+        },
+        {
+          "name": "timing_mode",
+          "type": "COMBO",
+          "widget": {
+            "name": "timing_mode"
+          },
+          "link": null
+        },
+        {
+          "name": "text_mode",
+          "type": "COMBO",
+          "widget": {
+            "name": "text_mode"
+          },
+          "link": null
+        },
+        {
+          "name": "include_role",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "include_role"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "srt",
+          "type": "STRING",
+          "links": []
+        },
+        {
+          "name": "rewrite_report",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "T8_IndexTTS25_SubtitleRewrite",
+        "cnr_id": "comfyui-indextts25-t8",
+        "ver": "0.8.0"
+      },
+      "widgets_values": [
+        "actual",
+        "asr_passed",
+        true
+      ]
+    },
+    {
+      "id": 10,
+      "type": "SaveAudio",
+      "pos": [
+        2300,
+        120
+      ],
+      "size": [
+        320,
+        130
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {
           "name": "audio",
           "type": "AUDIO",
-          "link": 8
+          "link": 10
         },
         {
           "name": "filename_prefix",
@@ -708,7 +784,7 @@
         "ver": "0.8.0"
       },
       "widgets_values": [
-        "IndexTTS25_T8/batch_dialogue"
+        "IndexTTS25_T8/subtitle_rewrite"
       ]
     }
   ],
@@ -771,21 +847,37 @@
     ],
     [
       8,
-      8,
+      7,
       0,
       9,
+      0,
+      "T8_INDEXTTS25_DIALOGUE_SCRIPT"
+    ],
+    [
+      9,
+      8,
+      2,
+      9,
+      1,
+      "STRING"
+    ],
+    [
+      10,
+      8,
+      0,
+      10,
       0,
       "AUDIO"
     ]
   ],
   "groups": [
     {
-      "title": "11 多角色对话 · B站：T8star-Aix",
+      "title": "22 ASR 字幕自动回写 · B站：T8star-Aix",
       "bounding": [
         -40,
         -60,
-        2160,
-        1150
+        2700,
+        1030
       ],
       "color": "#3f789e",
       "font_size": 24,

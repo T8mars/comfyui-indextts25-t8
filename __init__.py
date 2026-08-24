@@ -33,5 +33,5 @@ except ModuleNotFoundError as exc:
     async def comfy_entrypoint():
         raise RuntimeError("comfy_api.latest is required; install this directory inside a current ComfyUI build.") from _COMFY_IMPORT_ERROR
 
-__version__ = "0.7.0"
+__version__ = "0.8.0"
 __all__ = ["comfy_entrypoint", "__version__"]

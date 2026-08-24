@@ -90,7 +90,14 @@
       "fit_tolerance_ms": 180,
       "batch_gap_ms": 200,
       "postprocess_preset": "off",
-      "postprocess_strength": 1.0
+      "postprocess_strength": 1.0,
+      "asr_enabled": false,
+      "asr_model": "base",
+      "asr_device": "auto",
+      "asr_threshold": 0.82,
+      "subtitle_timing_mode": "actual",
+      "subtitle_text_mode": "asr_passed",
+      "subtitle_include_role": true
     }
   },
   "9": {

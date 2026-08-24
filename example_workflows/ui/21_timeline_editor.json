@@ -1,6 +1,6 @@
 {
-  "last_node_id": 9,
-  "last_link_id": 8,
+  "last_node_id": 11,
+  "last_link_id": 10,
   "nodes": [
     {
       "id": 1,
@@ -88,7 +88,7 @@
           "name": "model",
           "type": "T8_INDEXTTS25_MODEL",
           "links": [
-            5
+            7
           ]
         },
         {
@@ -367,7 +367,7 @@
           "name": "role_library",
           "type": "T8_INDEXTTS25_ROLE_LIBRARY",
           "links": [
-            6
+            8
           ]
         },
         {
@@ -435,7 +435,7 @@
           "name": "dialogue_script",
           "type": "T8_INDEXTTS25_DIALOGUE_SCRIPT",
           "links": [
-            7
+            5
           ]
         },
         {
@@ -450,41 +450,130 @@
         "ver": "0.8.0"
       },
       "widgets_values": [
-        "batch",
-        "角色A|你终于来了，我们开始吧。|ZH|1.0\n角色B|好，我已经准备好了。|ZH|0.95\n角色A|第一幕，现在开始。|ZH|1.05",
+        "srt",
+        "1\n00:00:00,000 --> 00:00:02,000\n[角色A] 第一条编辑后从零点二秒开始。\n\n2\n00:00:02,200 --> 00:00:04,500\n[角色B] 第二条保留独立时间槽位。",
         "角色A",
         "ZH"
       ]
     },
     {
       "id": 8,
-      "type": "T8_IndexTTS25_DialogueGenerate",
+      "type": "T8_IndexTTS25_TimelineEditor",
       "pos": [
-        1220,
-        220
+        1200,
+        650
       ],
       "size": [
-        500,
-        850
+        520,
+        330
       ],
       "flags": {},
       "order": 7,
       "mode": 0,
       "inputs": [
         {
+          "name": "dialogue_script",
+          "type": "T8_INDEXTTS25_DIALOGUE_SCRIPT",
+          "link": 5
+        },
+        {
+          "name": "timeline_edits_json",
+          "type": "STRING",
+          "widget": {
+            "name": "timeline_edits_json"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "dialogue_script",
+          "type": "T8_INDEXTTS25_DIALOGUE_SCRIPT",
+          "links": [
+            9
+          ]
+        },
+        {
+          "name": "timeline_preview",
+          "type": "STRING",
+          "links": []
+        },
+        {
+          "name": "timeline_image",
+          "type": "IMAGE",
+          "links": [
+            6
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "T8_IndexTTS25_TimelineEditor",
+        "cnr_id": "comfyui-indextts25-t8",
+        "ver": "0.8.0"
+      },
+      "widgets_values": [
+        "[\n  {\n    \"index\": 1,\n    \"role\": \"角色A\",\n    \"language\": \"ZH\",\n    \"start_ms\": 200,\n    \"end_ms\": 2000,\n    \"duration_factor\": 1.0,\n    \"text\": \"第一条编辑后从零点二秒开始。\"\n  },\n  {\n    \"index\": 2,\n    \"role\": \"角色B\",\n    \"language\": \"ZH\",\n    \"start_ms\": 2300,\n    \"end_ms\": 4600,\n    \"duration_factor\": 0.95,\n    \"text\": \"第二条保留独立时间槽位。\"\n  }\n]"
+      ]
+    },
+    {
+      "id": 9,
+      "type": "PreviewImage",
+      "pos": [
+        1760,
+        650
+      ],
+      "size": [
+        420,
+        360
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 6
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "PreviewImage",
+        "cnr_id": "comfy-core",
+        "ver": "0.8.0"
+      },
+      "widgets_values": [],
+      "title": "可视化时间轴预览"
+    },
+    {
+      "id": 10,
+      "type": "T8_IndexTTS25_DialogueGenerate",
+      "pos": [
+        1760,
+        80
+      ],
+      "size": [
+        500,
+        850
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {
           "name": "model",
           "type": "T8_INDEXTTS25_MODEL",
-          "link": 5
+          "link": 7
         },
         {
           "name": "role_library",
           "type": "T8_INDEXTTS25_ROLE_LIBRARY",
-          "link": 6
+          "link": 8
         },
         {
           "name": "dialogue_script",
           "type": "T8_INDEXTTS25_DIALOGUE_SCRIPT",
-          "link": 7
+          "link": 9
         },
         {
           "name": "sampling",
@@ -618,7 +707,7 @@
           "name": "audio",
           "type": "AUDIO",
           "links": [
-            8
+            10
           ]
         },
         {
@@ -650,8 +739,8 @@
       "widgets_values": [
         20260818,
         "fixed",
-        "shift",
-        false,
+        "overlay",
+        true,
         "native",
         180,
         200,
@@ -667,24 +756,24 @@
       ]
     },
     {
-      "id": 9,
+      "id": 11,
       "type": "SaveAudio",
       "pos": [
-        1760,
-        360
+        2320,
+        920
       ],
       "size": [
         320,
         130
       ],
       "flags": {},
-      "order": 8,
+      "order": 10,
       "mode": 0,
       "inputs": [
         {
           "name": "audio",
           "type": "AUDIO",
-          "link": 8
+          "link": 10
         },
         {
           "name": "filename_prefix",
@@ -708,7 +797,7 @@
         "ver": "0.8.0"
       },
       "widgets_values": [
-        "IndexTTS25_T8/batch_dialogue"
+        "IndexTTS25_T8/timeline_edited"
       ]
     }
   ],
@@ -747,45 +836,61 @@
     ],
     [
       5,
-      1,
+      7,
       0,
       8,
+      0,
+      "T8_INDEXTTS25_DIALOGUE_SCRIPT"
+    ],
+    [
+      6,
+      8,
+      2,
+      9,
+      0,
+      "IMAGE"
+    ],
+    [
+      7,
+      1,
+      0,
+      10,
       0,
       "T8_INDEXTTS25_MODEL"
     ],
     [
-      6,
+      8,
       6,
       0,
-      8,
+      10,
       1,
       "T8_INDEXTTS25_ROLE_LIBRARY"
     ],
     [
-      7,
-      7,
-      0,
+      9,
       8,
+      0,
+      10,
       2,
       "T8_INDEXTTS25_DIALOGUE_SCRIPT"
     ],
     [
-      8,
-      8,
+      10,
+      10,
       0,
-      9,
+      11,
       0,
       "AUDIO"
     ]
   ],
   "groups": [
     {
-      "title": "11 多角色对话 · B站：T8star-Aix",
+      "title": "21 可视化时间轴编辑 · B站：T8star-Aix",
       "bounding": [
         -40,
         -60,
-        2160,
-        1150
+        2720,
+        1130
       ],
       "color": "#3f789e",
       "font_size": 24,

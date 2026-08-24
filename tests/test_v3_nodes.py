@@ -39,18 +39,105 @@ def test_registers_all_pure_v3_nodes():
         "T8_IndexTTS25_VoiceProfile",
         "T8_IndexTTS25_RoleLibrary",
         "T8_IndexTTS25_DialogueScript",
+        "T8_IndexTTS25_TimelineEditor",
         "T8_IndexTTS25_DialogueGenerate",
+        "T8_IndexTTS25_ASRProofread",
+        "T8_IndexTTS25_SubtitleRewrite",
         "T8_IndexTTS25_AudioPostProcess",
         "T8_IndexTTS25_Environment",
     ]
     assert all(schema.category == "T8star-Aix/Audio/IndexTTS 2.5" for schema in schemas)
     assert schemas[5].outputs[0].io_type == "AUDIO"
-    assert schemas[9].outputs[0].io_type == "AUDIO"
     assert schemas[10].outputs[0].io_type == "AUDIO"
+    assert schemas[13].outputs[0].io_type == "AUDIO"
     dialogue_script_input = next(item for item in schemas[8].inputs if item.id == "script")
     assert dialogue_script_input.dynamic_prompts is False
     assert dialogue_script_input.as_dict()["dynamicPrompts"] is False
     assert not hasattr(plugin, "NODE_CLASS_MAPPINGS")
+
+
+def test_timeline_asr_and_subtitle_nodes_form_a_complete_editing_chain(monkeypatch):
+    _load_plugin()
+    from comfyui_indextts25_t8_test import nodes_v3
+    from comfyui_indextts25_t8_test.runtime.dialogue import DialogueLine
+    from comfyui_indextts25_t8_test.runtime.types import DialogueScript
+
+    script = DialogueScript([DialogueLine(1, "旁白", "原始字幕", "ZH", 0, 1000, 1.0)], "srt")
+    edited = nodes_v3.T8IndexTTS25TimelineEditor.execute(
+        script,
+        '[{"index":1,"role":"旁白","language":"ZH","start_ms":100,"end_ms":900,"duration_factor":1.0,"text":"修改字幕"}]',
+    )
+    assert edited[0].lines[0].start_ms == 100
+    assert "milliseconds" in edited[1]
+    assert tuple(edited[2].shape) == (1, 96, 1200, 3)
+
+    monkeypatch.setattr(nodes_v3, "asr_available", lambda: True)
+    monkeypatch.setattr(
+        nodes_v3,
+        "transcribe_waveform",
+        lambda *args, **kwargs: {"text": "修改字幕", "model": "tiny", "device": "cpu"},
+    )
+    asr = nodes_v3.T8IndexTTS25ASRProofread.execute(
+        {"waveform": __import__("torch").zeros(1, 1, 16000), "sample_rate": 16000},
+        "修改字幕",
+        "ZH",
+        "tiny",
+        "cpu",
+        0.8,
+    )
+    assert asr[0] == "修改字幕"
+    assert asr[1] is True
+    assert asr[2] == pytest.approx(1.0)
+
+    generation_report = '{"lines":[{"index":1,"timeline":{"actual_start_ms":150,"actual_end_ms":950},"asr":{"recognized_text":"识别字幕","passed":true}}]}'
+    rewritten = nodes_v3.T8IndexTTS25SubtitleRewrite.execute(
+        edited[0], generation_report, "actual", "asr_passed", True
+    )
+    assert "00:00:00,150 --> 00:00:00,950" in rewritten[0]
+    assert "[旁白] 识别字幕" in rewritten[0]
+
+
+def test_dialogue_generation_can_auto_review_and_return_rewritten_srt(tmp_path, monkeypatch):
+    _load_plugin()
+    from comfyui_indextts25_t8_test import nodes_v3
+    from comfyui_indextts25_t8_test.runtime.dialogue import DialogueLine
+    from comfyui_indextts25_t8_test.runtime.types import DialogueScript, ModelHandle, RoleLibrary, VoiceProfile
+
+    audio = {"waveform": __import__("torch").zeros(1, 1, 22050), "sample_rate": 22050}
+    monkeypatch.setattr(nodes_v3, "run_inference", lambda *args, **kwargs: (audio, "fake inference"))
+    monkeypatch.setattr(nodes_v3, "asr_available", lambda: True)
+    monkeypatch.setattr(
+        nodes_v3,
+        "transcribe_waveform",
+        lambda *args, **kwargs: {"text": "自动校对字幕", "model": "tiny", "device": "cpu"},
+    )
+    script = DialogueScript([DialogueLine(1, "角色A", "自动校对字幕", "ZH", 100, 1100)], "srt")
+    library = RoleLibrary({"角色A": VoiceProfile("角色A", audio, "ZH")})
+    result = nodes_v3.T8IndexTTS25DialogueGenerate.execute(
+        ModelHandle(tmp_path, "cpu", False),
+        library,
+        script,
+        1,
+        "overlay",
+        False,
+        "native",
+        180,
+        200,
+        "off",
+        1.0,
+        True,
+        "tiny",
+        "cpu",
+        0.8,
+        "actual",
+        "asr_passed",
+        True,
+    )
+    report = __import__("json").loads(result[2])
+    assert report["lines"][0]["asr"]["passed"] is True
+    assert "00:00:00,100 --> 00:00:01,100" in result[3]
+    assert "[角色A] 自动校对字幕" in result[3]
+    assert "\"reports\"" in result[4]
 
 
 def test_pronunciation_node_outputs_portable_annotated_text():

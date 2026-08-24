@@ -1,6 +1,6 @@
 {
-  "last_node_id": 4,
-  "last_link_id": 3,
+  "last_node_id": 5,
+  "last_link_id": 4,
   "nodes": [
     {
       "id": 1,
@@ -161,7 +161,7 @@
       "type": "T8_IndexTTS25_Generate",
       "pos": [
         900,
-        100
+        40
       ],
       "size": [
         470,
@@ -263,7 +263,8 @@
           "name": "audio",
           "type": "AUDIO",
           "links": [
-            3
+            3,
+            4
           ]
         },
         {
@@ -278,27 +279,27 @@
         "ver": "0.8.0"
       },
       "widgets_values": [
-        "这段语音会使用原生长度调节器，在一次推理中适配到五秒。",
+        "这是 ASR 自动校对示例，节点会识别生成音频并计算相似度和字符错误率。",
         "ZH",
         1.0,
-        "native",
-        5.0,
+        "off",
+        0.0,
         "off",
         1.0,
-        20260822,
+        20260825,
         "fixed"
       ]
     },
     {
       "id": 4,
-      "type": "SaveAudio",
+      "type": "T8_IndexTTS25_ASRProofread",
       "pos": [
         1460,
-        180
+        20
       ],
       "size": [
-        320,
-        130
+        430,
+        420
       ],
       "flags": {},
       "order": 3,
@@ -308,6 +309,102 @@
           "name": "audio",
           "type": "AUDIO",
           "link": 3
+        },
+        {
+          "name": "expected_text",
+          "type": "STRING",
+          "widget": {
+            "name": "expected_text"
+          },
+          "link": null
+        },
+        {
+          "name": "language",
+          "type": "COMBO",
+          "widget": {
+            "name": "language"
+          },
+          "link": null
+        },
+        {
+          "name": "model_name",
+          "type": "COMBO",
+          "widget": {
+            "name": "model_name"
+          },
+          "link": null
+        },
+        {
+          "name": "device",
+          "type": "COMBO",
+          "widget": {
+            "name": "device"
+          },
+          "link": null
+        },
+        {
+          "name": "threshold",
+          "type": "FLOAT",
+          "widget": {
+            "name": "threshold"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "recognized_text",
+          "type": "STRING",
+          "links": []
+        },
+        {
+          "name": "passed",
+          "type": "BOOLEAN",
+          "links": []
+        },
+        {
+          "name": "similarity",
+          "type": "FLOAT",
+          "links": []
+        },
+        {
+          "name": "review_report",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "T8_IndexTTS25_ASRProofread",
+        "cnr_id": "comfyui-indextts25-t8",
+        "ver": "0.8.0"
+      },
+      "widgets_values": [
+        "这是 ASR 自动校对示例，节点会识别生成音频并计算相似度和字符错误率。",
+        "ZH",
+        "base",
+        "auto",
+        0.82
+      ]
+    },
+    {
+      "id": 5,
+      "type": "SaveAudio",
+      "pos": [
+        1960,
+        300
+      ],
+      "size": [
+        320,
+        130
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "link": 4
         },
         {
           "name": "filename_prefix",
@@ -331,7 +428,7 @@
         "ver": "0.8.0"
       },
       "widgets_values": [
-        "IndexTTS25_T8/target_5s"
+        "IndexTTS25_T8/asr_proofread"
       ]
     }
   ],
@@ -359,16 +456,24 @@
       4,
       0,
       "AUDIO"
+    ],
+    [
+      4,
+      3,
+      0,
+      5,
+      0,
+      "AUDIO"
     ]
   ],
   "groups": [
     {
-      "title": "17 目标时长秒数 · B站：T8star-Aix",
+      "title": "20 ASR 自动校对 · B站：T8star-Aix",
       "bounding": [
         -40,
         -60,
-        1860,
-        740
+        2360,
+        680
       ],
       "color": "#3f789e",
       "font_size": 24,
