@@ -36,6 +36,7 @@ def test_normalize_postprocess_is_optional_and_reports_peak():
     assert off_report["preset"] == "off"
     assert report["preset"] == "normalize"
     assert float(normalized["waveform"].abs().max()) < 1.0
+    assert normalized["waveform"][..., -1].item() == 0.0
 
 
 def test_all_voice_presets_produce_finite_bounded_audio():

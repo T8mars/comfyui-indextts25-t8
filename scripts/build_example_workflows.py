@@ -19,6 +19,7 @@ PRONUNCIATION_NODE = "T8_IndexTTS25_Pronunciation"
 GENERATE_NODE = "T8_IndexTTS25_Generate"
 VOICE_NODE = "T8_IndexTTS25_VoiceProfile"
 ROLE_LIBRARY_NODE = "T8_IndexTTS25_RoleLibrary"
+MERGE_EMOTIONS_NODE = "T8_IndexTTS25_MergeVoiceEmotions"
 DIALOGUE_SCRIPT_NODE = "T8_IndexTTS25_DialogueScript"
 TIMELINE_EDITOR_NODE = "T8_IndexTTS25_TimelineEditor"
 DIALOGUE_GENERATE_NODE = "T8_IndexTTS25_DialogueGenerate"
@@ -55,7 +56,7 @@ def properties(node_type: str, *, core: bool = False) -> dict[str, str]:
     return {
         "Node name for S&R": node_type,
         "cnr_id": "comfy-core" if core else "comfyui-indextts25-t8",
-        "ver": "0.8.1",
+        "ver": "0.10.0",
     }
 
 
@@ -419,6 +420,17 @@ def add_role_library(workflow: Workflow, count: int, pos=(800, 40)) -> int:
     )
 
 
+def add_merge_voice_emotions(workflow: Workflow, count: int, pos=(800, 40)) -> int:
+    return workflow.add(
+        MERGE_EMOTIONS_NODE,
+        pos,
+        (390, 160 + count * 35),
+        [slot_input(f"voices.voice_{index}", "T8_INDEXTTS25_VOICE", optional=index > 0) for index in range(count)],
+        [output("role_library", "T8_INDEXTTS25_ROLE_LIBRARY"), output("role_info", "STRING")],
+        title="合并各角色的音色与独立情感",
+    )
+
+
 def add_dialogue_script(workflow: Workflow, script_type: str, script: str, default_role: str, pos=(400, 620)) -> int:
     return workflow.add(
         DIALOGUE_SCRIPT_NODE,
@@ -683,16 +695,32 @@ def api_emotion(mode: str, **values: Any) -> dict[str, Any]:
     return {"class_type": EMOTION_NODE, "inputs": inputs}
 
 
-def api_voice(role: str, audio_id: str, language: str = "ZH") -> dict[str, Any]:
-    return {
-        "class_type": VOICE_NODE,
-        "inputs": {"role_name": role, "speaker_audio": [audio_id, 0], "language": language},
+def api_voice(
+    role: str,
+    audio_id: str,
+    language: str = "ZH",
+    emotion_id: str | None = None,
+) -> dict[str, Any]:
+    inputs: dict[str, Any] = {
+        "role_name": role,
+        "speaker_audio": [audio_id, 0],
+        "language": language,
     }
+    if emotion_id:
+        inputs["emotion"] = [emotion_id, 0]
+    return {"class_type": VOICE_NODE, "inputs": inputs}
 
 
 def api_role_library(voice_ids: list[str]) -> dict[str, Any]:
     return {
         "class_type": ROLE_LIBRARY_NODE,
+        "inputs": {f"voices.voice_{index}": [voice_id, 0] for index, voice_id in enumerate(voice_ids)},
+    }
+
+
+def api_merge_voice_emotions(voice_ids: list[str]) -> dict[str, Any]:
+    return {
+        "class_type": MERGE_EMOTIONS_NODE,
         "inputs": {f"voices.voice_{index}": [voice_id, 0] for index, voice_id in enumerate(voice_ids)},
     }
 
@@ -969,9 +997,9 @@ def _pronunciation_pair(
 def chinese_pronunciation_pair() -> tuple[dict[str, Any], dict[str, Any]]:
     return _pronunciation_pair(
         "08 中文多音字词典",
-        "他在银行里工作，行长正在开会；这段手工标注的银<行|HANG2>不会被词典覆盖。",
+        "小明<要求|YAO4 QIU2>这个题的答案是多少；他在银行里工作，行长正在开会。",
         "ZH",
-        "银行|YIN2 HANG2|ZH\n行长|HANG2 ZHANG3|ZH\n重庆|CHONG2 QING4|ZH",
+        "要求|YAO4 QIU2|ZH\n银行|YIN2 HANG2|ZH\n行长|HANG2 ZHANG3|ZH\n重庆|CHONG2 QING4|ZH",
         "IndexTTS25_T8/pronunciation_zh",
     )
 
@@ -1058,12 +1086,70 @@ def srt_dialogue_pair() -> tuple[dict[str, Any], dict[str, Any]]:
     return _dialogue_pair("13 SRT 多角色配音", "srt", script, policy="shift", fit=True)
 
 
+def multi_role_emotions_pair() -> tuple[dict[str, Any], dict[str, Any]]:
+    vector_a = {
+        "happy": 0.55,
+        "surprised": 0.10,
+        "calm": 0.15,
+        "strength": 1.0,
+        "use_random": False,
+    }
+    vector_b = {
+        "angry": 0.15,
+        "sad": 0.45,
+        "calm": 0.10,
+        "strength": 0.9,
+        "use_random": False,
+    }
+    script = (
+        "角色A|太好了，我们终于找到出口了！|ZH|0.95\n"
+        "角色B|别高兴得太早，我听见后面还有脚步声。|ZH|1.05\n"
+        "角色A|那就冷静一点，我们一起离开这里。|ZH|1.0"
+    )
+    workflow = Workflow("23 多角色独立情感与 Merge Voice Emotions")
+    model = add_model(workflow, pos=(0, 0))
+    audio_a = add_load_audio(workflow, "role_a.wav", pos=(0, 340), title="角色 A 音色参考")
+    audio_b = add_load_audio(workflow, "role_b.wav", pos=(0, 520), title="角色 B 音色参考")
+    emotion_a = add_emotion(workflow, "vector", pos=(400, 0), **vector_a)
+    emotion_b = add_emotion(workflow, "vector", pos=(400, 570), **vector_b)
+    voice_a = add_voice_profile(workflow, "角色A", "ZH", pos=(840, 40))
+    voice_b = add_voice_profile(workflow, "角色B", "ZH", pos=(840, 390))
+    merged = add_merge_voice_emotions(workflow, 2, pos=(1240, 160))
+    script_node = add_dialogue_script(workflow, "batch", script, "角色A", pos=(840, 730))
+    generate = add_dialogue_generate(workflow, pos=(1680, 210))
+    save = add_save(workflow, "IndexTTS25_T8/multi_role_emotions", pos=(2240, 390))
+    workflow.connect(audio_a, "AUDIO", voice_a, "speaker_audio")
+    workflow.connect(audio_b, "AUDIO", voice_b, "speaker_audio")
+    workflow.connect(emotion_a, "emotion", voice_a, "emotion")
+    workflow.connect(emotion_b, "emotion", voice_b, "emotion")
+    workflow.connect(voice_a, "voice", merged, "voices.voice_0")
+    workflow.connect(voice_b, "voice", merged, "voices.voice_1")
+    workflow.connect(model, "model", generate, "model")
+    workflow.connect(merged, "role_library", generate, "role_library")
+    workflow.connect(script_node, "dialogue_script", generate, "dialogue_script")
+    workflow.connect(generate, "audio", save, "audio")
+    api = {
+        "1": api_model(),
+        "2": api_audio("role_a.wav"),
+        "3": api_audio("role_b.wav"),
+        "4": api_emotion("vector", **vector_a),
+        "5": api_emotion("vector", **vector_b),
+        "6": api_voice("角色A", "2", emotion_id="4"),
+        "7": api_voice("角色B", "3", emotion_id="5"),
+        "8": api_merge_voice_emotions(["6", "7"]),
+        "9": api_dialogue_script("batch", script, "角色A"),
+        "10": api_dialogue_generate("1", "8", "9"),
+        "11": api_save("10", "IndexTTS25_T8/multi_role_emotions"),
+    }
+    return workflow.as_dict(), api
+
+
 def acceleration_pair() -> tuple[dict[str, Any], dict[str, Any]]:
     workflow = Workflow("14 可选加速与环境诊断")
     model = add_model(workflow)
     workflow.nodes[model - 1]["widgets_values"][3] = "auto_safe"
     speaker = add_load_audio(workflow, "voice_reference.wav", title="音色参考音频")
-    environment = workflow.add(
+    workflow.add(
         ENVIRONMENT_NODE,
         (440, 0),
         (390, 140),
@@ -1341,6 +1427,7 @@ EXAMPLES = {
     "20_asr_proofread": asr_proofread_pair,
     "21_timeline_editor": timeline_editor_pair,
     "22_subtitle_rewrite": subtitle_rewrite_pair,
+    "23_multi_role_emotions": multi_role_emotions_pair,
 }
 
 

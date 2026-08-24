@@ -12,6 +12,31 @@ MATPLOTLIB_FLAG = False
 PCM16_MAX = 32767.0
 
 
+def fade_out_pcm_tail(wav, sampling_rate, duration_ms=20.0):
+    """Return a copy whose final samples fade smoothly to an exact zero."""
+    result = wav.detach().clone()
+    if result.numel() == 0 or result.shape[-1] == 0:
+        return result.contiguous()
+    fade_samples = min(
+        result.shape[-1],
+        max(1, round(float(sampling_rate) * max(0.0, float(duration_ms)) / 1000.0)),
+    )
+    if fade_samples == 1:
+        result[..., -1] = 0
+        return result.contiguous()
+    fade = torch.linspace(
+        1.0,
+        0.0,
+        fade_samples,
+        dtype=torch.float32,
+        device=result.device,
+    )
+    tail = result[..., -fade_samples:].to(torch.float32) * fade
+    result[..., -fade_samples:] = tail.to(result.dtype)
+    result[..., -1] = 0
+    return result.contiguous()
+
+
 def _torchaudio_honors_wav_encoding_args():
     """Return whether torchaudio.save still honors WAV encoding arguments."""
     raw = getattr(torchaudio, "__version__", "") or ""

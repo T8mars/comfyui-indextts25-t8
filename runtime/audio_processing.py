@@ -8,6 +8,8 @@ from typing import Any
 import torch
 import torch.nn.functional as F
 
+from indextts.utils.common import fade_out_pcm_tail
+
 from .audio_adapter import validate_comfy_audio
 
 
@@ -131,6 +133,7 @@ def postprocess_audio(
     processed = _filters(source, sample_rate, normalized)
     mixed = source * (1.0 - amount) + processed * amount
     mixed = _peak_normalize(mixed, float(target_peak_db)).clamp(-1.0, 1.0).contiguous()
+    mixed = fade_out_pcm_tail(mixed, sample_rate)
     if not torch.isfinite(mixed).all():
         raise RuntimeError("音频后处理产生了非法数值。")
     return {"waveform": mixed, "sample_rate": sample_rate}, {

@@ -420,7 +420,13 @@ class UnifiedVoice(nn.Module):
         self.use_accel = use_accel
         self.accel_engine = None  # Will be initialized in post_init_gpt2_config
 
-    def post_init_gpt2_config(self, use_deepspeed=False, kv_cache=False, half=False):
+    def post_init_gpt2_config(
+        self,
+        use_deepspeed=False,
+        kv_cache=False,
+        half=False,
+        deepspeed_dtype=None,
+    ):
         seq_length = self.max_mel_tokens + self.max_text_tokens + 2
         gpt_config = GPT2Config(
             vocab_size=self.number_mel_codes,
@@ -473,19 +479,15 @@ class UnifiedVoice(nn.Module):
             self.mel_head,
             kv_cache=kv_cache,
         )
-        if use_deepspeed and half and torch.cuda.is_available():
+        if use_deepspeed and torch.cuda.is_available():
             import deepspeed
+            inference_dtype = deepspeed_dtype or (
+                torch.float16 if half else torch.float32
+            )
             self.ds_engine = deepspeed.init_inference(model=self.inference_model,
                                                       mp_size=1,
                                                       replace_with_kernel_inject=True,
-                                                      dtype=torch.float16)
-            self.inference_model = self.ds_engine.module.eval()
-        elif use_deepspeed and torch.cuda.is_available():
-            import deepspeed
-            self.ds_engine = deepspeed.init_inference(model=self.inference_model,
-                                                      mp_size=1,
-                                                      replace_with_kernel_inject=True,
-                                                      dtype=torch.float32)
+                                                      dtype=inference_dtype)
             self.inference_model = self.ds_engine.module.eval()
         else:
             self.inference_model = self.inference_model.eval()

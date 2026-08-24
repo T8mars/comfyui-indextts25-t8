@@ -31,6 +31,7 @@
 | `20_asr_proofread.json` | 双 Whisper 后端、CER/WER、差异和词级时间戳校对 | `voice_reference.wav` |
 | `21_timeline_editor.json` | 以毫秒编辑起止时间，并用 Preview Image 显示彩色轨道 | `role_a.wav`、`role_b.wav` |
 | `22_subtitle_rewrite.json` | 根据生成报告回写实际时间轴和校对通过的 ASR 文本 | 无 |
+| `23_multi_role_emotions.json` | 两个角色分别使用独立八维情感，并通过 `Merge Voice Emotions` 汇总 | `role_a.wav`、`role_b.wav` |
 
 ## 使用方法
 
@@ -42,6 +43,9 @@
 
 角色音色库同样使用 V3 自动增长扁平路径 `voices.voice_0`、`voices.voice_1`。SRT 示例默认使用
 原生长度调节器单次适配字幕槽位，并在最终输出做采样点级收尾；目标时长与自然语速差异过大时仍可能影响听感。
+
+示例 23 中，每个“情感控制”先连接到对应的“角色音色”，再由 `Merge Voice Emotions` 汇总角色。
+该节点合并的是角色配置列表，不是把两个角色的八维情绪数值平均到一起。
 
 示例 20 需要可选的 `openai-whisper`，首次运行会从网络下载所选模型到
 `ComfyUI/models/TTS/Whisper/`。示例 21 的 `start_ms / end_ms` 单位均为毫秒；示例 22 内置的是可直接

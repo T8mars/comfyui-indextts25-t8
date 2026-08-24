@@ -1,6 +1,6 @@
 {
-  "last_node_id": 9,
-  "last_link_id": 8,
+  "last_node_id": 11,
+  "last_link_id": 10,
   "nodes": [
     {
       "id": 1,
@@ -88,7 +88,7 @@
           "name": "model",
           "type": "T8_INDEXTTS25_MODEL",
           "links": [
-            5
+            7
           ]
         },
         {
@@ -154,7 +154,7 @@
       "widgets_values": [
         "role_a.wav"
       ],
-      "title": "角色 A 参考音频"
+      "title": "角色 A 音色参考"
     },
     {
       "id": 3,
@@ -197,21 +197,295 @@
       "widgets_values": [
         "role_b.wav"
       ],
-      "title": "角色 B 参考音频"
+      "title": "角色 B 音色参考"
     },
     {
       "id": 4,
-      "type": "T8_IndexTTS25_VoiceProfile",
+      "type": "T8_IndexTTS25_EmotionControl",
       "pos": [
         400,
         0
+      ],
+      "size": [
+        390,
+        520
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "mode",
+          "type": "COMFY_DYNAMICCOMBO_V3",
+          "widget": {
+            "name": "mode"
+          },
+          "link": null
+        },
+        {
+          "name": "mode.happy",
+          "type": "FLOAT",
+          "widget": {
+            "name": "mode.happy"
+          },
+          "link": null
+        },
+        {
+          "name": "mode.angry",
+          "type": "FLOAT",
+          "widget": {
+            "name": "mode.angry"
+          },
+          "link": null
+        },
+        {
+          "name": "mode.sad",
+          "type": "FLOAT",
+          "widget": {
+            "name": "mode.sad"
+          },
+          "link": null
+        },
+        {
+          "name": "mode.afraid",
+          "type": "FLOAT",
+          "widget": {
+            "name": "mode.afraid"
+          },
+          "link": null
+        },
+        {
+          "name": "mode.disgusted",
+          "type": "FLOAT",
+          "widget": {
+            "name": "mode.disgusted"
+          },
+          "link": null
+        },
+        {
+          "name": "mode.melancholic",
+          "type": "FLOAT",
+          "widget": {
+            "name": "mode.melancholic"
+          },
+          "link": null
+        },
+        {
+          "name": "mode.surprised",
+          "type": "FLOAT",
+          "widget": {
+            "name": "mode.surprised"
+          },
+          "link": null
+        },
+        {
+          "name": "mode.calm",
+          "type": "FLOAT",
+          "widget": {
+            "name": "mode.calm"
+          },
+          "link": null
+        },
+        {
+          "name": "mode.strength",
+          "type": "FLOAT",
+          "widget": {
+            "name": "mode.strength"
+          },
+          "link": null
+        },
+        {
+          "name": "mode.use_random",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "mode.use_random"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "emotion",
+          "type": "T8_INDEXTTS25_EMOTION",
+          "links": [
+            3
+          ]
+        },
+        {
+          "name": "emotion_info",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "T8_IndexTTS25_EmotionControl",
+        "cnr_id": "comfyui-indextts25-t8",
+        "ver": "0.10.0"
+      },
+      "widgets_values": [
+        "vector",
+        0.55,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.1,
+        0.15,
+        1.0,
+        false
+      ]
+    },
+    {
+      "id": 5,
+      "type": "T8_IndexTTS25_EmotionControl",
+      "pos": [
+        400,
+        570
+      ],
+      "size": [
+        390,
+        520
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "mode",
+          "type": "COMFY_DYNAMICCOMBO_V3",
+          "widget": {
+            "name": "mode"
+          },
+          "link": null
+        },
+        {
+          "name": "mode.happy",
+          "type": "FLOAT",
+          "widget": {
+            "name": "mode.happy"
+          },
+          "link": null
+        },
+        {
+          "name": "mode.angry",
+          "type": "FLOAT",
+          "widget": {
+            "name": "mode.angry"
+          },
+          "link": null
+        },
+        {
+          "name": "mode.sad",
+          "type": "FLOAT",
+          "widget": {
+            "name": "mode.sad"
+          },
+          "link": null
+        },
+        {
+          "name": "mode.afraid",
+          "type": "FLOAT",
+          "widget": {
+            "name": "mode.afraid"
+          },
+          "link": null
+        },
+        {
+          "name": "mode.disgusted",
+          "type": "FLOAT",
+          "widget": {
+            "name": "mode.disgusted"
+          },
+          "link": null
+        },
+        {
+          "name": "mode.melancholic",
+          "type": "FLOAT",
+          "widget": {
+            "name": "mode.melancholic"
+          },
+          "link": null
+        },
+        {
+          "name": "mode.surprised",
+          "type": "FLOAT",
+          "widget": {
+            "name": "mode.surprised"
+          },
+          "link": null
+        },
+        {
+          "name": "mode.calm",
+          "type": "FLOAT",
+          "widget": {
+            "name": "mode.calm"
+          },
+          "link": null
+        },
+        {
+          "name": "mode.strength",
+          "type": "FLOAT",
+          "widget": {
+            "name": "mode.strength"
+          },
+          "link": null
+        },
+        {
+          "name": "mode.use_random",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "mode.use_random"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "emotion",
+          "type": "T8_INDEXTTS25_EMOTION",
+          "links": [
+            4
+          ]
+        },
+        {
+          "name": "emotion_info",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "T8_IndexTTS25_EmotionControl",
+        "cnr_id": "comfyui-indextts25-t8",
+        "ver": "0.10.0"
+      },
+      "widgets_values": [
+        "vector",
+        0.0,
+        0.15,
+        0.45,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.1,
+        0.9,
+        false
+      ]
+    },
+    {
+      "id": 6,
+      "type": "T8_IndexTTS25_VoiceProfile",
+      "pos": [
+        840,
+        40
       ],
       "size": [
         360,
         240
       ],
       "flags": {},
-      "order": 3,
+      "order": 5,
       "mode": 0,
       "inputs": [
         {
@@ -238,7 +512,7 @@
         {
           "name": "emotion",
           "type": "T8_INDEXTTS25_EMOTION",
-          "link": null,
+          "link": 3,
           "shape": 7
         }
       ],
@@ -247,7 +521,7 @@
           "name": "voice",
           "type": "T8_INDEXTTS25_VOICE",
           "links": [
-            3
+            5
           ]
         },
         {
@@ -268,18 +542,18 @@
       "title": "角色音色：角色A"
     },
     {
-      "id": 5,
+      "id": 7,
       "type": "T8_IndexTTS25_VoiceProfile",
       "pos": [
-        400,
-        300
+        840,
+        390
       ],
       "size": [
         360,
         240
       ],
       "flags": {},
-      "order": 4,
+      "order": 6,
       "mode": 0,
       "inputs": [
         {
@@ -306,7 +580,7 @@
         {
           "name": "emotion",
           "type": "T8_INDEXTTS25_EMOTION",
-          "link": null,
+          "link": 4,
           "shape": 7
         }
       ],
@@ -315,7 +589,7 @@
           "name": "voice",
           "type": "T8_INDEXTTS25_VOICE",
           "links": [
-            4
+            6
           ]
         },
         {
@@ -336,29 +610,29 @@
       "title": "角色音色：角色B"
     },
     {
-      "id": 6,
-      "type": "T8_IndexTTS25_RoleLibrary",
+      "id": 8,
+      "type": "T8_IndexTTS25_MergeVoiceEmotions",
       "pos": [
-        800,
-        60
+        1240,
+        160
       ],
       "size": [
-        360,
-        210
+        390,
+        230
       ],
       "flags": {},
-      "order": 5,
+      "order": 7,
       "mode": 0,
       "inputs": [
         {
           "name": "voices.voice_0",
           "type": "T8_INDEXTTS25_VOICE",
-          "link": 3
+          "link": 5
         },
         {
           "name": "voices.voice_1",
           "type": "T8_INDEXTTS25_VOICE",
-          "link": 4,
+          "link": 6,
           "shape": 7
         }
       ],
@@ -367,7 +641,7 @@
           "name": "role_library",
           "type": "T8_INDEXTTS25_ROLE_LIBRARY",
           "links": [
-            6
+            8
           ]
         },
         {
@@ -377,24 +651,25 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "T8_IndexTTS25_RoleLibrary",
+        "Node name for S&R": "T8_IndexTTS25_MergeVoiceEmotions",
         "cnr_id": "comfyui-indextts25-t8",
         "ver": "0.10.0"
-      }
+      },
+      "title": "合并各角色的音色与独立情感"
     },
     {
-      "id": 7,
+      "id": 9,
       "type": "T8_IndexTTS25_DialogueScript",
       "pos": [
-        650,
-        520
+        840,
+        730
       ],
       "size": [
         520,
         390
       ],
       "flags": {},
-      "order": 6,
+      "order": 8,
       "mode": 0,
       "inputs": [
         {
@@ -435,7 +710,7 @@
           "name": "dialogue_script",
           "type": "T8_INDEXTTS25_DIALOGUE_SCRIPT",
           "links": [
-            7
+            9
           ]
         },
         {
@@ -451,40 +726,40 @@
       },
       "widgets_values": [
         "batch",
-        "[\n  {\n    \"role\": \"角色A\",\n    \"text\": \"第一条批量台词。\",\n    \"language\": \"ZH\",\n    \"duration_factor\": 0.9\n  },\n  {\n    \"role\": \"角色A\",\n    \"text\": \"第二条批量台词。\",\n    \"language\": \"ZH\",\n    \"duration_factor\": 1.0\n  },\n  {\n    \"role\": \"角色B\",\n    \"text\": \"最后由另一个角色收尾。\",\n    \"language\": \"ZH\",\n    \"duration_factor\": 1.1\n  }\n]",
+        "角色A|太好了，我们终于找到出口了！|ZH|0.95\n角色B|别高兴得太早，我听见后面还有脚步声。|ZH|1.05\n角色A|那就冷静一点，我们一起离开这里。|ZH|1.0",
         "角色A",
         "ZH"
       ]
     },
     {
-      "id": 8,
+      "id": 10,
       "type": "T8_IndexTTS25_DialogueGenerate",
       "pos": [
-        1220,
-        220
+        1680,
+        210
       ],
       "size": [
         500,
         850
       ],
       "flags": {},
-      "order": 7,
+      "order": 9,
       "mode": 0,
       "inputs": [
         {
           "name": "model",
           "type": "T8_INDEXTTS25_MODEL",
-          "link": 5
+          "link": 7
         },
         {
           "name": "role_library",
           "type": "T8_INDEXTTS25_ROLE_LIBRARY",
-          "link": 6
+          "link": 8
         },
         {
           "name": "dialogue_script",
           "type": "T8_INDEXTTS25_DIALOGUE_SCRIPT",
-          "link": 7
+          "link": 9
         },
         {
           "name": "sampling",
@@ -626,7 +901,7 @@
           "name": "audio",
           "type": "AUDIO",
           "links": [
-            8
+            10
           ]
         },
         {
@@ -676,24 +951,24 @@
       ]
     },
     {
-      "id": 9,
+      "id": 11,
       "type": "SaveAudio",
       "pos": [
-        1760,
-        360
+        2240,
+        390
       ],
       "size": [
         320,
         130
       ],
       "flags": {},
-      "order": 8,
+      "order": 10,
       "mode": 0,
       "inputs": [
         {
           "name": "audio",
           "type": "AUDIO",
-          "link": 8
+          "link": 10
         },
         {
           "name": "filename_prefix",
@@ -717,7 +992,7 @@
         "ver": "0.10.0"
       },
       "widgets_values": [
-        "IndexTTS25_T8/batch_dialogue"
+        "IndexTTS25_T8/multi_role_emotions"
       ]
     }
   ],
@@ -726,7 +1001,7 @@
       1,
       2,
       0,
-      4,
+      6,
       1,
       "AUDIO"
     ],
@@ -734,7 +1009,7 @@
       2,
       3,
       0,
-      5,
+      7,
       1,
       "AUDIO"
     ],
@@ -743,58 +1018,74 @@
       4,
       0,
       6,
-      0,
-      "T8_INDEXTTS25_VOICE"
+      3,
+      "T8_INDEXTTS25_EMOTION"
     ],
     [
       4,
       5,
       0,
+      7,
+      3,
+      "T8_INDEXTTS25_EMOTION"
+    ],
+    [
+      5,
       6,
+      0,
+      8,
+      0,
+      "T8_INDEXTTS25_VOICE"
+    ],
+    [
+      6,
+      7,
+      0,
+      8,
       1,
       "T8_INDEXTTS25_VOICE"
     ],
     [
-      5,
+      7,
       1,
       0,
-      8,
+      10,
       0,
       "T8_INDEXTTS25_MODEL"
     ],
     [
-      6,
-      6,
-      0,
       8,
+      8,
+      0,
+      10,
       1,
       "T8_INDEXTTS25_ROLE_LIBRARY"
     ],
     [
-      7,
-      7,
+      9,
+      9,
       0,
-      8,
+      10,
       2,
       "T8_INDEXTTS25_DIALOGUE_SCRIPT"
     ],
     [
-      8,
-      8,
+      10,
+      10,
       0,
-      9,
+      11,
       0,
       "AUDIO"
     ]
   ],
   "groups": [
     {
-      "title": "12 JSON 批量台词 · B站：T8star-Aix",
+      "title": "23 多角色独立情感与 Merge Voice Emotions · B站：T8star-Aix",
       "bounding": [
         -40,
         -60,
-        2160,
-        1150
+        2640,
+        1200
       ],
       "color": "#3f789e",
       "font_size": 24,

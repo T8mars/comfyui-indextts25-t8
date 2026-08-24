@@ -20,7 +20,7 @@ from omegaconf import OmegaConf
 from indextts.codec.models import EnhancedCodec
 from indextts.gpt.model_v2 import UnifiedVoice
 from indextts.utils.checkpoint import load_checkpoint
-from indextts.utils.common import save_pcm_wav
+from indextts.utils.common import fade_out_pcm_tail, save_pcm_wav
 from indextts.utils.duration_control import (
     allocate_target_frames,
     fit_waveform_length,
@@ -157,7 +157,12 @@ class IndexTTS2:
                 use_deepspeed = False
                 print(f">> Failed to load DeepSpeed. Falling back to normal inference. Error: {e}")
 
-        self.gpt.post_init_gpt2_config(use_deepspeed=use_deepspeed, kv_cache=True, half=self.use_bf16)
+        self.gpt.post_init_gpt2_config(
+            use_deepspeed=use_deepspeed,
+            kv_cache=True,
+            half=self.use_bf16,
+            deepspeed_dtype=self.dtype,
+        )
 
         if self.use_cuda_kernel:
             # preload the CUDA kernel for BigVGAN
@@ -565,6 +570,7 @@ class IndexTTS2:
                         wav_parts.append(silence)
                 wav = torch.cat(wav_parts, dim=1)
                 wav = fit_waveform_length(wav, target_samples)
+                wav = fade_out_pcm_tail(wav, sampling_rate)
                 if output_path:
                     if os.path.isfile(output_path):
                         os.remove(output_path)
@@ -930,6 +936,8 @@ class IndexTTS2:
                         wav = fit_waveform_length(wav, final_segment_samples)
 
                 wav = torch.clamp(32767 * wav, -32767.0, 32767.0)
+                if stream_return or seg_idx == segments_count - 1:
+                    wav = fade_out_pcm_tail(wav, sampling_rate)
                 if verbose:
                     print(f"wav shape: {wav.shape}", "min:", wav.min(), "max:", wav.max())
                 # wavs.append(wav[:, :-512])
@@ -946,6 +954,7 @@ class IndexTTS2:
         wavs = self.insert_interval_silence(wavs, sampling_rate=sampling_rate, interval_silence=interval_silence)
         wav = torch.cat(wavs, dim=1)
         wav = fit_waveform_length(wav, target_samples)
+        wav = fade_out_pcm_tail(wav, sampling_rate)
         wav_length = wav.shape[-1] / sampling_rate
         print(f">> gpt_gen_time: {gpt_gen_time:.2f} seconds")
         print(f">> s2mel_time: {s2mel_time:.2f} seconds")

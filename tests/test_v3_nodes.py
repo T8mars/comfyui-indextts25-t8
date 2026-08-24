@@ -38,6 +38,7 @@ def test_registers_all_pure_v3_nodes():
         "T8_IndexTTS25_Generate",
         "T8_IndexTTS25_VoiceProfile",
         "T8_IndexTTS25_RoleLibrary",
+        "T8_IndexTTS25_MergeVoiceEmotions",
         "T8_IndexTTS25_DialogueScript",
         "T8_IndexTTS25_TimelineEditor",
         "T8_IndexTTS25_DialogueGenerate",
@@ -48,9 +49,9 @@ def test_registers_all_pure_v3_nodes():
     ]
     assert all(schema.category == "T8star-Aix/Audio/IndexTTS 2.5" for schema in schemas)
     assert schemas[5].outputs[0].io_type == "AUDIO"
-    assert schemas[10].outputs[0].io_type == "AUDIO"
-    assert schemas[13].outputs[0].io_type == "AUDIO"
-    dialogue_script_input = next(item for item in schemas[8].inputs if item.id == "script")
+    assert schemas[11].outputs[0].io_type == "AUDIO"
+    assert schemas[14].outputs[0].io_type == "AUDIO"
+    dialogue_script_input = next(item for item in schemas[9].inputs if item.id == "script")
     assert dialogue_script_input.dynamic_prompts is False
     assert dialogue_script_input.as_dict()["dynamicPrompts"] is False
     assert not hasattr(plugin, "NODE_CLASS_MAPPINGS")
@@ -157,7 +158,7 @@ def test_pronunciation_node_outputs_portable_annotated_text():
 
 
 def test_emotion_vector_is_safely_normalized():
-    plugin = _load_plugin()
+    _load_plugin()
     from comfyui_indextts25_t8_test.nodes_v3 import T8IndexTTS25EmotionControl
 
     result = T8IndexTTS25EmotionControl.execute(
@@ -178,6 +179,124 @@ def test_emotion_vector_is_safely_normalized():
     emotion = result[0]
     assert sum(emotion.vector) == pytest.approx(0.8)
     assert emotion.notes
+
+
+def test_role_library_and_merge_alias_preserve_each_roles_emotion():
+    _load_plugin()
+    from comfyui_indextts25_t8_test.nodes_v3 import (
+        T8IndexTTS25MergeVoiceEmotions,
+        T8IndexTTS25RoleLibrary,
+    )
+    from comfyui_indextts25_t8_test.runtime.types import EmotionConfig, VoiceProfile
+
+    audio = {"waveform": __import__("torch").zeros(1, 1, 22050), "sample_rate": 22050}
+    happy = EmotionConfig(mode="vector", vector=(0.6, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.2))
+    tense = EmotionConfig(mode="text", text="克制而紧张", strength=0.7)
+    voices = {
+        "voice_0": VoiceProfile("角色A", audio, "ZH", happy),
+        "voice_1": [VoiceProfile("角色B", audio, "ZH", tense)],
+    }
+
+    regular = T8IndexTTS25RoleLibrary.execute(voices)
+    compatible = T8IndexTTS25MergeVoiceEmotions.execute(voices)
+
+    for result in (regular, compatible):
+        library, info = result
+        assert library.profiles["角色A"].emotion is happy
+        assert library.profiles["角色B"].emotion is tense
+        assert "角色A（八维向量）" in info
+        assert "角色B（文本描述）" in info
+
+
+def test_role_emotion_merge_rejects_duplicate_names():
+    _load_plugin()
+    from comfyui_indextts25_t8_test.nodes_v3 import T8IndexTTS25MergeVoiceEmotions
+    from comfyui_indextts25_t8_test.runtime.types import VoiceProfile
+
+    audio = {"waveform": __import__("torch").zeros(1, 1, 1), "sample_rate": 22050}
+    with pytest.raises(ValueError, match="角色名称重复"):
+        T8IndexTTS25MergeVoiceEmotions.execute(
+            {
+                "voice_0": VoiceProfile("同名", audio),
+                "voice_1": VoiceProfile("同名", audio),
+            }
+        )
+
+
+@pytest.mark.parametrize("count", [1, 2, 16])
+def test_role_emotion_merge_accepts_documented_role_counts(count):
+    _load_plugin()
+    from comfyui_indextts25_t8_test.nodes_v3 import T8IndexTTS25MergeVoiceEmotions
+    from comfyui_indextts25_t8_test.runtime.types import VoiceProfile
+
+    audio = {"waveform": __import__("torch").zeros(1, 1, 1), "sample_rate": 22050}
+    result = T8IndexTTS25MergeVoiceEmotions.execute(
+        {f"voice_{index}": VoiceProfile(f"角色{index}", audio) for index in range(count)}
+    )
+    assert len(result[0].profiles) == count
+
+
+def test_dialogue_generation_routes_each_roles_emotion_without_leaking(tmp_path, monkeypatch):
+    _load_plugin()
+    from comfyui_indextts25_t8_test import nodes_v3
+    from comfyui_indextts25_t8_test.runtime.dialogue import DialogueLine
+    from comfyui_indextts25_t8_test.runtime.types import (
+        DialogueScript,
+        EmotionConfig,
+        ModelHandle,
+        RoleLibrary,
+        VoiceProfile,
+    )
+
+    audio = {"waveform": __import__("torch").zeros(1, 1, 2205), "sample_rate": 22050}
+    emotions = (
+        EmotionConfig(mode="speaker"),
+        EmotionConfig(mode="reference_audio", reference_audio=audio, strength=0.7),
+        EmotionConfig(mode="vector", vector=(0.6, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.2)),
+        EmotionConfig(mode="text", text="克制而紧张", strength=0.8),
+    )
+    routed = []
+
+    def fake_inference(*_args, **kwargs):
+        routed.append(kwargs["emotion"])
+        return audio, "fake inference"
+
+    monkeypatch.setattr(nodes_v3, "run_inference", fake_inference)
+    library = RoleLibrary(
+        {
+            f"角色{index}": VoiceProfile(f"角色{index}", audio, "ZH", emotion)
+            for index, emotion in enumerate(emotions)
+        }
+    )
+    script = DialogueScript(
+        [
+            DialogueLine(index + 1, f"角色{index}", f"第{index + 1}句", "ZH")
+            for index in range(len(emotions))
+        ],
+        "batch",
+    )
+    nodes_v3.T8IndexTTS25DialogueGenerate.execute(
+        ModelHandle(tmp_path, "cpu", False),
+        library,
+        script,
+        1,
+        "shift",
+        False,
+        "native",
+        180,
+        0,
+        "off",
+        1.0,
+        False,
+        "auto",
+        "base",
+        "cpu",
+        0.82,
+        "actual",
+        "original",
+        True,
+    )
+    assert routed == list(emotions)
 
 
 def test_sampling_exposes_auto_segmentation_and_real_pause_controls():

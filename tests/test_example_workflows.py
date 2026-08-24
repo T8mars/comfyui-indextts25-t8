@@ -34,6 +34,7 @@ EXAMPLES = (
     "20_asr_proofread",
     "21_timeline_editor",
     "22_subtitle_rewrite",
+    "23_multi_role_emotions",
 )
 
 
@@ -60,7 +61,7 @@ def test_all_ui_and_api_examples_are_present_and_valid():
 def test_embedded_dialogue_scripts_are_parsed_not_just_outer_workflow_json():
     ui_root = PLUGIN_ROOT / "example_workflows" / "ui"
     api_root = PLUGIN_ROOT / "example_workflows" / "api"
-    for name in ("11_multi_role_dialogue", "12_batch_dialogue_json", "13_srt_multi_role", "21_timeline_editor", "22_subtitle_rewrite"):
+    for name in ("11_multi_role_dialogue", "12_batch_dialogue_json", "13_srt_multi_role", "21_timeline_editor", "22_subtitle_rewrite", "23_multi_role_emotions"):
         workflow = _load(ui_root / f"{name}.json")
         ui_node = next(node for node in workflow["nodes"] if node["type"] == "T8_IndexTTS25_DialogueScript")
         script_type, script, default_role, default_language = ui_node["widgets_values"]
@@ -157,6 +158,7 @@ def test_api_prompts_expand_with_the_current_comfyui_v3_schema():
         "T8_IndexTTS25_Generate": nodes_module.T8IndexTTS25Generate,
         "T8_IndexTTS25_VoiceProfile": nodes_module.T8IndexTTS25VoiceProfile,
         "T8_IndexTTS25_RoleLibrary": nodes_module.T8IndexTTS25RoleLibrary,
+        "T8_IndexTTS25_MergeVoiceEmotions": nodes_module.T8IndexTTS25MergeVoiceEmotions,
         "T8_IndexTTS25_DialogueScript": nodes_module.T8IndexTTS25DialogueScript,
         "T8_IndexTTS25_TimelineEditor": nodes_module.T8IndexTTS25TimelineEditor,
         "T8_IndexTTS25_DialogueGenerate": nodes_module.T8IndexTTS25DialogueGenerate,
@@ -180,7 +182,10 @@ def test_api_prompts_expand_with_the_current_comfyui_v3_schema():
             if node["class_type"] == "T8_IndexTTS25_EmotionControl":
                 assert isinstance(nested["mode"], dict)
                 assert nested["mode"]["mode"] == live_inputs["mode"]
-            if node["class_type"] == "T8_IndexTTS25_RoleLibrary":
+            if node["class_type"] in {
+                "T8_IndexTTS25_RoleLibrary",
+                "T8_IndexTTS25_MergeVoiceEmotions",
+            }:
                 assert set(nested["voices"]) == {key.split(".", 1)[1] for key in live_inputs if key.startswith("voices.voice_")}
 
 
@@ -223,3 +228,19 @@ def test_examples_cover_multi_role_batch_srt_and_optional_acceleration():
         node["class_type"] == "T8_IndexTTS25_SubtitleRewrite"
         for node in prompts["22_subtitle_rewrite"].values()
     )
+    role_emotions = prompts["23_multi_role_emotions"]
+    assert sum(
+        node["class_type"] == "T8_IndexTTS25_EmotionControl"
+        for node in role_emotions.values()
+    ) == 2
+    assert any(
+        node["class_type"] == "T8_IndexTTS25_MergeVoiceEmotions"
+        and len(node["inputs"]) == 2
+        for node in role_emotions.values()
+    )
+    voice_emotion_links = [
+        node["inputs"].get("emotion")
+        for node in role_emotions.values()
+        if node["class_type"] == "T8_IndexTTS25_VoiceProfile"
+    ]
+    assert voice_emotion_links == [["4", 0], ["5", 0]]

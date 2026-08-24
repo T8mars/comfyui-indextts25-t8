@@ -34,7 +34,7 @@ from .runtime.pronunciation import (
 )
 from .runtime.text_planner import build_generation_plan
 from .runtime.speech_review import ASR_BACKENDS, ASR_MODELS, asr_available, review_transcript, transcribe_waveform
-from .runtime.timeline import apply_timeline_edits, render_timeline_image, rewrite_srt, timeline_json, timeline_rows
+from .runtime.timeline import apply_timeline_edits, render_timeline_image, rewrite_srt, timeline_json
 from .runtime.types import (
     DialogueScript,
     EmotionConfig,
@@ -694,7 +694,12 @@ class T8IndexTTS25VoiceProfile(io.ComfyNode):
                 io.String.Input("role_name", display_name="角色名称", default="旁白"),
                 io.Audio.Input("speaker_audio", display_name="音色参考音频"),
                 io.Combo.Input("language", display_name="默认语言", options=["ZH", "EN", "JA", "ES", "AR"], default="ZH"),
-                EmotionType.Input("emotion", display_name="默认情感", optional=True),
+                EmotionType.Input(
+                    "emotion",
+                    display_name="该角色默认情感",
+                    optional=True,
+                    tooltip="连接情感控制后，只影响当前角色；不连接时跟随该角色的音色参考。",
+                ),
             ],
             outputs=[
                 VoiceType.Output("voice", display_name="角色音色"),
@@ -715,7 +720,52 @@ class T8IndexTTS25VoiceProfile(io.ComfyNode):
         emotion: EmotionConfig | None = None,
     ) -> io.NodeOutput:
         profile = VoiceProfile(str(role_name).strip(), speaker_audio, str(language).upper(), emotion)
-        return io.NodeOutput(profile, f"角色={profile.name} | language={profile.language} | " + ("含默认情感" if emotion else "情感跟随音色"))
+        return io.NodeOutput(
+            profile,
+            f"角色={profile.name} | language={profile.language} | 情感={_emotion_mode_label(emotion)}",
+        )
+
+
+def _emotion_mode_label(emotion: EmotionConfig | None) -> str:
+    if emotion is None or emotion.mode == "speaker":
+        return "跟随音色"
+    return {
+        "reference_audio": "参考音频",
+        "vector": "八维向量",
+        "text": "文本描述",
+    }.get(emotion.mode, emotion.mode)
+
+
+def _voice_profiles(value) -> list[VoiceProfile]:
+    if isinstance(value, VoiceProfile):
+        return [value]
+    if isinstance(value, dict):
+        result: list[VoiceProfile] = []
+        for nested in value.values():
+            result.extend(_voice_profiles(nested))
+        return result
+    if isinstance(value, (list, tuple)):
+        result = []
+        for nested in value:
+            result.extend(_voice_profiles(nested))
+        return result
+    return []
+
+
+def _build_role_library(value) -> tuple[RoleLibrary, str]:
+    profiles = _voice_profiles(value)
+    if not profiles:
+        raise ValueError("角色音色/情感合并至少需要连接一个角色音色。")
+    result: dict[str, VoiceProfile] = {}
+    for profile in profiles:
+        if profile.name in result:
+            raise ValueError(f"角色名称重复：{profile.name}")
+        result[profile.name] = profile
+    summary = "、".join(
+        f"{profile.name}（{_emotion_mode_label(profile.emotion)}）"
+        for profile in result.values()
+    )
+    return RoleLibrary(result), "角色音色/情感：" + summary
 
 
 class T8IndexTTS25RoleLibrary(io.ComfyNode):
@@ -723,14 +773,21 @@ class T8IndexTTS25RoleLibrary(io.ComfyNode):
     def define_schema(cls) -> io.Schema:
         return io.Schema(
             node_id="T8_IndexTTS25_RoleLibrary",
-            display_name="IndexTTS 2.5 角色音色库 · T8star-Aix",
+            display_name="IndexTTS 2.5 角色音色 / 情感合并 · T8star-Aix",
             category=CATEGORY,
-            search_aliases=["多角色", "role library", "音色库"],
-            description="自动增长输入，可连接 1–16 个角色音色；同名角色会被拒绝。",
+            search_aliases=[
+                "多角色",
+                "role library",
+                "音色库",
+                "Merge Voice Emotions",
+                "合并角色情感",
+                "emotion merge",
+            ],
+            description="自动增长输入，可汇总 1–16 个角色各自的音色与情感；同名角色会被拒绝。",
             inputs=[
                 io.Autogrow.Input(
                     "voices",
-                    display_name="角色音色",
+                    display_name="角色音色 / 情感",
                     template=io.Autogrow.TemplatePrefix(VoiceType.Input("voice"), prefix="voice_", min=1, max=16),
                 )
             ],
@@ -740,34 +797,45 @@ class T8IndexTTS25RoleLibrary(io.ComfyNode):
             ],
         )
 
-    @staticmethod
-    def _profiles(value) -> list[VoiceProfile]:
-        if isinstance(value, VoiceProfile):
-            return [value]
-        if isinstance(value, dict):
-            result: list[VoiceProfile] = []
-            for nested in value.values():
-                result.extend(T8IndexTTS25RoleLibrary._profiles(nested))
-            return result
-        if isinstance(value, (list, tuple)):
-            result = []
-            for nested in value:
-                result.extend(T8IndexTTS25RoleLibrary._profiles(nested))
-            return result
-        return []
+    @classmethod
+    def execute(cls, voices: dict) -> io.NodeOutput:
+        library, info = _build_role_library(voices)
+        return io.NodeOutput(library, info)
+
+
+class T8IndexTTS25MergeVoiceEmotions(io.ComfyNode):
+    """Search-friendly equivalent of the role-library aggregator."""
+
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="T8_IndexTTS25_MergeVoiceEmotions",
+            display_name="IndexTTS 2.5 Merge Voice Emotions · T8star-Aix",
+            category=CATEGORY,
+            search_aliases=["合并角色情感", "角色 emotion 汇总", "多角色情感"],
+            description=(
+                "把 1–16 个已包含角色名、参考音色和可选情感的角色音色汇总为角色库；"
+                "这是角色配置汇总，不会把多个八维情绪数值混成一个新情绪。"
+            ),
+            inputs=[
+                io.Autogrow.Input(
+                    "voices",
+                    display_name="角色音色 / 情感",
+                    template=io.Autogrow.TemplatePrefix(
+                        VoiceType.Input("voice"), prefix="voice_", min=1, max=16
+                    ),
+                )
+            ],
+            outputs=[
+                RoleLibraryType.Output("role_library", display_name="角色音色 / 情感库"),
+                io.String.Output("role_info", display_name="角色与情感列表"),
+            ],
+        )
 
     @classmethod
     def execute(cls, voices: dict) -> io.NodeOutput:
-        profiles = cls._profiles(voices)
-        if not profiles:
-            raise ValueError("角色音色库至少需要连接一个角色音色。")
-        result: dict[str, VoiceProfile] = {}
-        for profile in profiles:
-            if profile.name in result:
-                raise ValueError(f"角色名称重复：{profile.name}")
-            result[profile.name] = profile
-        library = RoleLibrary(result)
-        return io.NodeOutput(library, "角色音色：" + "、".join(result))
+        library, info = _build_role_library(voices)
+        return io.NodeOutput(library, info)
 
 
 class T8IndexTTS25DialogueScript(io.ComfyNode):
@@ -1490,6 +1558,7 @@ class T8IndexTTS25Extension(ComfyExtension):
             T8IndexTTS25Generate,
             T8IndexTTS25VoiceProfile,
             T8IndexTTS25RoleLibrary,
+            T8IndexTTS25MergeVoiceEmotions,
             T8IndexTTS25DialogueScript,
             T8IndexTTS25TimelineEditor,
             T8IndexTTS25DialogueGenerate,
@@ -1513,6 +1582,7 @@ __all__ = [
     "T8IndexTTS25Generate",
     "T8IndexTTS25VoiceProfile",
     "T8IndexTTS25RoleLibrary",
+    "T8IndexTTS25MergeVoiceEmotions",
     "T8IndexTTS25DialogueScript",
     "T8IndexTTS25TimelineEditor",
     "T8IndexTTS25DialogueGenerate",

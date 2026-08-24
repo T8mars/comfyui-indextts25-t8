@@ -34,3 +34,19 @@ def test_strict_mode_rejects_invalid_dictionary_reading():
     entries = parse_dictionary_text("坏词|BAD9|ZH")
     with pytest.raises(PronunciationValidationError):
         process_pronunciation_text("坏词", "ZH", entries, strict=True)
+
+
+def test_issue_792_whole_word_annotation_is_the_safe_form():
+    risky = process_pronunciation_text(
+        "小明<要|YAO4>求这个题的答案是多少，该做什么呢？", "ZH", strict=True
+    )
+    assert any("<要求|YAO4 QIU2>" in item for item in risky.warnings)
+    robust = process_pronunciation_text(
+        "小明<要求|YAO4 QIU2>这个题的答案是多少，该做什么呢？", "ZH", strict=True
+    )
+    assert robust.warnings == ()
+
+
+def test_chinese_annotation_warns_on_mismatched_syllable_count():
+    result = process_pronunciation_text("请到<银行|HANG2>办理。", "ZH", strict=True)
+    assert any("2 个汉字" in item and "1 个拼音音节" in item for item in result.warnings)

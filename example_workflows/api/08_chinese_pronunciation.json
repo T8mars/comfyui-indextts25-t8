@@ -21,9 +21,9 @@
   "3": {
     "class_type": "T8_IndexTTS25_Pronunciation",
     "inputs": {
-      "text": "他在银行里工作，行长正在开会；这段手工标注的银<行|HANG2>不会被词典覆盖。",
+      "text": "小明<要求|YAO4 QIU2>这个题的答案是多少；他在银行里工作，行长正在开会。",
       "language": "ZH",
-      "dictionary": "银行|YIN2 HANG2|ZH\n行长|HANG2 ZHANG3|ZH\n重庆|CHONG2 QING4|ZH",
+      "dictionary": "要求|YAO4 QIU2|ZH\n银行|YIN2 HANG2|ZH\n行长|HANG2 ZHANG3|ZH\n重庆|CHONG2 QING4|ZH",
       "strict": true
     }
   },

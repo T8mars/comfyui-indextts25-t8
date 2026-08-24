@@ -100,7 +100,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_ModelLoader",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.8.1"
+        "ver": "0.10.0"
       },
       "widgets_values": [
         "IndexTTS-2.5",
@@ -149,7 +149,7 @@
       "properties": {
         "Node name for S&R": "LoadAudio",
         "cnr_id": "comfy-core",
-        "ver": "0.8.1"
+        "ver": "0.10.0"
       },
       "widgets_values": [
         "voice_reference.wav"
@@ -275,7 +275,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_Generate",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.8.1"
+        "ver": "0.10.0"
       },
       "widgets_values": [
         "这是清晰旁白后处理的真实节点连接示例。",
@@ -351,7 +351,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_AudioPostProcess",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.8.1"
+        "ver": "0.10.0"
       },
       "widgets_values": [
         "clear_narration",
@@ -398,7 +398,7 @@
       "properties": {
         "Node name for S&R": "SaveAudio",
         "cnr_id": "comfy-core",
-        "ver": "0.8.1"
+        "ver": "0.10.0"
       },
       "widgets_values": [
         "IndexTTS25_T8/clear_narration"

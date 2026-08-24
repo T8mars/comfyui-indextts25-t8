@@ -1,6 +1,21 @@
 # T8star-Aix IndexTTS 2.5 路线图
 
-本路线图同时记录 ComfyUI 节点和桌面整合包的共同方向。项目只支持 **IndexTTS 2.5**；DeepSpeed、FlashAttention、Triton 等均为可选加速依赖，不进入基础安装。
+本路线图同时记录 ComfyUI 节点和桌面整合包的共同方向。项目只支持 **IndexTTS 2.5**。ComfyUI 基础依赖不强装 DeepSpeed、FlashAttention、Triton；桌面 v0.10.0 则内置与固定 Python/torch/CUDA ABI 匹配的可选轮子，仍不默认启用。
+
+## v0.10.0（本地实现）
+
+- [x] 角色音色节点明确提供“该角色默认情感”连接点。
+- [x] 角色音色/情感合并与 `Merge Voice Emotions` 兼容节点支持 1–16 个独立角色配置。
+- [x] 新增多角色独立情感 UI/API 示例，并验证情感不会跨角色串用。
+- [x] 桌面角色音色库支持跟随音色、情感参考音频、八维向量和文本描述四种模式。
+
+## v0.9.0（本地实现与验证完成）
+
+- [x] Windows Python 3.10 / torch 2.8.0+cu128 精确轮子清单与 SHA-256。
+- [x] FlashAttention 2.8.3 + Triton 3.4.0.post21 的真实 GPT 加速 WAV 回归。
+- [x] DeepSpeed 0.17.5 FP32/BF16 真实 WAV 回归，并修正 BF16 被误传成 FP16。
+- [x] 普通、低显存、流式和后处理输出统一做 20ms 尾部淡出并归零。
+- [x] 官方问题 #792 的中文整词标注提示、音节数校验和固定 seed 音频回归。
 
 ## v0.6.0（已实现）
 
@@ -64,8 +79,8 @@
 ## 验收记录
 
 - [x] 公共解析、时间轴、混音和加速探测测试通过。
-- [x] V3 节点 schema 与 22 组 UI/API 工作流测试通过。
-- [x] 当前基础环境：50 项测试通过，2 项按环境条件跳过。
+- [x] V3 节点 schema 与 23 组 UI/API 工作流测试通过。
+- [x] 当前基础环境：73 项测试通过。
 - [x] Transformers 4.57.6：50 项测试通过，2 项按环境条件跳过。
 - [x] IndexTTS 2.5 真实模型联合冒烟：两段生成、前导/段间停顿、目标时长和人声后处理通过。
 - [x] 普通 BF16 与 BigVGAN CUDA kernel 完成真实 GPU 推理。

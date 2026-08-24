@@ -100,7 +100,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_ModelLoader",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.8.1"
+        "ver": "0.10.0"
       },
       "widgets_values": [
         "IndexTTS-2.5",
@@ -149,7 +149,7 @@
       "properties": {
         "Node name for S&R": "LoadAudio",
         "cnr_id": "comfy-core",
-        "ver": "0.8.1"
+        "ver": "0.10.0"
       },
       "widgets_values": [
         "voice_reference.wav"
@@ -221,12 +221,12 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_Pronunciation",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.8.1"
+        "ver": "0.10.0"
       },
       "widgets_values": [
-        "他在银行里工作，行长正在开会；这段手工标注的银<行|HANG2>不会被词典覆盖。",
+        "小明<要求|YAO4 QIU2>这个题的答案是多少；他在银行里工作，行长正在开会。",
         "ZH",
-        "银行|YIN2 HANG2|ZH\n行长|HANG2 ZHANG3|ZH\n重庆|CHONG2 QING4|ZH",
+        "要求|YAO4 QIU2|ZH\n银行|YIN2 HANG2|ZH\n行长|HANG2 ZHANG3|ZH\n重庆|CHONG2 QING4|ZH",
         true
       ]
     },
@@ -349,10 +349,10 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_Generate",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.8.1"
+        "ver": "0.10.0"
       },
       "widgets_values": [
-        "他在银行里工作，行长正在开会；这段手工标注的银<行|HANG2>不会被词典覆盖。",
+        "小明<要求|YAO4 QIU2>这个题的答案是多少；他在银行里工作，行长正在开会。",
         "ZH",
         1.0,
         "off",
@@ -402,7 +402,7 @@
       "properties": {
         "Node name for S&R": "SaveAudio",
         "cnr_id": "comfy-core",
-        "ver": "0.8.1"
+        "ver": "0.10.0"
       },
       "widgets_values": [
         "IndexTTS25_T8/pronunciation_zh"

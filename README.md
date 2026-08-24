@@ -1,5 +1,7 @@
 # comfyui-indextts25-T8
 
+**简体中文** | [English](README_EN.md)
+
 IndexTTS 2.5 的 ComfyUI V3 原生节点集成。节点菜单位于：
 
 `T8star-Aix / Audio / IndexTTS 2.5`
@@ -51,27 +53,30 @@ IndexTTS 2.5 的 ComfyUI V3 原生节点集成。节点菜单位于：
    - 可选人声清晰、清晰旁白、去刺耳、温暖、峰值归一化后处理
 7. `IndexTTS 2.5 角色音色 · T8star-Aix`
    - 将角色名、标准 AUDIO、默认语言和可选情感封装成工作流内音色
-8. `IndexTTS 2.5 角色音色库 · T8star-Aix`
-   - 自动增长输入，可连接 1–16 个角色；重复角色名会在排队前报错
-9. `IndexTTS 2.5 批量台词 / SRT · T8star-Aix`
+8. `IndexTTS 2.5 角色音色 / 情感合并 · T8star-Aix`
+   - 自动增长输入，可汇总 1–16 个角色各自的音色与独立情感；重复角色名会在排队前报错
+9. `IndexTTS 2.5 Merge Voice Emotions · T8star-Aix`
+   - 对应社区常用的 `Merge Voice Emotions` 搜索名称，输出与“角色音色 / 情感合并”完全一致
+   - 合并的是角色配置列表，不会把多个角色的八维情感数值混成一个新情绪
+10. `IndexTTS 2.5 批量台词 / SRT · T8star-Aix`
    - 解析 `角色|台词|语言|时长系数`、JSON 数组和标准 SRT
    - SRT 支持 `[角色] 台词` 与 `角色：台词`，输出结构化预览
    - 台词输入关闭 ComfyUI 动态提示词解析，JSON 大括号不会在排队时被改写
-10. `IndexTTS 2.5 多角色 / SRT 生成 · T8star-Aix`
+11. `IndexTTS 2.5 多角色 / SRT 生成 · T8star-Aix`
    - 逐句推理、逐句 AUDIO 列表、合并 AUDIO 和 JSON 报告
    - `shift` 顺延或 `overlay` 时间轴混音；字幕槽位默认使用原生单次适配，也可选择旧版二次推理兼容模式
-11. `IndexTTS 2.5 人声后处理 · T8star-Aix`
+12. `IndexTTS 2.5 人声后处理 · T8star-Aix`
    - 独立处理任意 ComfyUI AUDIO，支持强度混合和目标峰值，不依赖 FFmpeg
-12. `IndexTTS 2.5 环境与可选加速 · T8star-Aix`
+13. `IndexTTS 2.5 环境与可选加速 · T8star-Aix`
    - 不加载模型即可检查 BF16、CUDA 工具链、Triton、FlashAttention、DeepSpeed
    - 只报告能力，不安装任何附加依赖
-13. `IndexTTS 2.5 时间轴编辑 · T8star-Aix`
+14. `IndexTTS 2.5 时间轴编辑 · T8star-Aix`
    - 接收批量/SRT 脚本和可编辑 JSON，按毫秒修改逐句开始、结束、角色、语言与时长系数
    - 输出严格校验后的脚本、结构化 JSON 和标准 `IMAGE` 彩色轨道预览
-14. `IndexTTS 2.5 ASR 自动校对 · T8star-Aix`
+15. `IndexTTS 2.5 ASR 自动校对 · T8star-Aix`
    - 使用可选的本地 OpenAI Whisper 或 faster-whisper 对 AUDIO 识别并与目标文本比较
    - 输出简繁/数字归一化后的 CER/WER、差异明细、词级时间戳、阈值判定和完整 JSON 报告
-15. `IndexTTS 2.5 字幕自动回写 · T8star-Aix`
+16. `IndexTTS 2.5 字幕自动回写 · T8star-Aix`
    - 可保留原 SRT 时间或使用生成音频真实时间轴
    - 可写回原文、全部 ASR 识别结果或仅校对通过的识别结果
 
@@ -219,9 +224,22 @@ MaskGCT、CAMPPlus 和 BigVGAN 辅助模型。下载结束后重启 ComfyUI，�
 ### 多角色、批量台词与 SRT
 
 1. 每个角色添加一个“角色音色”节点，连接对应的 `Load Audio`。
-2. 把这些音色连接到“角色音色库”的自动增长输入。
-3. 添加“批量台词 / SRT”节点并选择格式。
-4. 把模型、角色库、脚本连接到“多角色 / SRT 生成”。
+2. 需要独立情感时，每个角色分别添加“情感控制”，连接到其“该角色默认情感”输入。
+3. 把这些角色连接到“角色音色 / 情感合并”；也可使用同功能的 `Merge Voice Emotions` 节点。
+4. 添加“批量台词 / SRT”节点并选择格式。
+5. 把模型、角色库、脚本连接到“多角色 / SRT 生成”。
+
+```text
+情感控制A ──► 角色音色A ┐
+参考音频A ──►            │
+                         ├─► 角色音色/情感合并 ─► 多角色/SRT生成
+情感控制B ──► 角色音色B │
+参考音频B ──►            ┘
+```
+
+每条台词只会读取对应角色保存的情感，不会串到其他角色。完整可运行连接见
+`23_multi_role_emotions.json`。这里的“合并”表示汇总多个角色配置；如果需要把“悲伤 60% + 愤怒
+40%”混成同一个八维情绪，应直接在单个“情感控制”节点中设置这两个维度。
 
 批量文本每行格式如下；语言和时长系数可省略：
 
@@ -313,6 +331,17 @@ v0.8.1 已回移 GPT 合成提示 KV Cache 根修复；多个停顿语音块和�
 缺依赖或初始化失败时，模型信息会显示 `effective=off` 和回退原因。先用“环境与可选加速”节点检查，
 再决定是否维护独立的加速环境。不要为了节点加速覆盖 ComfyUI 的 torch/CUDA 组合。
 
+Windows、Python 3.10、`torch 2.8.0+cu128` 可使用桌面整合包已实测的精确轮子：
+
+```powershell
+pip install "triton-windows==3.4.0.post21"
+pip install "https://github.com/kingbri1/flash-attention/releases/download/v2.8.3/flash_attn-2.8.3%2Bcu128torch2.8.0cxx11abiFALSE-cp310-cp310-win_amd64.whl"
+pip install "https://github.com/6Morpheus6/deepspeed-windows-wheels/releases/download/v0.17.5/deepspeed-0.17.5%2Be1560d84-2.8torch_cu128-cp310-cp310-win_amd64.whl"
+```
+
+这组轮子只适用于上述精确 ABI；其他 Python、torch 或 CUDA 组合必须寻找对应轮子。节点不会自动安装，
+也不会把它们加入基础 `requirements.txt`，以免覆盖宿主 ComfyUI 的 PyTorch 环境。
+
 vLLM-Omni 更适合 Linux 服务端吞吐场景，后续会作为隔离 sidecar 评估；当前不会塞入 Windows/ComfyUI
 基础环境。官方 TensorRT 后端目前只提供 IndexTTS 2.0 引擎，因此本节点不会虚假宣称 2.5 TensorRT。
 
@@ -365,10 +394,15 @@ ASR 校对节点接收标准 ComfyUI `AUDIO` 和目标文本，在本机运行 W
 不连接发音控制节点时，也可以在语音生成正文中直接使用官方格式：
 
 ```text
-他在银<行|XING2>里<行|HANG2>走了半天。
+小明<要求|YAO4 QIU2>这个题的答案是多少。
+他在<银行|YIN2 HANG2>里<行走|XING2 ZOU3>了半天。
 He had a <minute|M IH1 . N AH0 T> to check the <minute|M AY0 . N UW1 T> details.
 彼は料理が<上手|じょうず>だが、囲碁では<上手|うわて>に負けた。
 ```
+
+中文必须做到“一个汉字对应一个带声调拼音”。多音字位于连续词语中时请标注完整词语：官方问题
+#792 的 `小明<要|YAO4>求…` 可能被上下文词义覆盖，应写成 `小明<要求|YAO4 QIU2>…`。
+节点会对单字嵌入连续中文和汉字/音节数量不一致给出警告。
 
 批量规则建议使用发音控制节点。词典每行格式为 `文字|读音|语言`，例如：
 
@@ -382,11 +416,11 @@ Bilibili|B IY1 . L IY1 . B IY1 . L IY1|EN
 不会改写 `<文字|读音>` 内部。严格校验默认开启，错误会在排队前给出；关闭后无效词条保持原文并
 写入报告。该节点不依赖额外 G2P 模型，也不会修改已缓存模型的全局 glossary。
 
-完整示例见 `example_workflows/README.md`，包含 22 组可直接打开的 UI 工作流和 22 组 API prompt：
+完整示例见 `example_workflows/README.md`，包含 23 组可直接打开的 UI 工作流和 23 组 API prompt：
 基础克隆、语速对比、情感参考音频、八维情感、文本情感、随机采样长文本、五语种生成，以及中文
 多音字、英文 CMU 音素、日语假名发音控制、多角色、JSON 批量台词、SRT、可选加速诊断、自动分段
-预览、显式停顿、原生目标秒数、CFM 高级参数、独立音频后处理、ASR 自动校对、时间轴编辑和字幕
-回写。使用前把
+预览、显式停顿、原生目标秒数、CFM 高级参数、独立音频后处理、ASR 自动校对、时间轴编辑、字幕
+回写和多角色独立情感。使用前把
 `voice_reference.wav`（情感音频示例还需 `emotion_reference.wav`）上传到 ComfyUI input。
 
 ## 环境与模型检查

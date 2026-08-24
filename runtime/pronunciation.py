@@ -166,6 +166,31 @@ def annotation_language(surface: str, default_language: str) -> str:
     return default_language
 
 
+def _chinese_annotation_warnings(surface: str, reading: str) -> tuple[str, ...]:
+    han_count = len(CJK_PATTERN.findall(surface))
+    syllable_count = len(reading.split())
+    if han_count and han_count != syllable_count:
+        return (
+            f"标注含 {han_count} 个汉字，但提供了 {syllable_count} 个拼音音节；"
+            "建议每个汉字对应一个带声调拼音。",
+        )
+    return ()
+
+
+def _single_han_context_warning(source: str, match: re.Match[str]) -> str | None:
+    surface = match.group(1)
+    if len(CJK_PATTERN.findall(surface)) != 1 or len(surface) != 1:
+        return None
+    previous = source[match.start() - 1] if match.start() else ""
+    following = source[match.end()] if match.end() < len(source) else ""
+    if CJK_PATTERN.fullmatch(previous) or CJK_PATTERN.fullmatch(following):
+        return (
+            "单字标注位于连续中文词语中，模型可能被相邻词义覆盖；"
+            "请优先标注完整词语，例如把 <要|YAO4>求 改为 <要求|YAO4 QIU2>。"
+        )
+    return None
+
+
 def entry_from_mapping(item: dict[str, Any], default_language: str = "ZH") -> PronunciationEntry:
     language = normalize_language(item.get("language"), default_language)
     return PronunciationEntry(
@@ -332,10 +357,19 @@ def process_pronunciation_text(text, language, entries=None, *, strict=False, pi
             errors.append(f"发音标注格式无效：{candidate.group(0)!r}")
     for match in valid_spans:
         surface, reading = match.groups()
+        annotation_lang = annotation_language(surface, default_language)
         _normalized, item_warnings, item_errors = validate_reading(
-            reading, annotation_language(surface, default_language), pinyin_vocab_path=pinyin_vocab_path
+            reading, annotation_lang, pinyin_vocab_path=pinyin_vocab_path
         )
         warnings.extend(f"{surface}：{message}" for message in item_warnings)
+        if annotation_lang == "ZH" and not item_errors:
+            warnings.extend(
+                f"{surface}：{message}"
+                for message in _chinese_annotation_warnings(surface, _normalized)
+            )
+            context_warning = _single_han_context_warning(source, match)
+            if context_warning:
+                warnings.append(f"{surface}：{context_warning}")
         errors.extend(f"{surface}：{message}" for message in item_errors)
     prepared: list[PronunciationEntry] = []
     seen_terms: set[tuple[str, bool]] = set()
