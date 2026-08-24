@@ -47,7 +47,8 @@ def test_plan_reports_segments_pauses_and_gpt_cache_risk(tmp_path, monkeypatch):
     assert payload["max_tokens"] == 60
     assert payload["speech_blocks"] == 2
     assert payload["total_pause_ms"] == 520
-    assert payload["gpt_accel_risk"] is True
+    assert payload["gpt_accel_risk"] is False
+    assert payload["gpt_accel_cache_fix"] is True
     assert all(item["token_count"] <= 60 for item in payload["segments"])
 
 

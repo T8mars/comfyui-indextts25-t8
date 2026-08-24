@@ -10,6 +10,7 @@ from .attention import (
     reset_forward_context,
     set_forward_context,
 )
+from ..accel_cache_guard import reset_synthetic_prompt_cache_markers
 from .kv_manager import KVCacheManager, Seq
 
 
@@ -458,6 +459,7 @@ class AccelInferenceEngine:
             self.kv_manager.allocate(req)
             sequences.append(req)
 
+        reset_synthetic_prompt_cache_markers(sequences, tts_embeddings)
         self.current_sequences = sequences
 
         prefill_ids, prefill_pos = self._prepare_prefill(sequences)

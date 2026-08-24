@@ -48,6 +48,7 @@
       ],
       "expected_text": "这是 ASR 自动校对示例，节点会识别生成音频并计算相似度和字符错误率。",
       "language": "ZH",
+      "backend": "auto",
       "model_name": "base",
       "device": "auto",
       "threshold": 0.82

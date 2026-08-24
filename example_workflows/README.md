@@ -28,7 +28,7 @@
 | `17_target_duration.json` | 原生长度调节器单次适配到目标 5 秒 | `voice_reference.wav` |
 | `18_audio_postprocess.json` | 独立“清晰旁白”人声后处理节点 | `voice_reference.wav` |
 | `19_cfm_advanced.json` | CFM 扩散步数、CFG 引导强度和温度调节 | `voice_reference.wav` |
-| `20_asr_proofread.json` | 本地 Whisper 识别、CER/相似度校对与阈值判定 | `voice_reference.wav` |
+| `20_asr_proofread.json` | 双 Whisper 后端、CER/WER、差异和词级时间戳校对 | `voice_reference.wav` |
 | `21_timeline_editor.json` | 以毫秒编辑起止时间，并用 Preview Image 显示彩色轨道 | `role_a.wav`、`role_b.wav` |
 | `22_subtitle_rewrite.json` | 根据生成报告回写实际时间轴和校对通过的 ASR 文本 | 无 |
 

@@ -12,7 +12,7 @@ from .audio_processing import concatenate_with_pauses
 from .model_cache import MODEL_CACHE
 from .reference_cache import comfy_audio_to_reference_wav
 from .seed_scope import scoped_seed
-from .text_planner import build_generation_plan, gpt_accel_risk
+from .text_planner import build_generation_plan
 from .types import DEFAULT_EMOTION, DEFAULT_SAMPLING, EmotionConfig, ModelHandle, SamplingConfig
 
 
@@ -138,17 +138,12 @@ def run_inference(
                 and sampling.repetition_penalty == 1.0
                 and sampling.length_penalty == 0.0
             )
-            accel_cache_risk = gpt_accel_risk(plan)
-            temporarily_disabled_accel = accel_engine is not None and (
-                not accel_compatible or accel_cache_risk
-            )
+            temporarily_disabled_accel = accel_engine is not None and not accel_compatible
             try:
                 if temporarily_disabled_accel:
                     entry.model.gpt.accel_engine = None
                     if not accel_compatible:
                         notes.append("当前采样参数与 GPT 加速语义不兼容，本次自动使用普通 GPT 路径")
-                    if accel_cache_risk:
-                        notes.append("检测到长文本/显式停顿的 KV Cache 风险，本次已保护性关闭 GPT 加速")
                 if use_emo_text:
                     entry.model.ensure_qwen_emotion()
                     if handle.low_vram:

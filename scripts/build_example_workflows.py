@@ -55,7 +55,7 @@ def properties(node_type: str, *, core: bool = False) -> dict[str, str]:
     return {
         "Node name for S&R": node_type,
         "cnr_id": "comfy-core" if core else "comfyui-indextts25-t8",
-        "ver": "0.8.0",
+        "ver": "0.8.1",
     }
 
 
@@ -454,6 +454,7 @@ def add_dialogue_generate(workflow: Workflow, pos=(1220, 240), *, policy="shift"
             widget_input("postprocess_preset", "COMBO"),
             widget_input("postprocess_strength", "FLOAT"),
             widget_input("asr_enabled", "BOOLEAN"),
+            widget_input("asr_backend", "COMBO"),
             widget_input("asr_model", "COMBO"),
             widget_input("asr_device", "COMBO"),
             widget_input("asr_threshold", "FLOAT"),
@@ -468,7 +469,7 @@ def add_dialogue_generate(workflow: Workflow, pos=(1220, 240), *, policy="shift"
             output("rewritten_srt", "STRING"),
             output("timeline_report", "STRING"),
         ],
-        [20260818, "fixed", policy, fit, "native", 180, 200, "off", 1.0, False, "base", "auto", 0.82, "actual", "asr_passed", True],
+        [20260818, "fixed", policy, fit, "native", 180, 200, "off", 1.0, False, "auto", "base", "auto", 0.82, "actual", "asr_passed", True],
     )
 
 
@@ -512,6 +513,7 @@ def add_asr_proofread(workflow: Workflow, expected_text: str, language: str = "Z
             slot_input("audio", "AUDIO"),
             widget_input("expected_text", "STRING"),
             widget_input("language", "COMBO"),
+            widget_input("backend", "COMBO"),
             widget_input("model_name", "COMBO"),
             widget_input("device", "COMBO"),
             widget_input("threshold", "FLOAT"),
@@ -520,9 +522,10 @@ def add_asr_proofread(workflow: Workflow, expected_text: str, language: str = "Z
             output("recognized_text", "STRING"),
             output("passed", "BOOLEAN"),
             output("similarity", "FLOAT"),
+            output("word_timestamps", "STRING"),
             output("review_report", "STRING"),
         ],
-        [expected_text, language, "base", "auto", 0.82],
+        [expected_text, language, "auto", "base", "auto", 0.82],
     )
 
 
@@ -732,6 +735,7 @@ def api_dialogue_generate(model_id: str, library_id: str, script_id: str, *, pol
             "postprocess_preset": "off",
             "postprocess_strength": 1.0,
             "asr_enabled": False,
+            "asr_backend": "auto",
             "asr_model": "base",
             "asr_device": "auto",
             "asr_threshold": 0.82,
@@ -749,6 +753,7 @@ def api_asr(audio_id: str, expected_text: str, language: str = "ZH") -> dict[str
             "audio": [audio_id, 0],
             "expected_text": expected_text,
             "language": language,
+            "backend": "auto",
             "model_name": "base",
             "device": "auto",
             "threshold": 0.82,

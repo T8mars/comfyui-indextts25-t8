@@ -71,7 +71,7 @@ def test_timeline_asr_and_subtitle_nodes_form_a_complete_editing_chain(monkeypat
     assert "milliseconds" in edited[1]
     assert tuple(edited[2].shape) == (1, 96, 1200, 3)
 
-    monkeypatch.setattr(nodes_v3, "asr_available", lambda: True)
+    monkeypatch.setattr(nodes_v3, "asr_available", lambda *args: True)
     monkeypatch.setattr(
         nodes_v3,
         "transcribe_waveform",
@@ -81,6 +81,7 @@ def test_timeline_asr_and_subtitle_nodes_form_a_complete_editing_chain(monkeypat
         {"waveform": __import__("torch").zeros(1, 1, 16000), "sample_rate": 16000},
         "修改字幕",
         "ZH",
+        "auto",
         "tiny",
         "cpu",
         0.8,
@@ -105,7 +106,7 @@ def test_dialogue_generation_can_auto_review_and_return_rewritten_srt(tmp_path, 
 
     audio = {"waveform": __import__("torch").zeros(1, 1, 22050), "sample_rate": 22050}
     monkeypatch.setattr(nodes_v3, "run_inference", lambda *args, **kwargs: (audio, "fake inference"))
-    monkeypatch.setattr(nodes_v3, "asr_available", lambda: True)
+    monkeypatch.setattr(nodes_v3, "asr_available", lambda *args: True)
     monkeypatch.setattr(
         nodes_v3,
         "transcribe_waveform",
@@ -126,6 +127,7 @@ def test_dialogue_generation_can_auto_review_and_return_rewritten_srt(tmp_path, 
         "off",
         1.0,
         True,
+        "auto",
         "tiny",
         "cpu",
         0.8,

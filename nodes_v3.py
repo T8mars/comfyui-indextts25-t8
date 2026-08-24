@@ -33,7 +33,7 @@ from .runtime.pronunciation import (
     process_pronunciation_text,
 )
 from .runtime.text_planner import build_generation_plan
-from .runtime.speech_review import ASR_MODELS, asr_available, review_transcript, transcribe_waveform
+from .runtime.speech_review import ASR_BACKENDS, ASR_MODELS, asr_available, review_transcript, transcribe_waveform
 from .runtime.timeline import apply_timeline_edits, render_timeline_image, rewrite_srt, timeline_json, timeline_rows
 from .runtime.types import (
     DialogueScript,
@@ -894,6 +894,7 @@ class T8IndexTTS25DialogueGenerate(io.ComfyNode):
                 io.Combo.Input("postprocess_preset", display_name="合并音频后处理", options=list(POSTPROCESS_PRESETS), default="off"),
                 io.Float.Input("postprocess_strength", display_name="后处理强度", default=1.0, min=0.0, max=1.0, step=0.05, advanced=True),
                 io.Boolean.Input("asr_enabled", display_name="逐句自动 ASR 校对", default=False),
+                io.Combo.Input("asr_backend", display_name="ASR 后端", options=list(ASR_BACKENDS), default="auto"),
                 io.Combo.Input("asr_model", display_name="ASR 模型", options=list(ASR_MODELS), default="base"),
                 io.Combo.Input("asr_device", display_name="ASR 设备", options=["auto", "cuda", "cpu"], default="auto", advanced=True),
                 io.Float.Input("asr_threshold", display_name="ASR 通过阈值", default=0.82, min=0.0, max=1.0, step=0.01),
@@ -932,6 +933,7 @@ class T8IndexTTS25DialogueGenerate(io.ComfyNode):
         postprocess_preset: str,
         postprocess_strength: float,
         asr_enabled: bool,
+        asr_backend: str,
         asr_model: str,
         asr_device: str,
         asr_threshold: float,
@@ -943,9 +945,9 @@ class T8IndexTTS25DialogueGenerate(io.ComfyNode):
         missing = missing_roles(dialogue_script.lines, role_library.profiles)
         if missing:
             raise ValueError("以下角色没有连接音色：" + "、".join(missing))
-        if asr_enabled and not asr_available():
+        if asr_enabled and not asr_available(asr_backend):
             raise RuntimeError(
-                "自动 ASR 校对需要可选依赖 openai-whisper；请在 ComfyUI Python 环境中手动安装。"
+                "所选 ASR 后端不可用；请安装 openai-whisper / faster-whisper，或切换后端。"
             )
         work_handle = replace(model, release_after_run=False)
         clips: list[dict] = []
@@ -1036,6 +1038,7 @@ class T8IndexTTS25DialogueGenerate(io.ComfyNode):
                             audio["waveform"],
                             int(audio["sample_rate"]),
                             language=language,
+                            backend=asr_backend,
                             model_name=asr_model,
                             device=asr_device,
                             download_root=_asr_download_root(),
@@ -1052,6 +1055,7 @@ class T8IndexTTS25DialogueGenerate(io.ComfyNode):
                             "similarity": 0.0,
                             "threshold": float(asr_threshold),
                             "language": language,
+                            "backend": asr_backend,
                             "model": asr_model,
                             "error": str(exc).strip() or type(exc).__name__,
                         }
@@ -1090,6 +1094,7 @@ class T8IndexTTS25DialogueGenerate(io.ComfyNode):
             "postprocess": postprocess_report,
             "asr": {
                 "enabled": bool(asr_enabled),
+                "backend": asr_backend,
                 "model": asr_model,
                 "device": asr_device,
                 "threshold": float(asr_threshold),
@@ -1120,13 +1125,15 @@ class T8IndexTTS25ASRProofread(io.ComfyNode):
             essentials_category="Audio",
             search_aliases=["Whisper", "ASR", "语音校对", "CER"],
             description=(
-                "使用可选的本地 OpenAI Whisper 识别 AUDIO，并与原文计算相似度和字符错误率；"
+                "使用可选的本地 Whisper 后端识别 AUDIO；中文/日文计算 CER，其余语言计算 WER；"
+                "统一简繁体、数字和标点，并输出差异明细及词级时间戳；"
                 "不安装时只影响本节点。"
             ),
             inputs=[
                 io.Audio.Input("audio", display_name="待校对音频"),
                 io.String.Input("expected_text", display_name="原始文本", multiline=True, dynamic_prompts=False),
                 io.Combo.Input("language", display_name="语言", options=["AUTO", "ZH", "EN", "JA", "ES", "AR"], default="AUTO"),
+                io.Combo.Input("backend", display_name="ASR 后端", options=list(ASR_BACKENDS), default="auto"),
                 io.Combo.Input("model_name", display_name="ASR 模型", options=list(ASR_MODELS), default="base"),
                 io.Combo.Input("device", display_name="ASR 设备", options=["auto", "cuda", "cpu"], default="auto", advanced=True),
                 io.Float.Input("threshold", display_name="通过阈值", default=0.82, min=0.0, max=1.0, step=0.01),
@@ -1135,18 +1142,20 @@ class T8IndexTTS25ASRProofread(io.ComfyNode):
                 io.String.Output("recognized_text", display_name="识别文本"),
                 io.Boolean.Output("passed", display_name="是否通过"),
                 io.Float.Output("similarity", display_name="相似度"),
+                io.String.Output("word_timestamps", display_name="词级时间戳 JSON"),
                 io.String.Output("review_report", display_name="校对报告 JSON"),
             ],
         )
 
     @classmethod
-    def execute(cls, audio: dict, expected_text: str, language: str, model_name: str, device: str, threshold: float) -> io.NodeOutput:
-        if not asr_available():
-            raise RuntimeError("缺少可选依赖 openai-whisper；请在 ComfyUI Python 环境中手动安装。")
+    def execute(cls, audio: dict, expected_text: str, language: str, backend: str, model_name: str, device: str, threshold: float) -> io.NodeOutput:
+        if not asr_available(backend):
+            raise RuntimeError("所选 ASR 后端不可用；请安装 openai-whisper / faster-whisper，或切换后端。")
         transcript = transcribe_waveform(
             audio["waveform"],
             int(audio["sample_rate"]),
             language=language,
+            backend=backend,
             model_name=model_name,
             device=device,
             download_root=_asr_download_root(),
@@ -1156,6 +1165,7 @@ class T8IndexTTS25ASRProofread(io.ComfyNode):
             transcript["text"],
             bool(review["passed"]),
             float(review["similarity"]),
+            json.dumps(transcript.get("word_timestamps") or [], ensure_ascii=False, indent=2),
             json.dumps(review, ensure_ascii=False, indent=2),
         )
 

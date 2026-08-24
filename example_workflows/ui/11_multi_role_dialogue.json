@@ -100,7 +100,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_ModelLoader",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.8.0"
+        "ver": "0.8.1"
       },
       "widgets_values": [
         "IndexTTS-2.5",
@@ -149,7 +149,7 @@
       "properties": {
         "Node name for S&R": "LoadAudio",
         "cnr_id": "comfy-core",
-        "ver": "0.8.0"
+        "ver": "0.8.1"
       },
       "widgets_values": [
         "role_a.wav"
@@ -192,7 +192,7 @@
       "properties": {
         "Node name for S&R": "LoadAudio",
         "cnr_id": "comfy-core",
-        "ver": "0.8.0"
+        "ver": "0.8.1"
       },
       "widgets_values": [
         "role_b.wav"
@@ -259,7 +259,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_VoiceProfile",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.8.0"
+        "ver": "0.8.1"
       },
       "widgets_values": [
         "角色A",
@@ -327,7 +327,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_VoiceProfile",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.8.0"
+        "ver": "0.8.1"
       },
       "widgets_values": [
         "角色B",
@@ -379,7 +379,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_RoleLibrary",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.8.0"
+        "ver": "0.8.1"
       }
     },
     {
@@ -447,7 +447,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_DialogueScript",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.8.0"
+        "ver": "0.8.1"
       },
       "widgets_values": [
         "batch",
@@ -565,6 +565,14 @@
           "link": null
         },
         {
+          "name": "asr_backend",
+          "type": "COMBO",
+          "widget": {
+            "name": "asr_backend"
+          },
+          "link": null
+        },
+        {
           "name": "asr_model",
           "type": "COMBO",
           "widget": {
@@ -645,7 +653,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_DialogueGenerate",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.8.0"
+        "ver": "0.8.1"
       },
       "widgets_values": [
         20260818,
@@ -658,6 +666,7 @@
         "off",
         1.0,
         false,
+        "auto",
         "base",
         "auto",
         0.82,
@@ -705,7 +714,7 @@
       "properties": {
         "Node name for S&R": "SaveAudio",
         "cnr_id": "comfy-core",
-        "ver": "0.8.0"
+        "ver": "0.8.1"
       },
       "widgets_values": [
         "IndexTTS25_T8/batch_dialogue"

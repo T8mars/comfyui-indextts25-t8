@@ -85,6 +85,7 @@ class GenerationPlan:
             "segment_count": len(self.segments),
             "total_pause_ms": self.total_pause_ms,
             "gpt_accel_risk": gpt_accel_risk(self),
+            "gpt_accel_cache_fix": True,
             "chunks": [asdict(item) for item in self.chunks],
             "segments": [asdict(item) for item in self.segments],
         }
@@ -328,9 +329,9 @@ def build_generation_plan(
 
 
 def gpt_accel_risk(plan: GenerationPlan) -> bool:
-    """Guard the still-unmerged upstream synthetic-prompt KV-cache edge case."""
+    """Backward-compatible report field after the synthetic-prompt cache fix."""
 
-    return len(plan.chunks) > 1 or plan.max_segment_tokens >= 180
+    return False
 
 
 __all__ = [

@@ -41,7 +41,6 @@ def _patch_plan(monkeypatch, text="hello"):
         total_pause_ms=0,
     )
     monkeypatch.setattr(inference_adapter, "build_generation_plan", lambda *args, **kwargs: plan)
-    monkeypatch.setattr(inference_adapter, "gpt_accel_risk", lambda _plan: False)
 
 
 def test_adapter_maps_all_controls_without_global_side_effects(tmp_path: Path, monkeypatch):
