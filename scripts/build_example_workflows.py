@@ -52,7 +52,7 @@ def properties(node_type: str, *, core: bool = False) -> dict[str, str]:
     return {
         "Node name for S&R": node_type,
         "cnr_id": "comfy-core" if core else "comfyui-indextts25-t8",
-        "ver": "0.6.0",
+        "ver": "0.7.0",
     }
 
 
@@ -213,6 +213,9 @@ def sampling_values(**overrides: Any) -> dict[str, Any]:
         "repetition_penalty": 10.0,
         "length_penalty": 0.0,
         "max_mel_tokens": 1500,
+        "diffusion_steps": 25,
+        "inference_cfg_rate": 0.7,
+        "cfm_temperature": 1.0,
         "segmentation_mode": "auto",
         "max_text_tokens_per_segment": 120,
         "segment_silence_ms": 200,
@@ -237,6 +240,9 @@ def add_sampling(workflow: Workflow, pos=(440, 330), **overrides: Any) -> int:
         ("repetition_penalty", "FLOAT"),
         ("length_penalty", "FLOAT"),
         ("max_mel_tokens", "INT"),
+        ("diffusion_steps", "INT"),
+        ("inference_cfg_rate", "FLOAT"),
+        ("cfm_temperature", "FLOAT"),
         ("segmentation_mode", "COMBO"),
         ("max_text_tokens_per_segment", "INT"),
         ("segment_silence_ms", "INT"),
@@ -249,7 +255,7 @@ def add_sampling(workflow: Workflow, pos=(440, 330), **overrides: Any) -> int:
     return workflow.add(
         SAMPLING_NODE,
         pos,
-        (390, 650),
+        (390, 760),
         [widget_input(name, data_type) for name, data_type in names_types],
         [output("sampling", "T8_INDEXTTS25_SAMPLING"), output("sampling_info", "STRING")],
         [values[name] for name, _ in names_types],
@@ -450,7 +456,7 @@ def add_dialogue_generate(workflow: Workflow, pos=(1220, 240), *, policy="shift"
             output("line_audios", "AUDIO"),
             output("generation_report", "STRING"),
         ],
-        [20260818, "fixed", policy, fit, "natural", 180, 200, "off", 1.0],
+        [20260818, "fixed", policy, fit, "native", 180, 200, "off", 1.0],
     )
 
 
@@ -627,7 +633,7 @@ def api_dialogue_generate(model_id: str, library_id: str, script_id: str, *, pol
             "seed": 20260818,
             "timeline_policy": policy,
             "fit_srt_slots": fit,
-            "slot_duration_mode": "natural",
+            "slot_duration_mode": "native",
             "fit_tolerance_ms": 180,
             "batch_gap_ms": 200,
             "postprocess_preset": "off",
@@ -996,7 +1002,7 @@ def pause_control_pair() -> tuple[dict[str, Any], dict[str, Any]]:
 
 
 def target_duration_pair() -> tuple[dict[str, Any], dict[str, Any]]:
-    text = "这段语音会先用官方时长系数进行二次适配，再严格补齐到五秒。"
+    text = "这段语音会使用原生长度调节器，在一次推理中适配到五秒。"
     workflow = Workflow("17 目标时长秒数")
     model = add_model(workflow)
     speaker = add_load_audio(workflow, "voice_reference.wav", title="音色参考音频")
@@ -1006,7 +1012,7 @@ def target_duration_pair() -> tuple[dict[str, Any], dict[str, Any]]:
         "ZH",
         1.0,
         20260822,
-        target_duration_mode="pad",
+        target_duration_mode="native",
         target_duration_seconds=5.0,
     )
     save = add_save(workflow, "IndexTTS25_T8/target_5s")
@@ -1016,7 +1022,7 @@ def target_duration_pair() -> tuple[dict[str, Any], dict[str, Any]]:
         "2": api_audio("voice_reference.wav"),
         "3": api_generate(
             "1", "2", text, "ZH", 1.0, 20260822,
-            target_duration_mode="pad", target_duration_seconds=5.0,
+            target_duration_mode="native", target_duration_seconds=5.0,
         ),
         "4": api_save("3", "IndexTTS25_T8/target_5s"),
     }
@@ -1044,6 +1050,34 @@ def audio_postprocess_pair() -> tuple[dict[str, Any], dict[str, Any]]:
     return workflow.as_dict(), api
 
 
+def cfm_advanced_pair() -> tuple[dict[str, Any], dict[str, Any]]:
+    text = "这个示例使用四十步扩散、零点八五引导强度和零点八温度，适合比较稳定旁白。"
+    workflow = Workflow("19 CFM 高级稳定性参数")
+    model = add_model(workflow)
+    speaker = add_load_audio(workflow, "voice_reference.wav", title="音色参考音频")
+    sampling = add_sampling(
+        workflow,
+        diffusion_steps=40,
+        inference_cfg_rate=0.85,
+        cfm_temperature=0.8,
+    )
+    generate = add_generate(workflow, text, "ZH", 1.0, 20260824, pos=(900, 120))
+    save = add_save(workflow, "IndexTTS25_T8/cfm_stable", pos=(1460, 280))
+    wire_generation(workflow, model, speaker, generate, save, sampling=sampling)
+    api = {
+        "1": api_model(),
+        "2": api_audio("voice_reference.wav"),
+        "3": api_sampling(
+            diffusion_steps=40,
+            inference_cfg_rate=0.85,
+            cfm_temperature=0.8,
+        ),
+        "4": api_generate("1", "2", text, "ZH", 1.0, 20260824, sampling_id="3"),
+        "5": api_save("4", "IndexTTS25_T8/cfm_stable"),
+    }
+    return workflow.as_dict(), api
+
+
 EXAMPLES = {
     "01_basic_voice_clone": basic_pair,
     "02_speed_comparison": speed_pair,
@@ -1063,6 +1097,7 @@ EXAMPLES = {
     "16_pause_control": pause_control_pair,
     "17_target_duration": target_duration_pair,
     "18_audio_postprocess": audio_postprocess_pair,
+    "19_cfm_advanced": cfm_advanced_pair,
 }
 
 

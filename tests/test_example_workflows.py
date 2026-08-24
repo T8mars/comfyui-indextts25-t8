@@ -30,6 +30,7 @@ EXAMPLES = (
     "16_pause_control",
     "17_target_duration",
     "18_audio_postprocess",
+    "19_cfm_advanced",
 )
 
 
@@ -96,6 +97,18 @@ def test_examples_cover_every_emotion_mode_speed_sampling_and_language():
         node["class_type"] == "T8_IndexTTS25_SamplingConfig" and node["inputs"]["do_sample"]
         for prompt in prompts
         for node in prompt.values()
+    )
+    assert any(
+        node["class_type"] == "T8_IndexTTS25_SamplingConfig"
+        and node["inputs"]["diffusion_steps"] == 40
+        and node["inputs"]["inference_cfg_rate"] == 0.85
+        and node["inputs"]["cfm_temperature"] == 0.8
+        for node in _load(api_root / "19_cfm_advanced.json").values()
+    )
+    assert any(
+        node["class_type"] == "T8_IndexTTS25_Generate"
+        and node["inputs"]["target_duration_mode"] == "native"
+        for node in _load(api_root / "17_target_duration.json").values()
     )
     pronunciation_nodes = [
         node

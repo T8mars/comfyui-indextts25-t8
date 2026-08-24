@@ -97,9 +97,13 @@ def test_sampling_exposes_auto_segmentation_and_real_pause_controls():
 
     result = T8IndexTTS25SamplingConfig.execute(
         False, 0.8, 0.8, 30, 3, 10.0, 0.0, 1500,
+        25, 0.7, 1.0,
         "auto", 120, 200, "narration", 100, 300, 600, True,
     )
     config = result[0]
     assert config.effective_segment_tokens("EN") == 60
     assert config.effective_segment_tokens("ZH") == 120
     assert config.pause_preset == "narration"
+    assert config.diffusion_steps == 25
+    assert config.inference_cfg_rate == pytest.approx(0.7)
+    assert config.cfm_temperature == pytest.approx(1.0)

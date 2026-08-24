@@ -25,8 +25,9 @@
 | `14_optional_acceleration.json` | `auto_safe` 加速回退与环境诊断 | `voice_reference.wav` |
 | `15_auto_segment_preview.json` | 英文 60 Token 自动分段、预览 JSON 与 GPT 加速风险报告 | `voice_reference.wav` |
 | `16_pause_control.json` | 旁白标点停顿和 `<pause=0.8>` 显式停顿 | `voice_reference.wav` |
-| `17_target_duration.json` | 二次语速适配后严格补齐到目标 5 秒 | `voice_reference.wav` |
+| `17_target_duration.json` | 原生长度调节器单次适配到目标 5 秒 | `voice_reference.wav` |
 | `18_audio_postprocess.json` | 独立“清晰旁白”人声后处理节点 | `voice_reference.wav` |
+| `19_cfm_advanced.json` | CFM 扩散步数、CFG 引导强度和温度调节 | `voice_reference.wav` |
 
 ## 使用方法
 
@@ -36,8 +37,8 @@
 4. API 用户可直接读取 `api/` 下的同名文件提交；这些文件使用当前 ComfyUI V3 动态输入要求的
    `mode.xxx` 扁平路径格式。
 
-角色音色库同样使用 V3 自动增长扁平路径 `voices.voice_0`、`voices.voice_1`。SRT 示例开启了最多一次
-二次推理的时长适配；最终是否超时请读取生成报告，不应把它当作逐帧精确的字幕对齐器。
+角色音色库同样使用 V3 自动增长扁平路径 `voices.voice_0`、`voices.voice_1`。SRT 示例默认使用
+原生长度调节器单次适配字幕槽位，并在最终输出做采样点级收尾；目标时长与自然语速差异过大时仍可能影响听感。
 
 重新生成全部示例：
 

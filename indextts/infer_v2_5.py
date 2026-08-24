@@ -2,6 +2,7 @@ import os
 from subprocess import CalledProcessError
 
 import json
+import math
 import re
 import time
 import librosa
@@ -20,6 +21,11 @@ from indextts.codec.models import EnhancedCodec
 from indextts.gpt.model_v2 import UnifiedVoice
 from indextts.utils.checkpoint import load_checkpoint
 from indextts.utils.common import save_pcm_wav
+from indextts.utils.duration_control import (
+    allocate_target_frames,
+    fit_waveform_length,
+    normalize_target_duration,
+)
 from indextts.utils.front import TextNormalizer
 from indextts.utils.tokenizer import get_tokenizer, lang_to_token
 from indextts.utils.ja_g2p import JapaneseG2PProcessor
@@ -514,20 +520,35 @@ class IndexTTS2:
               emo_audio_prompt=None, emo_alpha=1.0,
               emo_vector=None, use_emo_text=False, emo_text=None, use_random=False, interval_silence=200,
               verbose=False, max_text_tokens_per_segment=120, stream_return=False, more_segment_before=0,
-              duration_factor=1.0, text_normalization=True, **generation_kwargs):
+              duration_factor=1.0, text_normalization=True, target_duration=None,
+              seed=None, diffusion_steps=25, inference_cfg_rate=0.7, cfm_temperature=1.0,
+              **generation_kwargs):
+        target_duration = normalize_target_duration(target_duration)
         if self.low_vram and not stream_return and len(text) > 40:
             segments = self.split_text_by_punctuation(text, max_chars=40)
             if verbose:
                 print(f">> Low-VRAM: split into {len(segments)} segments: {segments}")
             sampling_rate = 22050
+            hop_length = int(self.cfg.s2mel.preprocess_params.spect_params.hop_length)
+            target_segment_frames, target_samples = allocate_target_frames(
+                target_duration, [len(segment) for segment in segments],
+                sampling_rate, hop_length, interval_silence,
+            )
             all_wavs = []
-            for seg_text in segments:
+            for seg_idx, seg_text in enumerate(segments):
+                segment_target_duration = None
+                if target_segment_frames is not None:
+                    segment_target_duration = target_segment_frames[seg_idx] * hop_length / sampling_rate
                 gen = self.infer_generator(
                     spk_audio_prompt, seg_text, None, lang,
                     emo_audio_prompt, emo_alpha, emo_vector,
                     use_emo_text, emo_text, use_random, 0,
                     verbose, max_text_tokens_per_segment, False, 0,
-                    duration_factor=duration_factor, text_normalization=text_normalization, **generation_kwargs
+                    duration_factor=duration_factor, text_normalization=text_normalization,
+                    target_duration=segment_target_duration,
+                    seed=None if seed is None else int(seed) + seg_idx,
+                    diffusion_steps=diffusion_steps, inference_cfg_rate=inference_cfg_rate,
+                    cfm_temperature=cfm_temperature, **generation_kwargs
                 )
                 result = None
                 for result in gen:
@@ -543,6 +564,7 @@ class IndexTTS2:
                     if i < len(all_wavs) - 1:
                         wav_parts.append(silence)
                 wav = torch.cat(wav_parts, dim=1)
+                wav = fit_waveform_length(wav, target_samples)
                 if output_path:
                     if os.path.isfile(output_path):
                         os.remove(output_path)
@@ -562,7 +584,10 @@ class IndexTTS2:
                 emo_vector,
                 use_emo_text, emo_text, use_random, interval_silence,
                 verbose, max_text_tokens_per_segment, stream_return, more_segment_before,
-                duration_factor=duration_factor, text_normalization=text_normalization, **generation_kwargs
+                duration_factor=duration_factor, text_normalization=text_normalization,
+                target_duration=target_duration, seed=seed,
+                diffusion_steps=diffusion_steps, inference_cfg_rate=inference_cfg_rate,
+                cfm_temperature=cfm_temperature, **generation_kwargs
             )
         else:
             try:
@@ -572,7 +597,10 @@ class IndexTTS2:
                     emo_vector,
                     use_emo_text, emo_text, use_random, interval_silence,
                     verbose, max_text_tokens_per_segment, stream_return, more_segment_before,
-                    duration_factor=duration_factor, text_normalization=text_normalization, **generation_kwargs
+                    duration_factor=duration_factor, text_normalization=text_normalization,
+                    target_duration=target_duration, seed=seed,
+                    diffusion_steps=diffusion_steps, inference_cfg_rate=inference_cfg_rate,
+                    cfm_temperature=cfm_temperature, **generation_kwargs
                 ))[0]
             except IndexError:
                 return None
@@ -582,9 +610,27 @@ class IndexTTS2:
               emo_audio_prompt=None, emo_alpha=1.0, emo_vector=None,
               use_emo_text=False, emo_text=None, use_random=False, interval_silence=200,
               verbose=False, max_text_tokens_per_segment=120, stream_return=False, quick_streaming_tokens=0,
-              duration_factor=1.0, text_normalization=True, **generation_kwargs):
+              duration_factor=1.0, text_normalization=True, target_duration=None,
+              seed=None, diffusion_steps=25, inference_cfg_rate=0.7, cfm_temperature=1.0,
+              **generation_kwargs):
         print(">> starting inference...")
         self._set_gr_progress(0, "starting inference...")
+        target_duration = normalize_target_duration(target_duration)
+        diffusion_steps = int(diffusion_steps)
+        inference_cfg_rate = float(inference_cfg_rate)
+        cfm_temperature = float(cfm_temperature)
+        if not 1 <= diffusion_steps <= 200:
+            raise ValueError("diffusion_steps must be between 1 and 200")
+        if not math.isfinite(inference_cfg_rate) or not 0 <= inference_cfg_rate <= 3:
+            raise ValueError("inference_cfg_rate must be between 0 and 3")
+        if not math.isfinite(cfm_temperature) or not 0.05 <= cfm_temperature <= 2:
+            raise ValueError("cfm_temperature must be between 0.05 and 2")
+        if seed is not None:
+            seed = int(seed)
+            torch.manual_seed(seed)
+            random.seed(seed)
+            if torch.cuda.is_available():
+                torch.cuda.manual_seed_all(seed)
         if verbose:
             print(f"origin text:{text}, spk_audio_prompt:{spk_audio_prompt}, "
                   f"emo_audio_prompt:{emo_audio_prompt}, emo_alpha:{emo_alpha}, "
@@ -731,7 +777,9 @@ class IndexTTS2:
         segments = self.split_text_by_tokens(text, max_text_tokens_per_segment, lang_prefix)
         segments_count = len(segments)
         segment_tokens = []
+        segment_token_weights = []
         for seg_text in segments:
+            segment_token_weights.append(len(self.tokenizer.encode(seg_text, allowed_special='all')))
             tokens = self.tokenizer.encode(lang_prefix + seg_text, allowed_special='all')
             tokens = torch.IntTensor(tokens).unsqueeze(0).to(self.device)
             segment_tokens.append(F.pad(tokens, (0, 1), value=1))
@@ -750,6 +798,10 @@ class IndexTTS2:
         repetition_penalty = generation_kwargs.pop("repetition_penalty", 10.0)
         max_mel_tokens = generation_kwargs.pop("max_mel_tokens", 1500)
         sampling_rate = 22050
+        hop_length = int(self.cfg.s2mel.preprocess_params.spect_params.hop_length)
+        target_segment_frames, target_samples = allocate_target_frames(
+            target_duration, segment_token_weights, sampling_rate, hop_length, interval_silence
+        )
 
         wavs = []
         gpt_gen_time = 0
@@ -840,12 +892,13 @@ class IndexTTS2:
                 dtype = None
                 with torch.amp.autocast(text_tokens.device.type, enabled=dtype is not None, dtype=dtype):
                     m_start_time = time.perf_counter()
-                    diffusion_steps = 25
-                    inference_cfg_rate = 0.7
                     S_infer = self.semantic_codec.decode(codes)
-                    target_lengths = torch.LongTensor(
-                        [int(S_infer.shape[1] * 1.72 * duration_factor)]
-                    ).to(codes.device)
+                    if target_segment_frames is None:
+                        target_lengths = torch.LongTensor(
+                            [max(1, int(S_infer.shape[1] * 1.72 * duration_factor))]
+                        ).to(codes.device)
+                    else:
+                        target_lengths = torch.LongTensor([target_segment_frames[seg_idx]]).to(codes.device)
 
                     cond = self.s2mel.models['length_regulator'](S_infer,
                                                                  ylens=target_lengths,
@@ -857,6 +910,7 @@ class IndexTTS2:
                                                                    torch.LongTensor([cat_condition.size(1)]).to(
                                                                        cond.device),
                                                                    ref_mel, style, None, diffusion_steps,
+                                                                   temperature=cfm_temperature,
                                                                    inference_cfg_rate=inference_cfg_rate)
                     vc_target = vc_target[:, :, ref_mel.size(-1):]
                     s2mel_time += time.perf_counter() - m_start_time
@@ -867,6 +921,14 @@ class IndexTTS2:
                     bigvgan_time += time.perf_counter() - m_start_time
                     wav = wav.squeeze(1)
 
+                    if target_samples is not None and seg_idx == segments_count - 1:
+                        silence_samples = max(0, int(sampling_rate * interval_silence / 1000.0)) * (segments_count - 1)
+                        previous_samples = sum(part.shape[-1] for part in wavs)
+                        final_segment_samples = target_samples - silence_samples - previous_samples
+                        if final_segment_samples <= 0:
+                            raise ValueError("target_duration is too short for the synthesized segments")
+                        wav = fit_waveform_length(wav, final_segment_samples)
+
                 wav = torch.clamp(32767 * wav, -32767.0, 32767.0)
                 if verbose:
                     print(f"wav shape: {wav.shape}", "min:", wav.min(), "max:", wav.max())
@@ -874,14 +936,16 @@ class IndexTTS2:
                 wavs.append(wav.cpu())  # to cpu before saving
                 if stream_return:
                     yield wav.cpu()
-                    if silence == None:
+                    if silence is None:
                         silence = self.interval_silence(wavs, sampling_rate=sampling_rate, interval_silence=interval_silence)
-                    yield silence
+                    if seg_idx < segments_count - 1:
+                        yield silence
         end_time = time.perf_counter()
 
         self._set_gr_progress(0.9, "saving audio...")
         wavs = self.insert_interval_silence(wavs, sampling_rate=sampling_rate, interval_silence=interval_silence)
         wav = torch.cat(wavs, dim=1)
+        wav = fit_waveform_length(wav, target_samples)
         wav_length = wav.shape[-1] / sampling_rate
         print(f">> gpt_gen_time: {gpt_gen_time:.2f} seconds")
         print(f">> s2mel_time: {s2mel_time:.2f} seconds")

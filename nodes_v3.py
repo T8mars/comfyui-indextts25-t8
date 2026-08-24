@@ -9,9 +9,8 @@ import torch
 from comfy_api.latest import ComfyExtension, io
 from typing_extensions import override
 
-from .runtime.inference_adapter import run_inference
+from .runtime.inference_adapter import NativeTargetDurationUnsupported, run_inference
 from .runtime.audio_processing import (
-    DURATION_MODES,
     POSTPROCESS_PRESETS,
     apply_duration_policy,
     audio_duration_ms,
@@ -423,6 +422,36 @@ class T8IndexTTS25SamplingConfig(io.ComfyNode):
                 ),
                 io.Float.Input("length_penalty", display_name="length_penalty", default=0.0, min=-2.0, max=2.0, step=0.05, advanced=True),
                 io.Int.Input("max_mel_tokens", display_name="最大语音 token", default=1500, min=256, max=4096, step=16, advanced=True),
+                io.Int.Input(
+                    "diffusion_steps",
+                    display_name="CFM 扩散步数",
+                    default=25,
+                    min=5,
+                    max=100,
+                    step=1,
+                    advanced=True,
+                    tooltip="官方默认 25；更高通常更稳定但更慢，旁白可尝试 40–50。",
+                ),
+                io.Float.Input(
+                    "inference_cfg_rate",
+                    display_name="CFM 引导强度",
+                    default=0.7,
+                    min=0.0,
+                    max=1.5,
+                    step=0.05,
+                    advanced=True,
+                    tooltip="提高后更贴近参考音色/音高；过高可能过度平滑。",
+                ),
+                io.Float.Input(
+                    "cfm_temperature",
+                    display_name="CFM 温度",
+                    default=1.0,
+                    min=0.1,
+                    max=1.5,
+                    step=0.05,
+                    advanced=True,
+                    tooltip="降低可减少抖动；稳定旁白可尝试 0.8。",
+                ),
                 io.Combo.Input(
                     "segmentation_mode",
                     display_name="长文本分段模式",
@@ -468,6 +497,9 @@ class T8IndexTTS25SamplingConfig(io.ComfyNode):
         repetition_penalty: float,
         length_penalty: float,
         max_mel_tokens: int,
+        diffusion_steps: int,
+        inference_cfg_rate: float,
+        cfm_temperature: float,
         segmentation_mode: str,
         max_text_tokens_per_segment: int,
         segment_silence_ms: int,
@@ -486,6 +518,9 @@ class T8IndexTTS25SamplingConfig(io.ComfyNode):
             repetition_penalty=float(repetition_penalty),
             length_penalty=float(length_penalty),
             max_mel_tokens=int(max_mel_tokens),
+            diffusion_steps=int(diffusion_steps),
+            inference_cfg_rate=float(inference_cfg_rate),
+            cfm_temperature=float(cfm_temperature),
             segmentation_mode=str(segmentation_mode),
             max_text_tokens_per_segment=int(max_text_tokens_per_segment),
             segment_silence_ms=int(segment_silence_ms),
@@ -499,7 +534,8 @@ class T8IndexTTS25SamplingConfig(io.ComfyNode):
         info = (
             f"{mode} | beams={config.num_beams} | max_mel={config.max_mel_tokens} | "
             f"segment={config.segmentation_mode}/{config.max_text_tokens_per_segment} | "
-            f"pause={config.pause_preset} | internal_silence={config.segment_silence_ms}ms"
+            f"pause={config.pause_preset} | internal_silence={config.segment_silence_ms}ms | "
+            f"CFM={config.diffusion_steps}steps/cfg{config.inference_cfg_rate:.2f}/temp{config.cfm_temperature:.2f}"
         )
         return io.NodeOutput(config, info)
 
@@ -787,13 +823,13 @@ class T8IndexTTS25DialogueGenerate(io.ComfyNode):
                 SamplingType.Input("sampling", display_name="采样设置", optional=True),
                 io.Int.Input("seed", display_name="起始 seed", default=0, min=0, max=0xFFFFFFFFFFFFFFFF, control_after_generate=True),
                 io.Combo.Input("timeline_policy", display_name="时间冲突策略", options=["shift", "overlay"], default="shift", tooltip="shift 顺延避免重叠；overlay 保留 SRT 起点并安全混音。"),
-                io.Boolean.Input("fit_srt_slots", display_name="二次推理适配字幕槽位", default=False, tooltip="仅 SRT 有效；不保证逐帧精确，超时会写入报告。"),
+                io.Boolean.Input("fit_srt_slots", display_name="适配字幕槽位", default=False, tooltip="仅 SRT 有效；native 单次控制，其他模式保留兼容回退。"),
                 io.Combo.Input(
                     "slot_duration_mode",
                     display_name="字幕槽位收尾模式",
-                    options=["natural", "pad", "exact"],
-                    default="natural",
-                    tooltip="natural 只二次适配；pad 不足补静音且保留超长；exact 会补静音或强制裁剪。",
+                    options=["native", "natural", "pad", "exact"],
+                    default="native",
+                    tooltip="native 原生单次控制（推荐）；natural 二次适配；pad/exact 为兼容收尾。",
                 ),
                 io.Int.Input("fit_tolerance_ms", display_name="允许时长误差（毫秒）", default=180, min=0, max=2000, step=10, advanced=True),
                 io.Int.Input("batch_gap_ms", display_name="批量句间静音（毫秒）", default=200, min=0, max=5000, step=10),
@@ -841,21 +877,46 @@ class T8IndexTTS25DialogueGenerate(io.ComfyNode):
             for offset, line in enumerate(dialogue_script.lines):
                 profile = role_library.profiles[line.role]
                 language = line.language or profile.language
-                audio, status = run_inference(
-                    work_handle,
-                    profile.speaker_audio,
-                    line.text,
-                    language,
-                    line.duration_factor,
-                    int(seed) + offset,
-                    emotion=profile.emotion,
-                    sampling=sampling,
+                native_slot = bool(
+                    fit_srt_slots and line.slot_ms and slot_duration_mode == "native"
                 )
+                native_fallback = False
+                try:
+                    audio, status = run_inference(
+                        work_handle,
+                        profile.speaker_audio,
+                        line.text,
+                        language,
+                        line.duration_factor,
+                        int(seed) + offset,
+                        emotion=profile.emotion,
+                        sampling=sampling,
+                        target_duration_seconds=(line.slot_ms / 1000.0) if native_slot else None,
+                    )
+                except NativeTargetDurationUnsupported:
+                    native_slot = False
+                    native_fallback = True
+                    audio, status = run_inference(
+                        work_handle,
+                        profile.speaker_audio,
+                        line.text,
+                        language,
+                        line.duration_factor,
+                        int(seed) + offset,
+                        emotion=profile.emotion,
+                        sampling=sampling,
+                    )
                 actual_ms = audio["waveform"].shape[-1] * 1000 / audio["sample_rate"]
                 used_factor = line.duration_factor
                 regenerated = False
                 duration_adjustment = {"mode": "off", "action": "unchanged"}
-                if fit_srt_slots and line.slot_ms and abs(actual_ms - line.slot_ms) > int(fit_tolerance_ms):
+                if native_slot:
+                    audio, duration_adjustment = apply_duration_policy(
+                        audio, line.slot_ms / 1000.0, "exact"
+                    )
+                    duration_adjustment["mode"] = "native"
+                    actual_ms = audio_duration_ms(audio)
+                elif fit_srt_slots and line.slot_ms and abs(actual_ms - line.slot_ms) > int(fit_tolerance_ms):
                     fitted = fit_duration_factor(used_factor, actual_ms, line.slot_ms)
                     if abs(fitted - used_factor) >= 0.02:
                         audio, status = run_inference(
@@ -886,6 +947,8 @@ class T8IndexTTS25DialogueGenerate(io.ComfyNode):
                     "actual_duration_ms": round(actual_ms),
                     "used_duration_factor": round(used_factor, 4),
                     "regenerated_for_slot": regenerated,
+                    "native_duration": native_slot,
+                    "native_duration_fallback": native_fallback,
                     "duration_adjustment": duration_adjustment,
                     "status": status,
                 })
@@ -1000,9 +1063,9 @@ class T8IndexTTS25Generate(io.ComfyNode):
                 io.Combo.Input(
                     "target_duration_mode",
                     display_name="目标时长模式",
-                    options=list(DURATION_MODES),
+                    options=["off", "native", "natural", "pad", "exact"],
                     default="off",
-                    tooltip="natural 二次推理；pad 不足补静音且不裁剪；exact 会补静音或强制裁剪。",
+                    tooltip="native 为原生单次控制（推荐）；natural 二次推理；pad/exact 为兼容后处理。",
                 ),
                 io.Float.Input(
                     "target_duration_seconds",
@@ -1079,19 +1142,42 @@ class T8IndexTTS25Generate(io.ComfyNode):
         emotion: EmotionConfig | None = None,
         sampling: SamplingConfig | None = None,
     ) -> io.NodeOutput:
-        audio, status = run_inference(
-            handle=model,
-            speaker_audio=speaker_audio,
-            text=text,
-            language=language,
-            duration_factor=duration_factor,
-            seed=seed,
-            emotion=emotion,
-            sampling=sampling,
-        )
+        native_requested = target_duration_mode == "native" and float(target_duration_seconds) > 0
+        native_fallback = False
+        try:
+            audio, status = run_inference(
+                handle=model,
+                speaker_audio=speaker_audio,
+                text=text,
+                language=language,
+                duration_factor=duration_factor,
+                seed=seed,
+                emotion=emotion,
+                sampling=sampling,
+                target_duration_seconds=float(target_duration_seconds) if native_requested else None,
+            )
+        except NativeTargetDurationUnsupported:
+            native_requested = False
+            native_fallback = True
+            audio, status = run_inference(
+                handle=model,
+                speaker_audio=speaker_audio,
+                text=text,
+                language=language,
+                duration_factor=duration_factor,
+                seed=seed,
+                emotion=emotion,
+                sampling=sampling,
+            )
         duration_report: dict = {"mode": "off", "action": "unchanged"}
         used_factor = float(duration_factor)
-        if target_duration_mode != "off" and float(target_duration_seconds) > 0:
+        if native_requested:
+            audio, duration_report = apply_duration_policy(
+                audio, target_duration_seconds, "exact"
+            )
+            duration_report["mode"] = "native"
+            status += f" | target={float(target_duration_seconds):.2f}s/native"
+        elif target_duration_mode != "off" and float(target_duration_seconds) > 0:
             actual_ms = audio_duration_ms(audio)
             fitted = fit_duration_factor(
                 used_factor, actual_ms, float(target_duration_seconds) * 1000.0
@@ -1120,6 +1206,8 @@ class T8IndexTTS25Generate(io.ComfyNode):
                     "action": "regenerated" if used_factor != float(duration_factor) else "unchanged",
                 }
             status += f" | target={float(target_duration_seconds):.2f}s/{target_duration_mode} | fitted_factor={used_factor:.3f}"
+        if native_fallback:
+            status += " | 原生目标时长不可用，已回退为二次推理适配"
         audio, postprocess_report = postprocess_audio(
             audio, postprocess_preset, postprocess_strength
         )

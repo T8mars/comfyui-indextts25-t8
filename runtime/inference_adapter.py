@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import gc
+import inspect
 import time
 from typing import Any
 
@@ -13,6 +14,33 @@ from .reference_cache import comfy_audio_to_reference_wav
 from .seed_scope import scoped_seed
 from .text_planner import build_generation_plan, gpt_accel_risk
 from .types import DEFAULT_EMOTION, DEFAULT_SAMPLING, EmotionConfig, ModelHandle, SamplingConfig
+
+
+class NativeTargetDurationUnsupported(RuntimeError):
+    """Raised when a selected external runtime predates native duration control."""
+
+
+def _native_chunk_durations(plan, target_duration_seconds: float | None) -> list[float | None]:
+    if target_duration_seconds is None:
+        return [None] * len(plan.chunks)
+    duration = float(target_duration_seconds)
+    pause_ms = sum(int(chunk.pause_after_ms) for chunk in plan.chunks)
+    if plan.chunks:
+        pause_ms += int(getattr(plan.chunks[0], "pause_before_ms", 0))
+    pause_seconds = pause_ms / 1000.0
+    speech_seconds = duration - pause_seconds
+    if speech_seconds <= 0:
+        raise ValueError(
+            f"目标时长 {duration:.3f} 秒不足以容纳已配置的 {pause_seconds:.3f} 秒停顿。"
+        )
+    weights = [max(1, len(str(chunk.text))) for chunk in plan.chunks]
+    total_weight = sum(weights)
+    return [speech_seconds * weight / total_weight for weight in weights]
+
+
+def _supports_native_target_duration(model) -> bool:
+    parameters = inspect.signature(model.infer).parameters.values()
+    return any(parameter.name == "target_duration" for parameter in parameters)
 
 
 def _progress_callback():
@@ -40,6 +68,7 @@ def run_inference(
     seed: int,
     emotion: EmotionConfig | None = None,
     sampling: SamplingConfig | None = None,
+    target_duration_seconds: float | None = None,
 ) -> tuple[dict[str, Any], str]:
     text = str(text).strip()
     if not text:
@@ -62,6 +91,7 @@ def run_inference(
         sentence_pause_ms=sampling.sentence_pause_ms,
         paragraph_pause_ms=sampling.paragraph_pause_ms,
     )
+    native_chunk_durations = _native_chunk_durations(plan, target_duration_seconds)
     speaker_path, speaker_notes = comfy_audio_to_reference_wav(speaker_audio, kind="speaker")
     notes = list(speaker_notes) + list(emotion.notes)
 
@@ -95,6 +125,10 @@ def run_inference(
             if handle.device.startswith("cuda") and torch.cuda.is_available():
                 torch.cuda.reset_peak_memory_stats()
             entry.model.gr_progress = _progress_callback()
+            if target_duration_seconds is not None and not _supports_native_target_duration(entry.model):
+                raise NativeTargetDurationUnsupported(
+                    "当前 IndexTTS 推理核心不支持原生 target_duration，请更新内置核心。"
+                )
             accel_engine = getattr(getattr(entry.model, "gpt", None), "accel_engine", None)
             accel_compatible = bool(
                 sampling.do_sample
@@ -130,7 +164,7 @@ def run_inference(
                         notes.append("低显存模式已在生成前释放 QwenEmotion")
                 for block_index, chunk in enumerate(plan.chunks):
                     with scoped_seed(int(seed) + block_index, handle.device):
-                        results.append(entry.model.infer(
+                        infer_kwargs = dict(
                             spk_audio_prompt=str(speaker_path),
                             text=chunk.text,
                             output_path=None,
@@ -147,7 +181,10 @@ def run_inference(
                             duration_factor=float(duration_factor),
                             text_normalization=bool(sampling.text_normalization),
                             **sampling.generation_kwargs(),
-                        ))
+                        )
+                        if native_chunk_durations[block_index] is not None:
+                            infer_kwargs["target_duration"] = native_chunk_durations[block_index]
+                        results.append(entry.model.infer(**infer_kwargs))
             finally:
                 if temporarily_disabled_accel:
                     entry.model.gpt.accel_engine = accel_engine
@@ -165,6 +202,8 @@ def run_inference(
         )
 
     if inference_error is not None:
+        if isinstance(inference_error, NativeTargetDurationUnsupported):
+            raise inference_error
         if handle.acceleration_effective != "off":
             handle.use_cuda_kernel = False
             handle.use_torch_compile = False
@@ -185,6 +224,7 @@ def run_inference(
                     seed,
                     emotion,
                     sampling,
+                    target_duration_seconds,
                 )
             except Exception as fallback_error:
                 raise fallback_error from inference_error
@@ -208,6 +248,12 @@ def run_inference(
         f"segments={len(plan.segments)}@{plan.max_tokens}token | "
         f"pause={plan.total_pause_ms}ms | accel={handle.acceleration_effective}"
     )
+    status += (
+        f" | CFM={sampling.diffusion_steps}steps/cfg{sampling.inference_cfg_rate:.2f}"
+        f"/temp{sampling.cfm_temperature:.2f}"
+    )
+    if target_duration_seconds is not None:
+        status += f" | native_target={float(target_duration_seconds):.3f}s"
     if peak_memory_mb is not None:
         status += f" | CUDA峰值={peak_memory_mb:.0f}MiB"
     if handle.acceleration_note:

@@ -86,7 +86,7 @@
       "seed": 20260818,
       "timeline_policy": "shift",
       "fit_srt_slots": true,
-      "slot_duration_mode": "natural",
+      "slot_duration_mode": "native",
       "fit_tolerance_ms": 180,
       "batch_gap_ms": 200,
       "postprocess_preset": "off",

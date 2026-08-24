@@ -84,6 +84,9 @@ class SamplingConfig:
     repetition_penalty: float = 10.0
     length_penalty: float = 0.0
     max_mel_tokens: int = 1500
+    diffusion_steps: int = 25
+    inference_cfg_rate: float = 0.7
+    cfm_temperature: float = 1.0
     segmentation_mode: str = "auto"
     max_text_tokens_per_segment: int = 120
     segment_silence_ms: int = 200
@@ -92,6 +95,14 @@ class SamplingConfig:
     sentence_pause_ms: int = 0
     paragraph_pause_ms: int = 0
     text_normalization: bool = True
+
+    def __post_init__(self) -> None:
+        if not 1 <= int(self.diffusion_steps) <= 200:
+            raise ValueError("diffusion_steps 必须在 1 到 200 之间。")
+        if not 0 <= float(self.inference_cfg_rate) <= 3:
+            raise ValueError("inference_cfg_rate 必须在 0 到 3 之间。")
+        if not 0.05 <= float(self.cfm_temperature) <= 2:
+            raise ValueError("cfm_temperature 必须在 0.05 到 2 之间。")
 
     def effective_segment_tokens(self, language: str) -> int:
         from .text_planner import effective_segment_limit
@@ -110,6 +121,9 @@ class SamplingConfig:
             "repetition_penalty": self.repetition_penalty,
             "length_penalty": self.length_penalty,
             "max_mel_tokens": self.max_mel_tokens,
+            "diffusion_steps": self.diffusion_steps,
+            "inference_cfg_rate": self.inference_cfg_rate,
+            "cfm_temperature": self.cfm_temperature,
         }
 
 
