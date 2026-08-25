@@ -32,6 +32,10 @@
 | `21_timeline_editor.json` | 以毫秒编辑起止时间，并用 Preview Image 显示彩色轨道 | `role_a.wav`、`role_b.wav` |
 | `22_subtitle_rewrite.json` | 根据生成报告回写实际时间轴和校对通过的 ASR 文本 | 无 |
 | `23_multi_role_emotions.json` | 两个角色分别使用独立八维情感，并通过 `Merge Voice Emotions` 汇总 | `role_a.wav`、`role_b.wav` |
+| `24_reference_quality.json` | 参考音频质量评分、自动裁剪和波形预览 | `voice_reference.wav` |
+| `25_quality_retry.json` | ASR 质检失败后更换 seed，保留相似度最高的生成结果 | `voice_reference.wav` |
+| `26_memory_control.json` | 连续生成自动重载、显存和模型缓存状态 | `voice_reference.wav` |
+| `27_audiocpp_experimental.json` | 隔离的 audio.cpp IndexTTS2.5 GGUF 实验后端 | `voice_reference.wav` |
 
 ## 使用方法
 
@@ -50,6 +54,9 @@
 示例 20 需要可选的 `openai-whisper`，首次运行会从网络下载所选模型到
 `ComfyUI/models/TTS/Whisper/`。示例 21 的 `start_ms / end_ms` 单位均为毫秒；示例 22 内置的是可直接
 运行的真实报告结构示例，用于演示无需重新生成语音的字幕回写。
+
+示例 25 同样需要可选 Whisper。示例 27 不使用默认 Python 模型加载器，需要先从 audio.cpp 官方发布页
+下载 `audiocpp_cli`，并另行下载 `IndexTTS2.5-GGUF`；打开工作流后把两个示例绝对路径改成自己的位置。
 
 重新生成全部示例：
 

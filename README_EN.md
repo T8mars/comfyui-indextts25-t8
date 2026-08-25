@@ -26,7 +26,7 @@ This repository is locked to the IndexTTS 2.5 inference core and the official 2.
    - Scans the standard model directory and `TTS` paths from `extra_model_paths.yaml`
    - Validates official model file sizes, with optional full SHA-256 verification
    - `auto / CUDA / CPU` device selection and `auto / bfloat16 / float32` precision
-   - Global lazy cache, per-model inference lock, and optional unload after generation
+   - Global lazy cache, per-model inference lock, and optional unload after generation or safe recycle every N runs
 2. `IndexTTS 2.5 Emotion Control · T8star-Aix`
    - Follow the speaker reference
    - Independent emotion reference audio
@@ -51,6 +51,7 @@ This repository is locked to the IndexTTS 2.5 inference core and the official 2.
    - Voice cloning, seed, and the official `duration_factor=0.5–2.0` duration/speed adaptation
    - Target duration through one-pass native length regulation, natural second-pass adaptation, silence padding, or exact compatibility mode
    - Optional voice clarity, clear narration, de-harsh, warmth, and peak-normalization post-processing
+   - Optional local-ASR quality retries that change the seed and retain the highest-similarity result
 7. `IndexTTS 2.5 Voice Profile · T8star-Aix`
    - Packages a role name, standard AUDIO, default language, and optional role-specific emotion into a workflow voice profile
 8. `IndexTTS 2.5 Voice / Emotion Merge · T8star-Aix`
@@ -65,6 +66,7 @@ This repository is locked to the IndexTTS 2.5 inference core and the official 2.
 11. `IndexTTS 2.5 Multi-role / SRT Generation · T8star-Aix`
     - Per-line inference, per-line AUDIO list, merged AUDIO, and a JSON report
     - `shift` conflict resolution or `overlay` timeline mixing; subtitle slots use native one-pass adaptation by default, with a legacy second-pass compatibility option
+    - Optional per-line ASR retry, with every seed, score, and final selection recorded in the task report
 12. `IndexTTS 2.5 Voice Post-processing · T8star-Aix`
     - Processes any ComfyUI AUDIO independently, with wet/dry strength and target peak, without FFmpeg
 13. `IndexTTS 2.5 Environment and Optional Acceleration · T8star-Aix`
@@ -75,10 +77,19 @@ This repository is locked to the IndexTTS 2.5 inference core and the official 2.
     - Outputs a strictly validated script, structured JSON, and a standard `IMAGE` timeline preview
 15. `IndexTTS 2.5 ASR Proofreading · T8star-Aix`
     - Uses optional local OpenAI Whisper or faster-whisper to transcribe AUDIO and compare it with target text
-    - Reports normalized CER/WER, differences, word timestamps, threshold result, and complete JSON
+    - Reports normalized CER/WER, differences, word timestamps, threshold result, waveform alignment image, and complete JSON
 16. `IndexTTS 2.5 Subtitle Rewrite · T8star-Aix`
     - Preserves original SRT timing or uses the generated audio timeline
     - Writes original text, all ASR results, or only results that pass proofreading
+17. `IndexTTS 2.5 Reference Audio Quality · T8star-Aix`
+    - Measures duration, leading/trailing silence, silence ratio, loudness, clipping, estimated SNR, and DC offset
+    - Can trim silence and select the highest-energy section of an overlong reference without overwriting the source
+18. `IndexTTS 2.5 Memory Control · T8star-Aix`
+    - Reports this extension's model cache and CUDA memory, and releases idle or all IndexTTS models owned by this extension
+    - Never invokes ComfyUI-wide cleanup or unloads another node's models
+19. `IndexTTS 2.5 audio.cpp Experimental Generation · T8star-Aix`
+    - Isolated optional `audiocpp_cli` + IndexTTS2.5 GGUF route with five languages, speed, and emotion controls
+    - Does not replace Python inference; the CLI and roughly 3.5 GB Q8 GGUF are separate downloads
 
 Output is standard ComfyUI AUDIO at `22050 Hz`, `float32`, and `[1,1,T]`, ready for Save Audio, audio-combine, video, and other native nodes.
 
@@ -368,7 +379,11 @@ Bilibili|B IY1 . L IY1 . B IY1 . L IY1|EN
 
 The dictionary is embedded in workflow JSON and travels with the workflow. Existing manual annotations always win; dictionary replacements use longest match first and never rewrite inside `<text|pronunciation>`. Strict validation is enabled by default and fails before queueing. When disabled, invalid entries remain unchanged and are recorded in the report. This node requires no additional G2P model and never mutates the cached model's global glossary.
 
-See `example_workflows/README.md` for 23 ready-to-open UI workflows and 23 API prompts covering basic cloning, speed comparison, emotion reference audio, eight-dimensional emotion, text emotion, random-sampling long text, five-language generation, Chinese polyphonic characters, English CMU phonemes, Japanese Kana, multi-role dialogue, JSON batch lines, SRT, acceleration diagnostics, segmentation preview, explicit pauses, native target duration, advanced CFM parameters, audio post-processing, ASR proofreading, timeline editing, subtitle rewriting, and independent per-role emotions. Upload `voice_reference.wav` and, for emotion-audio examples, `emotion_reference.wav` to ComfyUI input first.
+See `example_workflows/README.md` for 27 ready-to-open UI workflows and 27 API prompts covering basic cloning, speed comparison, emotion reference audio, eight-dimensional emotion, text emotion, random-sampling long text, five-language generation, Chinese polyphonic characters, English CMU phonemes, Japanese Kana, multi-role dialogue, JSON batch lines, SRT, acceleration diagnostics, segmentation preview, explicit pauses, native target duration, advanced CFM parameters, audio post-processing, ASR proofreading, timeline editing, subtitle rewriting, independent per-role emotions, reference-audio quality, ASR retries, model recycling, and the experimental audio.cpp backend. Upload `voice_reference.wav` and, for emotion-audio examples, `emotion_reference.wav` to ComfyUI input first.
+
+### Optional audio.cpp experimental backend
+
+The node provides a shell-free CLI connector only. It does not bundle a third-party executable or GGUF weights and never changes the default loader. Download a matching Windows CLI from the [official audio.cpp releases](https://github.com/0xShug0/audio.cpp/releases), then obtain `IndexTTS2.5-GGUF` from the [audio.cpp GGUF repository](https://huggingface.co/audio-cpp/audio.cpp-gguf). The current Q8 file is roughly 3.5 GB. audio.cpp uses an independent C++ text normalizer, so unusual dates, units, URLs, and Japanese/Spanish tokenization boundaries can differ from the official Python path. Compare all five languages, emotion modes, pronunciation overrides, and speed before production use.
 
 ## Environment and model checks
 

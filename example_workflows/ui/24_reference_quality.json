@@ -1,6 +1,6 @@
 {
-  "last_node_id": 5,
-  "last_link_id": 4,
+  "last_node_id": 6,
+  "last_link_id": 5,
   "nodes": [
     {
       "id": 1,
@@ -96,7 +96,7 @@
           "name": "model",
           "type": "T8_INDEXTTS25_MODEL",
           "links": [
-            1
+            3
           ]
         },
         {
@@ -151,7 +151,7 @@
           "name": "AUDIO",
           "type": "AUDIO",
           "links": [
-            2
+            1
           ]
         }
       ],
@@ -163,241 +163,139 @@
       "widgets_values": [
         "voice_reference.wav"
       ],
-      "title": "音色参考音频"
+      "title": "待检测参考音频"
     },
     {
       "id": 3,
-      "type": "T8_IndexTTS25_SamplingConfig",
+      "type": "T8_IndexTTS25_ReferenceQuality",
       "pos": [
-        440,
-        330
+        390,
+        320
       ],
       "size": [
-        390,
-        760
+        430,
+        330
       ],
       "flags": {},
       "order": 2,
       "mode": 0,
       "inputs": [
         {
-          "name": "do_sample",
+          "name": "audio",
+          "type": "AUDIO",
+          "link": 1
+        },
+        {
+          "name": "auto_prepare",
           "type": "BOOLEAN",
           "widget": {
-            "name": "do_sample"
+            "name": "auto_prepare"
           },
           "link": null
         },
         {
-          "name": "temperature",
+          "name": "maximum_seconds",
           "type": "FLOAT",
           "widget": {
-            "name": "temperature"
+            "name": "maximum_seconds"
           },
           "link": null
         },
         {
-          "name": "top_p",
-          "type": "FLOAT",
-          "widget": {
-            "name": "top_p"
-          },
-          "link": null
-        },
-        {
-          "name": "top_k",
+          "name": "silence_padding_ms",
           "type": "INT",
           "widget": {
-            "name": "top_k"
-          },
-          "link": null
-        },
-        {
-          "name": "num_beams",
-          "type": "INT",
-          "widget": {
-            "name": "num_beams"
-          },
-          "link": null
-        },
-        {
-          "name": "repetition_penalty",
-          "type": "FLOAT",
-          "widget": {
-            "name": "repetition_penalty"
-          },
-          "link": null
-        },
-        {
-          "name": "length_penalty",
-          "type": "FLOAT",
-          "widget": {
-            "name": "length_penalty"
-          },
-          "link": null
-        },
-        {
-          "name": "max_mel_tokens",
-          "type": "INT",
-          "widget": {
-            "name": "max_mel_tokens"
-          },
-          "link": null
-        },
-        {
-          "name": "diffusion_steps",
-          "type": "INT",
-          "widget": {
-            "name": "diffusion_steps"
-          },
-          "link": null
-        },
-        {
-          "name": "inference_cfg_rate",
-          "type": "FLOAT",
-          "widget": {
-            "name": "inference_cfg_rate"
-          },
-          "link": null
-        },
-        {
-          "name": "cfm_temperature",
-          "type": "FLOAT",
-          "widget": {
-            "name": "cfm_temperature"
-          },
-          "link": null
-        },
-        {
-          "name": "segmentation_mode",
-          "type": "COMBO",
-          "widget": {
-            "name": "segmentation_mode"
-          },
-          "link": null
-        },
-        {
-          "name": "max_text_tokens_per_segment",
-          "type": "INT",
-          "widget": {
-            "name": "max_text_tokens_per_segment"
-          },
-          "link": null
-        },
-        {
-          "name": "segment_silence_ms",
-          "type": "INT",
-          "widget": {
-            "name": "segment_silence_ms"
-          },
-          "link": null
-        },
-        {
-          "name": "pause_preset",
-          "type": "COMBO",
-          "widget": {
-            "name": "pause_preset"
-          },
-          "link": null
-        },
-        {
-          "name": "comma_pause_ms",
-          "type": "INT",
-          "widget": {
-            "name": "comma_pause_ms"
-          },
-          "link": null
-        },
-        {
-          "name": "sentence_pause_ms",
-          "type": "INT",
-          "widget": {
-            "name": "sentence_pause_ms"
-          },
-          "link": null
-        },
-        {
-          "name": "paragraph_pause_ms",
-          "type": "INT",
-          "widget": {
-            "name": "paragraph_pause_ms"
-          },
-          "link": null
-        },
-        {
-          "name": "text_normalization",
-          "type": "BOOLEAN",
-          "widget": {
-            "name": "text_normalization"
+            "name": "silence_padding_ms"
           },
           "link": null
         }
       ],
       "outputs": [
         {
-          "name": "sampling",
-          "type": "T8_INDEXTTS25_SAMPLING",
+          "name": "prepared_audio",
+          "type": "AUDIO",
           "links": [
-            3
+            4
           ]
         },
         {
-          "name": "sampling_info",
+          "name": "quality_report",
           "type": "STRING",
           "links": []
+        },
+        {
+          "name": "waveform_image",
+          "type": "IMAGE",
+          "links": [
+            2
+          ]
         }
       ],
       "properties": {
-        "Node name for S&R": "T8_IndexTTS25_SamplingConfig",
+        "Node name for S&R": "T8_IndexTTS25_ReferenceQuality",
         "cnr_id": "comfyui-indextts25-t8",
         "ver": "0.11.0"
       },
       "widgets_values": [
-        false,
-        0.8,
-        0.8,
-        30,
-        3,
-        10.0,
-        0.0,
-        1500,
-        25,
-        0.7,
-        1.0,
-        "auto",
-        120,
-        200,
-        "narration",
-        100,
-        300,
-        600,
-        true
+        true,
+        15.0,
+        150
       ]
     },
     {
       "id": 4,
-      "type": "T8_IndexTTS25_Generate",
+      "type": "PreviewImage",
       "pos": [
-        900,
-        120
+        880,
+        520
       ],
       "size": [
-        470,
-        560
+        420,
+        360
       ],
       "flags": {},
       "order": 3,
       "mode": 0,
       "inputs": [
         {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 2
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "PreviewImage",
+        "cnr_id": "comfy-core",
+        "ver": "0.11.0"
+      },
+      "widgets_values": [],
+      "title": "参考音频波形"
+    },
+    {
+      "id": 5,
+      "type": "T8_IndexTTS25_Generate",
+      "pos": [
+        900,
+        0
+      ],
+      "size": [
+        470,
+        560
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
           "name": "model",
           "type": "T8_INDEXTTS25_MODEL",
-          "link": 1
+          "link": 3
         },
         {
           "name": "speaker_audio",
           "type": "AUDIO",
-          "link": 2
+          "link": 4
         },
         {
           "name": "text",
@@ -512,7 +410,7 @@
         {
           "name": "sampling",
           "type": "T8_INDEXTTS25_SAMPLING",
-          "link": 3,
+          "link": null,
           "shape": 7
         }
       ],
@@ -521,7 +419,7 @@
           "name": "audio",
           "type": "AUDIO",
           "links": [
-            4
+            5
           ]
         },
         {
@@ -536,14 +434,14 @@
         "ver": "0.11.0"
       },
       "widgets_values": [
-        "第一句结束。这里会自然停顿，接着说<pause=0.8>这一句前有八百毫秒显式停顿。",
+        "这个示例先检测并优化参考音频，再进行音色克隆。",
         "ZH",
         1.0,
         "off",
         0.0,
         "off",
         1.0,
-        20260822,
+        20260826,
         "fixed",
         0,
         "auto",
@@ -553,24 +451,24 @@
       ]
     },
     {
-      "id": 5,
+      "id": 6,
       "type": "SaveAudio",
       "pos": [
-        1460,
-        280
+        1480,
+        180
       ],
       "size": [
         320,
         130
       ],
       "flags": {},
-      "order": 4,
+      "order": 5,
       "mode": 0,
       "inputs": [
         {
           "name": "audio",
           "type": "AUDIO",
-          "link": 4
+          "link": 5
         },
         {
           "name": "filename_prefix",
@@ -594,52 +492,60 @@
         "ver": "0.11.0"
       },
       "widgets_values": [
-        "IndexTTS25_T8/pause_control"
+        "IndexTTS25_T8/reference_quality"
       ]
     }
   ],
   "links": [
     [
       1,
+      2,
+      0,
+      3,
+      0,
+      "AUDIO"
+    ],
+    [
+      2,
+      3,
+      2,
+      4,
+      0,
+      "IMAGE"
+    ],
+    [
+      3,
       1,
       0,
-      4,
+      5,
       0,
       "T8_INDEXTTS25_MODEL"
     ],
     [
-      2,
-      2,
-      0,
       4,
+      3,
+      0,
+      5,
       1,
       "AUDIO"
     ],
     [
-      3,
-      3,
-      0,
-      4,
-      16,
-      "T8_INDEXTTS25_SAMPLING"
-    ],
-    [
-      4,
-      4,
-      0,
       5,
+      5,
+      0,
+      6,
       0,
       "AUDIO"
     ]
   ],
   "groups": [
     {
-      "title": "16 标点与显式停顿 · B站：T8star-Aix",
+      "title": "24 参考音频质量检测与自动裁剪 · B站：T8star-Aix",
       "bounding": [
         -40,
         -60,
-        1860,
-        1170
+        1880,
+        960
       ],
       "color": "#3f789e",
       "font_size": 24,

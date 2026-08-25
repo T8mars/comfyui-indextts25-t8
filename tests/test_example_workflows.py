@@ -35,6 +35,10 @@ EXAMPLES = (
     "21_timeline_editor",
     "22_subtitle_rewrite",
     "23_multi_role_emotions",
+    "24_reference_quality",
+    "25_quality_retry",
+    "26_memory_control",
+    "27_audiocpp_experimental",
 )
 
 
@@ -54,8 +58,14 @@ def test_all_ui_and_api_examples_are_present_and_valid():
         assert workflow["version"] == 0.4
         assert workflow["last_node_id"] == max(node["id"] for node in workflow["nodes"])
         assert workflow["last_link_id"] == len(workflow["links"])
-        assert any(node["type"] in {"T8_IndexTTS25_Generate", "T8_IndexTTS25_DialogueGenerate", "T8_IndexTTS25_AudioPostProcess"} for node in workflow["nodes"])
-        assert any(node["class_type"] in {"T8_IndexTTS25_Generate", "T8_IndexTTS25_DialogueGenerate", "T8_IndexTTS25_AudioPostProcess"} for node in prompt.values())
+        generation_types = {
+            "T8_IndexTTS25_Generate",
+            "T8_IndexTTS25_DialogueGenerate",
+            "T8_IndexTTS25_AudioPostProcess",
+            "T8_IndexTTS25_AudioCppGenerate",
+        }
+        assert any(node["type"] in generation_types for node in workflow["nodes"])
+        assert any(node["class_type"] in generation_types for node in prompt.values())
 
 
 def test_embedded_dialogue_scripts_are_parsed_not_just_outer_workflow_json():
@@ -164,6 +174,9 @@ def test_api_prompts_expand_with_the_current_comfyui_v3_schema():
         "T8_IndexTTS25_DialogueGenerate": nodes_module.T8IndexTTS25DialogueGenerate,
         "T8_IndexTTS25_ASRProofread": nodes_module.T8IndexTTS25ASRProofread,
         "T8_IndexTTS25_SubtitleRewrite": nodes_module.T8IndexTTS25SubtitleRewrite,
+        "T8_IndexTTS25_ReferenceQuality": nodes_module.T8IndexTTS25ReferenceQuality,
+        "T8_IndexTTS25_MemoryControl": nodes_module.T8IndexTTS25MemoryControl,
+        "T8_IndexTTS25_AudioCppGenerate": nodes_module.T8IndexTTS25AudioCppGenerate,
         "T8_IndexTTS25_AudioPostProcess": nodes_module.T8IndexTTS25AudioPostProcess,
         "T8_IndexTTS25_Environment": nodes_module.T8IndexTTS25Environment,
     }
@@ -227,6 +240,24 @@ def test_examples_cover_multi_role_batch_srt_and_optional_acceleration():
     assert any(
         node["class_type"] == "T8_IndexTTS25_SubtitleRewrite"
         for node in prompts["22_subtitle_rewrite"].values()
+    )
+    assert any(
+        node["class_type"] == "T8_IndexTTS25_ReferenceQuality"
+        for node in prompts["24_reference_quality"].values()
+    )
+    assert any(
+        node["class_type"] == "T8_IndexTTS25_Generate"
+        and node["inputs"]["quality_retry_count"] == 2
+        for node in prompts["25_quality_retry"].values()
+    )
+    assert any(
+        node["class_type"] == "T8_IndexTTS25_ModelLoader"
+        and node["inputs"]["recycle_after_runs"] == 20
+        for node in prompts["26_memory_control"].values()
+    )
+    assert any(
+        node["class_type"] == "T8_IndexTTS25_AudioCppGenerate"
+        for node in prompts["27_audiocpp_experimental"].values()
     )
     role_emotions = prompts["23_multi_role_emotions"]
     assert sum(

@@ -1,15 +1,25 @@
 """ComfyUI IndexTTS 2.5 nodes by Bilibili creator T8star-Aix."""
 
+import sys
+from pathlib import Path
+
+
+# ComfyUI 2026.08 no longer guarantees that every custom-node directory is
+# present on ``sys.path`` while importing an extension package.  The bundled
+# upstream core still uses its official absolute ``indextts.*`` imports, so the
+# repository root must be discoverable before importing any runtime module.
+_PLUGIN_ROOT = Path(__file__).resolve().parent
+if str(_PLUGIN_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PLUGIN_ROOT))
+
 try:
     if __package__:
         from .nodes_v3 import comfy_entrypoint
     else:  # Allows direct-file import by test runners despite the distribution folder's hyphen.
         import importlib.util
-        import sys
         import types
-        from pathlib import Path
 
-        _root = Path(__file__).resolve().parent
+        _root = _PLUGIN_ROOT
         _package_name = "_comfyui_indextts25_t8_bootstrap"
         _package = sys.modules.get(_package_name)
         if _package is None:
@@ -33,5 +43,5 @@ except ModuleNotFoundError as exc:
     async def comfy_entrypoint():
         raise RuntimeError("comfy_api.latest is required; install this directory inside a current ComfyUI build.") from _COMFY_IMPORT_ERROR
 
-__version__ = "0.10.0"
+__version__ = "0.11.0"
 __all__ = ["comfy_entrypoint", "__version__"]

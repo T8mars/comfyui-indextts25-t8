@@ -28,6 +28,7 @@ class CacheEntry:
     pending_release: bool = False
     acceleration_effective: str | None = None
     acceleration_note: str = ""
+    completed_runs: int = 0
 
 
 def _load_core_class():
@@ -137,8 +138,12 @@ class ModelCache:
             if current is not entry:
                 return
             current.users = max(0, current.users - 1)
+            current.completed_runs += 1
             current.last_used = time.monotonic()
-            if release:
+            if release or (
+                int(handle.recycle_after_runs) > 0
+                and current.completed_runs >= int(handle.recycle_after_runs)
+            ):
                 current.pending_release = True
             if current.users == 0 and current.pending_release:
                 dispose = self._entries.pop(handle.cache_key)
@@ -161,6 +166,44 @@ class ModelCache:
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
         return count
+
+    def evict_idle(self, idle_seconds: float) -> int:
+        """Evict only this extension's idle, currently unused model entries."""
+        threshold = max(0.0, float(idle_seconds))
+        now = time.monotonic()
+        removed: list[tuple[CacheEntry, str]] = []
+        with self._guard:
+            for key, entry in list(self._entries.items()):
+                if entry.users == 0 and now - entry.last_used >= threshold:
+                    self._entries.pop(key)
+                    removed.append((entry, str(key[1])))
+        for entry, device in removed:
+            self._dispose(entry, device)
+        return len(removed)
+
+    def status(self) -> dict[str, Any]:
+        now = time.monotonic()
+        with self._guard:
+            entries = [
+                {
+                    "device": str(key[1]),
+                    "precision": "bfloat16" if bool(key[2]) else "float32",
+                    "users": entry.users,
+                    "completed_runs": entry.completed_runs,
+                    "idle_seconds": round(max(0.0, now - entry.last_used), 3),
+                    "pending_release": entry.pending_release,
+                    "acceleration": entry.acceleration_effective or "off",
+                }
+                for key, entry in self._entries.items()
+            ]
+        cuda = {"available": torch.cuda.is_available()}
+        if torch.cuda.is_available():
+            cuda.update(
+                allocated_mb=round(torch.cuda.memory_allocated() / (1024**2), 2),
+                reserved_mb=round(torch.cuda.memory_reserved() / (1024**2), 2),
+                max_allocated_mb=round(torch.cuda.max_memory_allocated() / (1024**2), 2),
+            )
+        return {"cached_models": len(entries), "entries": entries, "cuda": cuda}
 
     def size(self) -> int:
         with self._guard:

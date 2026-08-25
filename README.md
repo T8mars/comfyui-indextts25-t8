@@ -26,7 +26,7 @@ IndexTTS 2.5 的 ComfyUI V3 原生节点集成。节点菜单位于：
    - 扫描标准模型目录和 `extra_model_paths.yaml` 中的 `TTS` 路径
    - 正式模型文件大小校验；可选完整 SHA-256 校验
    - `auto / CUDA / CPU` 设备和 `auto / bfloat16 / float32` 精度
-   - 全局惰性缓存、同模型线程锁、可选生成后释放
+   - 全局惰性缓存、同模型线程锁、可选生成后释放或连续 N 次生成后安全重载
 2. `IndexTTS 2.5 情感控制 · T8star-Aix`
    - 跟随音色参考
    - 独立情感参考音频
@@ -51,6 +51,7 @@ IndexTTS 2.5 的 ComfyUI V3 原生节点集成。节点菜单位于：
    - 音色克隆、seed、官方 `duration_factor=0.5~2.0` 语速/时长适配
    - 目标秒数支持原生长度调节器单次适配，以及自然二次适配、补静音、强制精确兼容模式
    - 可选人声清晰、清晰旁白、去刺耳、温暖、峰值归一化后处理
+   - 可选本地 ASR 自动质检；失败后更换 seed 重试并保留相似度最高的结果
 7. `IndexTTS 2.5 角色音色 · T8star-Aix`
    - 将角色名、标准 AUDIO、默认语言和可选情感封装成工作流内音色
 8. `IndexTTS 2.5 角色音色 / 情感合并 · T8star-Aix`
@@ -65,6 +66,7 @@ IndexTTS 2.5 的 ComfyUI V3 原生节点集成。节点菜单位于：
 11. `IndexTTS 2.5 多角色 / SRT 生成 · T8star-Aix`
    - 逐句推理、逐句 AUDIO 列表、合并 AUDIO 和 JSON 报告
    - `shift` 顺延或 `overlay` 时间轴混音；字幕槽位默认使用原生单次适配，也可选择旧版二次推理兼容模式
+   - 可逐句 ASR 校对并在低于阈值时自动重试，任务报告记录每次 seed、相似度和最终选择
 12. `IndexTTS 2.5 人声后处理 · T8star-Aix`
    - 独立处理任意 ComfyUI AUDIO，支持强度混合和目标峰值，不依赖 FFmpeg
 13. `IndexTTS 2.5 环境与可选加速 · T8star-Aix`
@@ -75,10 +77,19 @@ IndexTTS 2.5 的 ComfyUI V3 原生节点集成。节点菜单位于：
    - 输出严格校验后的脚本、结构化 JSON 和标准 `IMAGE` 彩色轨道预览
 15. `IndexTTS 2.5 ASR 自动校对 · T8star-Aix`
    - 使用可选的本地 OpenAI Whisper 或 faster-whisper 对 AUDIO 识别并与目标文本比较
-   - 输出简繁/数字归一化后的 CER/WER、差异明细、词级时间戳、阈值判定和完整 JSON 报告
+   - 输出简繁/数字归一化后的 CER/WER、差异明细、词级时间戳、阈值判定、波形对齐图和完整 JSON 报告
 16. `IndexTTS 2.5 字幕自动回写 · T8star-Aix`
    - 可保留原 SRT 时间或使用生成音频真实时间轴
    - 可写回原文、全部 ASR 识别结果或仅校对通过的识别结果
+17. `IndexTTS 2.5 参考音频质量检测 · T8star-Aix`
+   - 检测时长、首尾静音、静音占比、响度、削波、估算信噪比和直流偏移
+   - 可在不覆盖原音频的前提下自动裁剪静音，并从超长音频中选取能量最集中的片段
+18. `IndexTTS 2.5 显存管理 · T8star-Aix`
+   - 查看本扩展模型缓存与 CUDA 显存状态；按空闲时间释放或立即释放本扩展模型
+   - 不调用 ComfyUI 全局清理，不会卸载其他节点正在使用的模型
+19. `IndexTTS 2.5 audio.cpp 实验生成 · T8star-Aix`
+   - 隔离调用可选 `audiocpp_cli` 与 IndexTTS2.5 GGUF，支持五语种、语速、情感文本/向量/参考音频
+   - 不替换默认 Python 推理；CLI 和约 3.5GB 的 Q8 GGUF 均需用户另行下载
 
 输出固定为 `22050 Hz`、`float32`、`[1,1,T]` 的标准 ComfyUI AUDIO，可直接连接 Save Audio、
 音频合并、视频等原生节点。
@@ -416,12 +427,20 @@ Bilibili|B IY1 . L IY1 . B IY1 . L IY1|EN
 不会改写 `<文字|读音>` 内部。严格校验默认开启，错误会在排队前给出；关闭后无效词条保持原文并
 写入报告。该节点不依赖额外 G2P 模型，也不会修改已缓存模型的全局 glossary。
 
-完整示例见 `example_workflows/README.md`，包含 23 组可直接打开的 UI 工作流和 23 组 API prompt：
+完整示例见 `example_workflows/README.md`，包含 27 组可直接打开的 UI 工作流和 27 组 API prompt：
 基础克隆、语速对比、情感参考音频、八维情感、文本情感、随机采样长文本、五语种生成，以及中文
 多音字、英文 CMU 音素、日语假名发音控制、多角色、JSON 批量台词、SRT、可选加速诊断、自动分段
 预览、显式停顿、原生目标秒数、CFM 高级参数、独立音频后处理、ASR 自动校对、时间轴编辑、字幕
-回写和多角色独立情感。使用前把
+回写、多角色独立情感、参考音频检测、ASR 失败重试、模型回收和 audio.cpp 实验后端。使用前把
 `voice_reference.wav`（情感音频示例还需 `emotion_reference.wav`）上传到 ComfyUI input。
+
+### 可选 audio.cpp 实验后端
+
+节点只提供安全的无 shell CLI 连接器，不捆绑第三方二进制或 GGUF 模型，也不会改变默认加载器。
+从 [audio.cpp 官方发布页](https://github.com/0xShug0/audio.cpp/releases) 下载对应 Windows CLI，模型从
+[audio.cpp GGUF 仓库](https://huggingface.co/audio-cpp/audio.cpp-gguf) 的 `IndexTTS2.5-GGUF` 获取。
+当前 Q8 文件约 3.5GB。audio.cpp 的文本归一化是独立 C++ 实现，少见日期、单位、网址，以及日语/西语
+分词边界可能与官方 Python 路径不同；正式使用前应对五语种、情感、发音标注和语速分别试听对比。
 
 ## 环境与模型检查
 

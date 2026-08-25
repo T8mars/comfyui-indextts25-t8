@@ -8,6 +8,7 @@
       "acceleration_mode": "off",
       "use_cuda_kernel": false,
       "release_after_run": false,
+      "recycle_after_runs": 0,
       "verify_hashes": false,
       "custom_model_path": ""
     }
@@ -36,7 +37,12 @@
       "target_duration_seconds": 0.0,
       "postprocess_preset": "off",
       "postprocess_strength": 1.0,
-      "seed": 20260811
+      "seed": 20260811,
+      "quality_retry_count": 0,
+      "quality_asr_backend": "auto",
+      "quality_asr_model": "base",
+      "quality_asr_device": "auto",
+      "quality_threshold": 0.82
     }
   },
   "4": {

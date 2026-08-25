@@ -8,6 +8,7 @@
       "acceleration_mode": "off",
       "use_cuda_kernel": false,
       "release_after_run": false,
+      "recycle_after_runs": 0,
       "verify_hashes": false,
       "custom_model_path": ""
     }
@@ -96,6 +97,7 @@
       "asr_model": "base",
       "asr_device": "auto",
       "asr_threshold": 0.82,
+      "asr_retry_count": 0,
       "subtitle_timing_mode": "actual",
       "subtitle_text_mode": "asr_passed",
       "subtitle_include_role": true

@@ -20,6 +20,7 @@ class ModelHandle:
     acceleration_effective: str = "off"
     acceleration_note: str = ""
     release_after_run: bool = False
+    recycle_after_runs: int = 0
     model_revision: str = ""
     low_vram: bool = False
 

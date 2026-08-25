@@ -1,0 +1,34 @@
+{
+  "1": {
+    "class_type": "LoadAudio",
+    "inputs": {
+      "audio": "voice_reference.wav"
+    }
+  },
+  "2": {
+    "class_type": "T8_IndexTTS25_AudioCppGenerate",
+    "inputs": {
+      "executable_path": "D:\\audio.cpp\\audiocpp_cli.exe",
+      "gguf_model_path": "D:\\models\\IndexTTS2.5-GGUF",
+      "speaker_audio": [
+        "1",
+        0
+      ],
+      "text": "这是隔离的 audio.cpp IndexTTS 2.5 实验工作流。",
+      "language": "ZH",
+      "backend": "cuda",
+      "duration_factor": 1.0,
+      "memory_saver": true
+    }
+  },
+  "3": {
+    "class_type": "SaveAudio",
+    "inputs": {
+      "audio": [
+        "2",
+        0
+      ],
+      "filename_prefix": "IndexTTS25_T8/audiocpp_experimental"
+    }
+  }
+}

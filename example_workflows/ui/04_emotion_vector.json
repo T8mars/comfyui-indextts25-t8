@@ -66,6 +66,14 @@
           "link": null
         },
         {
+          "name": "recycle_after_runs",
+          "type": "INT",
+          "widget": {
+            "name": "recycle_after_runs"
+          },
+          "link": null
+        },
+        {
           "name": "verify_hashes",
           "type": "BOOLEAN",
           "widget": {
@@ -100,7 +108,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_ModelLoader",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.10.0"
+        "ver": "0.11.0"
       },
       "widgets_values": [
         "IndexTTS-2.5",
@@ -109,6 +117,7 @@
         "off",
         false,
         false,
+        0,
         false,
         ""
       ]
@@ -149,7 +158,7 @@
       "properties": {
         "Node name for S&R": "LoadAudio",
         "cnr_id": "comfy-core",
-        "ver": "0.10.0"
+        "ver": "0.11.0"
       },
       "widgets_values": [
         "voice_reference.wav"
@@ -277,7 +286,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_EmotionControl",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.10.0"
+        "ver": "0.11.0"
       },
       "widgets_values": [
         "vector",
@@ -383,6 +392,46 @@
           "link": null
         },
         {
+          "name": "quality_retry_count",
+          "type": "INT",
+          "widget": {
+            "name": "quality_retry_count"
+          },
+          "link": null
+        },
+        {
+          "name": "quality_asr_backend",
+          "type": "COMBO",
+          "widget": {
+            "name": "quality_asr_backend"
+          },
+          "link": null
+        },
+        {
+          "name": "quality_asr_model",
+          "type": "COMBO",
+          "widget": {
+            "name": "quality_asr_model"
+          },
+          "link": null
+        },
+        {
+          "name": "quality_asr_device",
+          "type": "COMBO",
+          "widget": {
+            "name": "quality_asr_device"
+          },
+          "link": null
+        },
+        {
+          "name": "quality_threshold",
+          "type": "FLOAT",
+          "widget": {
+            "name": "quality_threshold"
+          },
+          "link": null
+        },
+        {
           "name": "emotion",
           "type": "T8_INDEXTTS25_EMOTION",
           "link": 3,
@@ -412,7 +461,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_Generate",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.10.0"
+        "ver": "0.11.0"
       },
       "widgets_values": [
         "太好了，这个版本终于加入了真正可控的语速适配功能！",
@@ -423,7 +472,12 @@
         "off",
         1.0,
         20260811,
-        "fixed"
+        "fixed",
+        0,
+        "auto",
+        "base",
+        "auto",
+        0.82
       ]
     },
     {
@@ -465,7 +519,7 @@
       "properties": {
         "Node name for S&R": "SaveAudio",
         "cnr_id": "comfy-core",
-        "ver": "0.10.0"
+        "ver": "0.11.0"
       },
       "widgets_values": [
         "IndexTTS25_T8/emotion_vector"
@@ -494,7 +548,7 @@
       3,
       0,
       4,
-      10,
+      15,
       "T8_INDEXTTS25_EMOTION"
     ],
     [

@@ -26,6 +26,9 @@ DIALOGUE_GENERATE_NODE = "T8_IndexTTS25_DialogueGenerate"
 ASR_PROOFREAD_NODE = "T8_IndexTTS25_ASRProofread"
 SUBTITLE_REWRITE_NODE = "T8_IndexTTS25_SubtitleRewrite"
 AUDIO_POSTPROCESS_NODE = "T8_IndexTTS25_AudioPostProcess"
+REFERENCE_QUALITY_NODE = "T8_IndexTTS25_ReferenceQuality"
+MEMORY_CONTROL_NODE = "T8_IndexTTS25_MemoryControl"
+AUDIOCPP_GENERATE_NODE = "T8_IndexTTS25_AudioCppGenerate"
 ENVIRONMENT_NODE = "T8_IndexTTS25_Environment"
 
 
@@ -56,7 +59,7 @@ def properties(node_type: str, *, core: bool = False) -> dict[str, str]:
     return {
         "Node name for S&R": node_type,
         "cnr_id": "comfy-core" if core else "comfyui-indextts25-t8",
-        "ver": "0.10.0",
+        "ver": "0.11.0",
     }
 
 
@@ -145,11 +148,12 @@ def add_model(workflow: Workflow, pos=(0, 0), *, release_after_run: bool = False
             widget_input("acceleration_mode", "COMBO"),
             widget_input("use_cuda_kernel", "BOOLEAN"),
             widget_input("release_after_run", "BOOLEAN"),
+            widget_input("recycle_after_runs", "INT"),
             widget_input("verify_hashes", "BOOLEAN"),
             widget_input("custom_model_path", "STRING", optional=True),
         ],
         [output("model", "T8_INDEXTTS25_MODEL"), output("model_info", "STRING")],
-        ["IndexTTS-2.5", "auto", "auto", "off", False, release_after_run, False, ""],
+        ["IndexTTS-2.5", "auto", "auto", "off", False, release_after_run, 0, False, ""],
     )
 
 
@@ -295,6 +299,11 @@ def add_generate(
             widget_input("postprocess_preset", "COMBO"),
             widget_input("postprocess_strength", "FLOAT"),
             widget_input("seed", "INT"),
+            widget_input("quality_retry_count", "INT"),
+            widget_input("quality_asr_backend", "COMBO"),
+            widget_input("quality_asr_model", "COMBO"),
+            widget_input("quality_asr_device", "COMBO"),
+            widget_input("quality_threshold", "FLOAT"),
             slot_input("emotion", "T8_INDEXTTS25_EMOTION", optional=True),
             slot_input("sampling", "T8_INDEXTTS25_SAMPLING", optional=True),
         ],
@@ -309,6 +318,11 @@ def add_generate(
             postprocess_strength,
             seed,
             "fixed",
+            0,
+            "auto",
+            "base",
+            "auto",
+            0.82,
         ],
         title=title,
     )
@@ -377,6 +391,66 @@ def add_audio_postprocess(
         ],
         [output("audio", "AUDIO"), output("report", "STRING")],
         [preset, strength, -1.0],
+    )
+
+
+def add_reference_quality(workflow: Workflow, pos=(400, 330)) -> int:
+    return workflow.add(
+        REFERENCE_QUALITY_NODE,
+        pos,
+        (430, 330),
+        [
+            slot_input("audio", "AUDIO"),
+            widget_input("auto_prepare", "BOOLEAN"),
+            widget_input("maximum_seconds", "FLOAT"),
+            widget_input("silence_padding_ms", "INT"),
+        ],
+        [
+            output("prepared_audio", "AUDIO"),
+            output("quality_report", "STRING"),
+            output("waveform_image", "IMAGE"),
+        ],
+        [True, 15.0, 150],
+    )
+
+
+def add_memory_control(workflow: Workflow, pos=(440, 0), action="status") -> int:
+    return workflow.add(
+        MEMORY_CONTROL_NODE,
+        pos,
+        (390, 210),
+        [widget_input("action", "COMBO"), widget_input("idle_seconds", "FLOAT")],
+        [output("memory_report", "STRING")],
+        [action, 300.0],
+    )
+
+
+def add_audiocpp_generate(workflow: Workflow, pos=(420, 0)) -> int:
+    return workflow.add(
+        AUDIOCPP_GENERATE_NODE,
+        pos,
+        (520, 560),
+        [
+            widget_input("executable_path", "STRING"),
+            widget_input("gguf_model_path", "STRING"),
+            slot_input("speaker_audio", "AUDIO"),
+            widget_input("text", "STRING"),
+            widget_input("language", "COMBO"),
+            widget_input("backend", "COMBO"),
+            widget_input("duration_factor", "FLOAT"),
+            widget_input("memory_saver", "BOOLEAN"),
+            slot_input("emotion", "T8_INDEXTTS25_EMOTION", optional=True),
+        ],
+        [output("audio", "AUDIO"), output("report", "STRING")],
+        [
+            r"D:\audio.cpp\audiocpp_cli.exe",
+            r"D:\models\IndexTTS2.5-GGUF",
+            "这是隔离的 audio.cpp IndexTTS 2.5 实验工作流。",
+            "ZH",
+            "cuda",
+            1.0,
+            True,
+        ],
     )
 
 
@@ -470,6 +544,7 @@ def add_dialogue_generate(workflow: Workflow, pos=(1220, 240), *, policy="shift"
             widget_input("asr_model", "COMBO"),
             widget_input("asr_device", "COMBO"),
             widget_input("asr_threshold", "FLOAT"),
+            widget_input("asr_retry_count", "INT"),
             widget_input("subtitle_timing_mode", "COMBO"),
             widget_input("subtitle_text_mode", "COMBO"),
             widget_input("subtitle_include_role", "BOOLEAN"),
@@ -481,7 +556,7 @@ def add_dialogue_generate(workflow: Workflow, pos=(1220, 240), *, policy="shift"
             output("rewritten_srt", "STRING"),
             output("timeline_report", "STRING"),
         ],
-        [20260818, "fixed", policy, fit, "native", 180, 200, "off", 1.0, False, "auto", "base", "auto", 0.82, "actual", "asr_passed", True],
+        [20260818, "fixed", policy, fit, "native", 180, 200, "off", 1.0, False, "auto", "base", "auto", 0.82, 0, "actual", "asr_passed", True],
     )
 
 
@@ -536,6 +611,7 @@ def add_asr_proofread(workflow: Workflow, expected_text: str, language: str = "Z
             output("similarity", "FLOAT"),
             output("word_timestamps", "STRING"),
             output("review_report", "STRING"),
+            output("alignment_image", "IMAGE"),
         ],
         [expected_text, language, "auto", "base", "auto", 0.82],
     )
@@ -587,6 +663,7 @@ def api_model(*, release_after_run: bool = False) -> dict[str, Any]:
             "acceleration_mode": "off",
             "use_cuda_kernel": False,
             "release_after_run": release_after_run,
+            "recycle_after_runs": 0,
             "verify_hashes": False,
             "custom_model_path": "",
         },
@@ -611,6 +688,7 @@ def api_generate(
     target_duration_seconds: float = 0.0,
     postprocess_preset: str = "off",
     postprocess_strength: float = 1.0,
+    quality_retry_count: int = 0,
 ) -> dict[str, Any]:
     inputs: dict[str, Any] = {
         "model": [model_id, 0],
@@ -623,6 +701,11 @@ def api_generate(
         "postprocess_preset": postprocess_preset,
         "postprocess_strength": postprocess_strength,
         "seed": seed,
+        "quality_retry_count": quality_retry_count,
+        "quality_asr_backend": "auto",
+        "quality_asr_model": "base",
+        "quality_asr_device": "auto",
+        "quality_threshold": 0.82,
     }
     if emotion_id:
         inputs["emotion"] = [emotion_id, 0]
@@ -662,6 +745,41 @@ def api_audio_postprocess(audio_id: str, preset: str, strength: float = 1.0) -> 
             "preset": preset,
             "strength": strength,
             "target_peak_db": -1.0,
+        },
+    }
+
+
+def api_reference_quality(audio_id: str) -> dict[str, Any]:
+    return {
+        "class_type": REFERENCE_QUALITY_NODE,
+        "inputs": {
+            "audio": [audio_id, 0],
+            "auto_prepare": True,
+            "maximum_seconds": 15.0,
+            "silence_padding_ms": 150,
+        },
+    }
+
+
+def api_memory_control(action: str = "status") -> dict[str, Any]:
+    return {
+        "class_type": MEMORY_CONTROL_NODE,
+        "inputs": {"action": action, "idle_seconds": 300.0},
+    }
+
+
+def api_audiocpp_generate(audio_id: str) -> dict[str, Any]:
+    return {
+        "class_type": AUDIOCPP_GENERATE_NODE,
+        "inputs": {
+            "executable_path": r"D:\audio.cpp\audiocpp_cli.exe",
+            "gguf_model_path": r"D:\models\IndexTTS2.5-GGUF",
+            "speaker_audio": [audio_id, 0],
+            "text": "这是隔离的 audio.cpp IndexTTS 2.5 实验工作流。",
+            "language": "ZH",
+            "backend": "cuda",
+            "duration_factor": 1.0,
+            "memory_saver": True,
         },
     }
 
@@ -767,6 +885,7 @@ def api_dialogue_generate(model_id: str, library_id: str, script_id: str, *, pol
             "asr_model": "base",
             "asr_device": "auto",
             "asr_threshold": 0.82,
+            "asr_retry_count": 0,
             "subtitle_timing_mode": "actual",
             "subtitle_text_mode": "asr_passed",
             "subtitle_include_role": True,
@@ -1404,6 +1523,103 @@ def subtitle_rewrite_pair() -> tuple[dict[str, Any], dict[str, Any]]:
     return workflow.as_dict(), api
 
 
+def reference_quality_pair() -> tuple[dict[str, Any], dict[str, Any]]:
+    workflow = Workflow("24 参考音频质量检测与自动裁剪")
+    model = add_model(workflow)
+    speaker = add_load_audio(workflow, "voice_reference.wav", pos=(0, 340), title="待检测参考音频")
+    quality = add_reference_quality(workflow, pos=(390, 320))
+    preview = add_preview_image(workflow, pos=(880, 520), title="参考音频波形")
+    generate = add_generate(
+        workflow,
+        "这个示例先检测并优化参考音频，再进行音色克隆。",
+        "ZH",
+        1.0,
+        20260826,
+        pos=(900, 0),
+    )
+    save = add_save(workflow, "IndexTTS25_T8/reference_quality", pos=(1480, 180))
+    workflow.connect(speaker, "AUDIO", quality, "audio")
+    workflow.connect(quality, "waveform_image", preview, "images")
+    workflow.connect(model, "model", generate, "model")
+    workflow.connect(quality, "prepared_audio", generate, "speaker_audio")
+    workflow.connect(generate, "audio", save, "audio")
+    api = {
+        "1": api_model(),
+        "2": api_audio("voice_reference.wav"),
+        "3": api_reference_quality("2"),
+        "4": api_generate(
+            "1", "3", "这个示例先检测并优化参考音频，再进行音色克隆。", "ZH", 1.0, 20260826
+        ),
+        "5": api_save("4", "IndexTTS25_T8/reference_quality"),
+        "6": {"class_type": "PreviewImage", "inputs": {"images": ["3", 2]}},
+    }
+    return workflow.as_dict(), api
+
+
+def quality_retry_pair() -> tuple[dict[str, Any], dict[str, Any]]:
+    text = "自动质检会在识别相似度不足时更换随机种子，并保留最佳结果。"
+    workflow = Workflow("25 ASR 自动质检失败重试")
+    model = add_model(workflow)
+    speaker = add_load_audio(workflow, "voice_reference.wav", title="音色参考音频")
+    generate = add_generate(workflow, text, "ZH", 1.0, 20260826)
+    workflow.nodes[generate - 1]["widgets_values"][9] = 2
+    save = add_save(workflow, "IndexTTS25_T8/quality_retry")
+    wire_generation(workflow, model, speaker, generate, save)
+    api = {
+        "1": api_model(),
+        "2": api_audio("voice_reference.wav"),
+        "3": api_generate(
+            "1", "2", text, "ZH", 1.0, 20260826, quality_retry_count=2
+        ),
+        "4": api_save("3", "IndexTTS25_T8/quality_retry"),
+    }
+    return workflow.as_dict(), api
+
+
+def memory_control_pair() -> tuple[dict[str, Any], dict[str, Any]]:
+    workflow = Workflow("26 长批量模型回收与显存状态")
+    model = add_model(workflow)
+    workflow.nodes[model - 1]["widgets_values"][6] = 20
+    speaker = add_load_audio(workflow, "voice_reference.wav", title="音色参考音频")
+    generate = add_generate(
+        workflow,
+        "模型每完成二十次推理后自动安全重载，状态节点只管理本扩展。",
+        "ZH",
+        1.0,
+        20260826,
+    )
+    add_memory_control(workflow, pos=(440, 0), action="status")
+    save = add_save(workflow, "IndexTTS25_T8/memory_control")
+    wire_generation(workflow, model, speaker, generate, save)
+    model_api = api_model()
+    model_api["inputs"]["recycle_after_runs"] = 20
+    api = {
+        "1": model_api,
+        "2": api_audio("voice_reference.wav"),
+        "3": api_generate(
+            "1", "2", "模型每完成二十次推理后自动安全重载，状态节点只管理本扩展。", "ZH", 1.0, 20260826
+        ),
+        "4": api_memory_control("status"),
+        "5": api_save("3", "IndexTTS25_T8/memory_control"),
+    }
+    return workflow.as_dict(), api
+
+
+def audiocpp_pair() -> tuple[dict[str, Any], dict[str, Any]]:
+    workflow = Workflow("27 audio.cpp IndexTTS2.5 GGUF 隔离实验后端")
+    speaker = add_load_audio(workflow, "voice_reference.wav", title="音色参考音频")
+    generate = add_audiocpp_generate(workflow, pos=(420, 0))
+    save = add_save(workflow, "IndexTTS25_T8/audiocpp_experimental", pos=(1020, 180))
+    workflow.connect(speaker, "AUDIO", generate, "speaker_audio")
+    workflow.connect(generate, "audio", save, "audio")
+    api = {
+        "1": api_audio("voice_reference.wav"),
+        "2": api_audiocpp_generate("1"),
+        "3": api_save("2", "IndexTTS25_T8/audiocpp_experimental"),
+    }
+    return workflow.as_dict(), api
+
+
 EXAMPLES = {
     "01_basic_voice_clone": basic_pair,
     "02_speed_comparison": speed_pair,
@@ -1428,6 +1644,10 @@ EXAMPLES = {
     "21_timeline_editor": timeline_editor_pair,
     "22_subtitle_rewrite": subtitle_rewrite_pair,
     "23_multi_role_emotions": multi_role_emotions_pair,
+    "24_reference_quality": reference_quality_pair,
+    "25_quality_retry": quality_retry_pair,
+    "26_memory_control": memory_control_pair,
+    "27_audiocpp_experimental": audiocpp_pair,
 }
 
 

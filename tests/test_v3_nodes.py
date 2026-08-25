@@ -44,6 +44,9 @@ def test_registers_all_pure_v3_nodes():
         "T8_IndexTTS25_DialogueGenerate",
         "T8_IndexTTS25_ASRProofread",
         "T8_IndexTTS25_SubtitleRewrite",
+        "T8_IndexTTS25_ReferenceQuality",
+        "T8_IndexTTS25_MemoryControl",
+        "T8_IndexTTS25_AudioCppGenerate",
         "T8_IndexTTS25_AudioPostProcess",
         "T8_IndexTTS25_Environment",
     ]
@@ -51,6 +54,8 @@ def test_registers_all_pure_v3_nodes():
     assert schemas[5].outputs[0].io_type == "AUDIO"
     assert schemas[11].outputs[0].io_type == "AUDIO"
     assert schemas[14].outputs[0].io_type == "AUDIO"
+    assert schemas[15].outputs[0].io_type == "STRING"
+    assert schemas[16].outputs[0].io_type == "AUDIO"
     dialogue_script_input = next(item for item in schemas[9].inputs if item.id == "script")
     assert dialogue_script_input.dynamic_prompts is False
     assert dialogue_script_input.as_dict()["dynamicPrompts"] is False
@@ -90,6 +95,7 @@ def test_timeline_asr_and_subtitle_nodes_form_a_complete_editing_chain(monkeypat
     assert asr[0] == "修改字幕"
     assert asr[1] is True
     assert asr[2] == pytest.approx(1.0)
+    assert tuple(asr[5].shape) == (1, 280, 1200, 3)
 
     generation_report = '{"lines":[{"index":1,"timeline":{"actual_start_ms":150,"actual_end_ms":950},"asr":{"recognized_text":"识别字幕","passed":true}}]}'
     rewritten = nodes_v3.T8IndexTTS25SubtitleRewrite.execute(
@@ -155,6 +161,75 @@ def test_pronunciation_node_outputs_portable_annotated_text():
     )
     assert result[0] == "<银行|YIN2 HANG2>的<行长|HANG2 ZHANG3>到了。"
     assert "已应用 2 处" in result[1]
+
+
+def test_reference_quality_node_can_prepare_and_render_audio():
+    _load_plugin()
+    import json
+
+    import torch
+
+    from comfyui_indextts25_t8_test.nodes_v3 import T8IndexTTS25ReferenceQuality
+
+    waveform = torch.cat((torch.zeros(2000), torch.full((8000,), 0.1), torch.zeros(2000)))
+    result = T8IndexTTS25ReferenceQuality.execute(
+        {"waveform": waveform.reshape(1, 1, -1), "sample_rate": 16000},
+        True,
+        15.0,
+        100,
+    )
+    assert result[0]["waveform"].shape[-1] < waveform.numel()
+    assert json.loads(result[1])["trimmed"] is True
+    assert tuple(result[2].shape) == (1, 280, 1200, 3)
+
+
+def test_single_generation_quality_retry_selects_first_passing_seed(tmp_path, monkeypatch):
+    _load_plugin()
+    import json
+
+    import torch
+
+    from comfyui_indextts25_t8_test import nodes_v3
+    from comfyui_indextts25_t8_test.runtime.types import ModelHandle
+
+    generated_seeds = []
+    transcripts = iter(("错误文本", "目标文本"))
+
+    def fake_inference(*args, **kwargs):
+        generated_seeds.append(int(kwargs["seed"]))
+        return {"waveform": torch.zeros(1, 1, 1600), "sample_rate": 16000}, "generated"
+
+    monkeypatch.setattr(nodes_v3, "run_inference", fake_inference)
+    monkeypatch.setattr(nodes_v3, "asr_available", lambda *_args: True)
+    monkeypatch.setattr(
+        nodes_v3,
+        "transcribe_waveform",
+        lambda *_args, **_kwargs: {"text": next(transcripts)},
+    )
+
+    result = nodes_v3.T8IndexTTS25Generate.execute(
+        model=ModelHandle(tmp_path, "cpu", False),
+        speaker_audio={"waveform": torch.zeros(1, 1, 1600), "sample_rate": 16000},
+        text="目标文本",
+        language="ZH",
+        duration_factor=1.0,
+        target_duration_mode="off",
+        target_duration_seconds=0.0,
+        postprocess_preset="off",
+        postprocess_strength=1.0,
+        seed=7,
+        quality_retry_count=2,
+        quality_asr_backend="auto",
+        quality_asr_model="tiny",
+        quality_asr_device="cpu",
+        quality_threshold=0.8,
+    )
+
+    report = json.loads(result[1].split(" | quality=", 1)[1])
+    assert generated_seeds == [7, 100010]
+    assert report["selected_seed"] == 100010
+    assert report["attempt_count"] == 2
+    assert report["review"]["passed"] is True
 
 
 def test_emotion_vector_is_safely_normalized():

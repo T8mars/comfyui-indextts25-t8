@@ -1,0 +1,249 @@
+{
+  "last_node_id": 3,
+  "last_link_id": 2,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "LoadAudio",
+      "pos": [
+        0,
+        340
+      ],
+      "size": [
+        330,
+        130
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "audio",
+          "type": "COMBO",
+          "widget": {
+            "name": "audio"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "AUDIO",
+          "type": "AUDIO",
+          "links": [
+            1
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadAudio",
+        "cnr_id": "comfy-core",
+        "ver": "0.11.0"
+      },
+      "widgets_values": [
+        "voice_reference.wav"
+      ],
+      "title": "音色参考音频"
+    },
+    {
+      "id": 2,
+      "type": "T8_IndexTTS25_AudioCppGenerate",
+      "pos": [
+        420,
+        0
+      ],
+      "size": [
+        520,
+        560
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "executable_path",
+          "type": "STRING",
+          "widget": {
+            "name": "executable_path"
+          },
+          "link": null
+        },
+        {
+          "name": "gguf_model_path",
+          "type": "STRING",
+          "widget": {
+            "name": "gguf_model_path"
+          },
+          "link": null
+        },
+        {
+          "name": "speaker_audio",
+          "type": "AUDIO",
+          "link": 1
+        },
+        {
+          "name": "text",
+          "type": "STRING",
+          "widget": {
+            "name": "text"
+          },
+          "link": null
+        },
+        {
+          "name": "language",
+          "type": "COMBO",
+          "widget": {
+            "name": "language"
+          },
+          "link": null
+        },
+        {
+          "name": "backend",
+          "type": "COMBO",
+          "widget": {
+            "name": "backend"
+          },
+          "link": null
+        },
+        {
+          "name": "duration_factor",
+          "type": "FLOAT",
+          "widget": {
+            "name": "duration_factor"
+          },
+          "link": null
+        },
+        {
+          "name": "memory_saver",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "memory_saver"
+          },
+          "link": null
+        },
+        {
+          "name": "emotion",
+          "type": "T8_INDEXTTS25_EMOTION",
+          "link": null,
+          "shape": 7
+        }
+      ],
+      "outputs": [
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "links": [
+            2
+          ]
+        },
+        {
+          "name": "report",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "T8_IndexTTS25_AudioCppGenerate",
+        "cnr_id": "comfyui-indextts25-t8",
+        "ver": "0.11.0"
+      },
+      "widgets_values": [
+        "D:\\audio.cpp\\audiocpp_cli.exe",
+        "D:\\models\\IndexTTS2.5-GGUF",
+        "这是隔离的 audio.cpp IndexTTS 2.5 实验工作流。",
+        "ZH",
+        "cuda",
+        1.0,
+        true
+      ]
+    },
+    {
+      "id": 3,
+      "type": "SaveAudio",
+      "pos": [
+        1020,
+        180
+      ],
+      "size": [
+        320,
+        130
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "link": 2
+        },
+        {
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "SaveAudio",
+        "cnr_id": "comfy-core",
+        "ver": "0.11.0"
+      },
+      "widgets_values": [
+        "IndexTTS25_T8/audiocpp_experimental"
+      ]
+    }
+  ],
+  "links": [
+    [
+      1,
+      1,
+      0,
+      2,
+      2,
+      "AUDIO"
+    ],
+    [
+      2,
+      2,
+      0,
+      3,
+      0,
+      "AUDIO"
+    ]
+  ],
+  "groups": [
+    {
+      "title": "27 audio.cpp IndexTTS2.5 GGUF 隔离实验后端 · B站：T8star-Aix",
+      "bounding": [
+        -40,
+        -60,
+        1420,
+        640
+      ],
+      "color": "#3f789e",
+      "font_size": 24,
+      "flags": {}
+    }
+  ],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.9,
+      "offset": [
+        80,
+        60
+      ]
+    }
+  },
+  "version": 0.4
+}

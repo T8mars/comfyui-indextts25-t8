@@ -5,10 +5,10 @@
       "model_name": "IndexTTS-2.5",
       "device": "auto",
       "precision": "auto",
-      "acceleration_mode": "auto_safe",
+      "acceleration_mode": "off",
       "use_cuda_kernel": false,
       "release_after_run": false,
-      "recycle_after_runs": 0,
+      "recycle_after_runs": 20,
       "verify_hashes": false,
       "custom_model_path": ""
     }
@@ -20,12 +20,6 @@
     }
   },
   "3": {
-    "class_type": "T8_IndexTTS25_Environment",
-    "inputs": {
-      "device": "auto"
-    }
-  },
-  "4": {
     "class_type": "T8_IndexTTS25_Generate",
     "inputs": {
       "model": [
@@ -36,14 +30,14 @@
         "2",
         0
       ],
-      "text": "这是可选加速模式的安全回退测试。",
+      "text": "模型每完成二十次推理后自动安全重载，状态节点只管理本扩展。",
       "language": "ZH",
       "duration_factor": 1.0,
       "target_duration_mode": "off",
       "target_duration_seconds": 0.0,
       "postprocess_preset": "off",
       "postprocess_strength": 1.0,
-      "seed": 20260818,
+      "seed": 20260826,
       "quality_retry_count": 0,
       "quality_asr_backend": "auto",
       "quality_asr_model": "base",
@@ -51,14 +45,21 @@
       "quality_threshold": 0.82
     }
   },
+  "4": {
+    "class_type": "T8_IndexTTS25_MemoryControl",
+    "inputs": {
+      "action": "status",
+      "idle_seconds": 300.0
+    }
+  },
   "5": {
     "class_type": "SaveAudio",
     "inputs": {
       "audio": [
-        "4",
+        "3",
         0
       ],
-      "filename_prefix": "IndexTTS25_T8/optional_acceleration"
+      "filename_prefix": "IndexTTS25_T8/memory_control"
     }
   }
 }

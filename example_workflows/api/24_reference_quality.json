@@ -5,7 +5,7 @@
       "model_name": "IndexTTS-2.5",
       "device": "auto",
       "precision": "auto",
-      "acceleration_mode": "auto_safe",
+      "acceleration_mode": "off",
       "use_cuda_kernel": false,
       "release_after_run": false,
       "recycle_after_runs": 0,
@@ -20,9 +20,15 @@
     }
   },
   "3": {
-    "class_type": "T8_IndexTTS25_Environment",
+    "class_type": "T8_IndexTTS25_ReferenceQuality",
     "inputs": {
-      "device": "auto"
+      "audio": [
+        "2",
+        0
+      ],
+      "auto_prepare": true,
+      "maximum_seconds": 15.0,
+      "silence_padding_ms": 150
     }
   },
   "4": {
@@ -33,17 +39,17 @@
         0
       ],
       "speaker_audio": [
-        "2",
+        "3",
         0
       ],
-      "text": "这是可选加速模式的安全回退测试。",
+      "text": "这个示例先检测并优化参考音频，再进行音色克隆。",
       "language": "ZH",
       "duration_factor": 1.0,
       "target_duration_mode": "off",
       "target_duration_seconds": 0.0,
       "postprocess_preset": "off",
       "postprocess_strength": 1.0,
-      "seed": 20260818,
+      "seed": 20260826,
       "quality_retry_count": 0,
       "quality_asr_backend": "auto",
       "quality_asr_model": "base",
@@ -58,7 +64,16 @@
         "4",
         0
       ],
-      "filename_prefix": "IndexTTS25_T8/optional_acceleration"
+      "filename_prefix": "IndexTTS25_T8/reference_quality"
+    }
+  },
+  "6": {
+    "class_type": "PreviewImage",
+    "inputs": {
+      "images": [
+        "3",
+        2
+      ]
     }
   }
 }

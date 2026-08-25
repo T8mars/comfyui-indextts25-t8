@@ -1,6 +1,16 @@
 # T8star-Aix IndexTTS 2.5 路线图
 
-本路线图同时记录 ComfyUI 节点和桌面整合包的共同方向。项目只支持 **IndexTTS 2.5**。ComfyUI 基础依赖不强装 DeepSpeed、FlashAttention、Triton；桌面 v0.10.0 则内置与固定 Python/torch/CUDA ABI 匹配的可选轮子，仍不默认启用。
+本路线图同时记录 ComfyUI 节点和桌面整合包的共同方向。项目只支持 **IndexTTS 2.5**。ComfyUI 基础依赖不强装 DeepSpeed、FlashAttention、Triton；桌面 v0.11.0 则内置与固定 Python/torch/CUDA ABI 匹配的可选轮子，仍不默认启用。
+
+## v0.11.0（本地实现）
+
+- [x] 修复 ComfyUI 2026.08 不再自动把自定义节点目录加入 `sys.path` 时的内置 `indextts` 导入。
+- [x] 单句与多角色支持 ASR 低分自动换 seed 重试并保留最佳结果。
+- [x] 参考音频质量评分、静音裁剪、高信息片段选择和波形预览。
+- [x] ASR 波形/逐字时间标记，多角色时间轴显示逐字标记。
+- [x] 生成后、空闲、连续 N 次生成和手动模型释放，且不清理其他 ComfyUI 模型。
+- [x] 隔离的 audio.cpp IndexTTS2.5 GGUF 实验节点；不捆绑 CLI 与 GGUF，不改变默认推理路径。
+- [x] 扩展为 27 组 UI/API 示例工作流并按 ComfyUI V3 实时 schema 校验。
 
 ## v0.10.0（本地实现）
 
@@ -79,7 +89,7 @@
 ## 验收记录
 
 - [x] 公共解析、时间轴、混音和加速探测测试通过。
-- [x] V3 节点 schema 与 23 组 UI/API 工作流测试通过。
+- [x] V3 节点 schema 与 27 组 UI/API 工作流测试通过。
 - [x] 当前基础环境：73 项测试通过。
 - [x] Transformers 4.57.6：50 项测试通过，2 项按环境条件跳过。
 - [x] IndexTTS 2.5 真实模型联合冒烟：两段生成、前导/段间停顿、目标时长和人声后处理通过。
@@ -89,4 +99,4 @@
 ## 后续候选
 
 - vLLM-Omni Linux/服务端 sidecar，用于并发和吞吐优先场景。
-- 波形缩略图和拖拽吸附；v0.8.1 已提供 ASR 词级时间戳和逐句毫秒级时间轴编辑。
+- 波形时间轴拖拽吸附；v0.11.0 已提供波形、逐字标记和逐句毫秒级时间轴编辑。

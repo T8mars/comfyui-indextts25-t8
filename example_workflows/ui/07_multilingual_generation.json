@@ -66,6 +66,14 @@
           "link": null
         },
         {
+          "name": "recycle_after_runs",
+          "type": "INT",
+          "widget": {
+            "name": "recycle_after_runs"
+          },
+          "link": null
+        },
+        {
           "name": "verify_hashes",
           "type": "BOOLEAN",
           "widget": {
@@ -104,7 +112,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_ModelLoader",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.10.0"
+        "ver": "0.11.0"
       },
       "widgets_values": [
         "IndexTTS-2.5",
@@ -113,6 +121,7 @@
         "off",
         false,
         false,
+        0,
         false,
         ""
       ]
@@ -157,7 +166,7 @@
       "properties": {
         "Node name for S&R": "LoadAudio",
         "cnr_id": "comfy-core",
-        "ver": "0.10.0"
+        "ver": "0.11.0"
       },
       "widgets_values": [
         "voice_reference.wav"
@@ -254,6 +263,46 @@
           "link": null
         },
         {
+          "name": "quality_retry_count",
+          "type": "INT",
+          "widget": {
+            "name": "quality_retry_count"
+          },
+          "link": null
+        },
+        {
+          "name": "quality_asr_backend",
+          "type": "COMBO",
+          "widget": {
+            "name": "quality_asr_backend"
+          },
+          "link": null
+        },
+        {
+          "name": "quality_asr_model",
+          "type": "COMBO",
+          "widget": {
+            "name": "quality_asr_model"
+          },
+          "link": null
+        },
+        {
+          "name": "quality_asr_device",
+          "type": "COMBO",
+          "widget": {
+            "name": "quality_asr_device"
+          },
+          "link": null
+        },
+        {
+          "name": "quality_threshold",
+          "type": "FLOAT",
+          "widget": {
+            "name": "quality_threshold"
+          },
+          "link": null
+        },
+        {
           "name": "emotion",
           "type": "T8_INDEXTTS25_EMOTION",
           "link": null,
@@ -283,7 +332,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_Generate",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.10.0"
+        "ver": "0.11.0"
       },
       "widgets_values": [
         "这是中文语音生成示例。",
@@ -294,7 +343,12 @@
         "off",
         1.0,
         20260811,
-        "fixed"
+        "fixed",
+        0,
+        "auto",
+        "base",
+        "auto",
+        0.82
       ],
       "title": "ZH 生成"
     },
@@ -337,7 +391,7 @@
       "properties": {
         "Node name for S&R": "SaveAudio",
         "cnr_id": "comfy-core",
-        "ver": "0.10.0"
+        "ver": "0.11.0"
       },
       "widgets_values": [
         "IndexTTS25_T8/zh"
@@ -433,6 +487,46 @@
           "link": null
         },
         {
+          "name": "quality_retry_count",
+          "type": "INT",
+          "widget": {
+            "name": "quality_retry_count"
+          },
+          "link": null
+        },
+        {
+          "name": "quality_asr_backend",
+          "type": "COMBO",
+          "widget": {
+            "name": "quality_asr_backend"
+          },
+          "link": null
+        },
+        {
+          "name": "quality_asr_model",
+          "type": "COMBO",
+          "widget": {
+            "name": "quality_asr_model"
+          },
+          "link": null
+        },
+        {
+          "name": "quality_asr_device",
+          "type": "COMBO",
+          "widget": {
+            "name": "quality_asr_device"
+          },
+          "link": null
+        },
+        {
+          "name": "quality_threshold",
+          "type": "FLOAT",
+          "widget": {
+            "name": "quality_threshold"
+          },
+          "link": null
+        },
+        {
           "name": "emotion",
           "type": "T8_INDEXTTS25_EMOTION",
           "link": null,
@@ -462,7 +556,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_Generate",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.10.0"
+        "ver": "0.11.0"
       },
       "widgets_values": [
         "This is an English speech generation example.",
@@ -473,7 +567,12 @@
         "off",
         1.0,
         20260811,
-        "fixed"
+        "fixed",
+        0,
+        "auto",
+        "base",
+        "auto",
+        0.82
       ],
       "title": "EN 生成"
     },
@@ -516,7 +615,7 @@
       "properties": {
         "Node name for S&R": "SaveAudio",
         "cnr_id": "comfy-core",
-        "ver": "0.10.0"
+        "ver": "0.11.0"
       },
       "widgets_values": [
         "IndexTTS25_T8/en"
@@ -612,6 +711,46 @@
           "link": null
         },
         {
+          "name": "quality_retry_count",
+          "type": "INT",
+          "widget": {
+            "name": "quality_retry_count"
+          },
+          "link": null
+        },
+        {
+          "name": "quality_asr_backend",
+          "type": "COMBO",
+          "widget": {
+            "name": "quality_asr_backend"
+          },
+          "link": null
+        },
+        {
+          "name": "quality_asr_model",
+          "type": "COMBO",
+          "widget": {
+            "name": "quality_asr_model"
+          },
+          "link": null
+        },
+        {
+          "name": "quality_asr_device",
+          "type": "COMBO",
+          "widget": {
+            "name": "quality_asr_device"
+          },
+          "link": null
+        },
+        {
+          "name": "quality_threshold",
+          "type": "FLOAT",
+          "widget": {
+            "name": "quality_threshold"
+          },
+          "link": null
+        },
+        {
           "name": "emotion",
           "type": "T8_INDEXTTS25_EMOTION",
           "link": null,
@@ -641,7 +780,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_Generate",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.10.0"
+        "ver": "0.11.0"
       },
       "widgets_values": [
         "これは日本語の音声生成サンプルです。",
@@ -652,7 +791,12 @@
         "off",
         1.0,
         20260811,
-        "fixed"
+        "fixed",
+        0,
+        "auto",
+        "base",
+        "auto",
+        0.82
       ],
       "title": "JA 生成"
     },
@@ -695,7 +839,7 @@
       "properties": {
         "Node name for S&R": "SaveAudio",
         "cnr_id": "comfy-core",
-        "ver": "0.10.0"
+        "ver": "0.11.0"
       },
       "widgets_values": [
         "IndexTTS25_T8/ja"
@@ -791,6 +935,46 @@
           "link": null
         },
         {
+          "name": "quality_retry_count",
+          "type": "INT",
+          "widget": {
+            "name": "quality_retry_count"
+          },
+          "link": null
+        },
+        {
+          "name": "quality_asr_backend",
+          "type": "COMBO",
+          "widget": {
+            "name": "quality_asr_backend"
+          },
+          "link": null
+        },
+        {
+          "name": "quality_asr_model",
+          "type": "COMBO",
+          "widget": {
+            "name": "quality_asr_model"
+          },
+          "link": null
+        },
+        {
+          "name": "quality_asr_device",
+          "type": "COMBO",
+          "widget": {
+            "name": "quality_asr_device"
+          },
+          "link": null
+        },
+        {
+          "name": "quality_threshold",
+          "type": "FLOAT",
+          "widget": {
+            "name": "quality_threshold"
+          },
+          "link": null
+        },
+        {
           "name": "emotion",
           "type": "T8_INDEXTTS25_EMOTION",
           "link": null,
@@ -820,7 +1004,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_Generate",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.10.0"
+        "ver": "0.11.0"
       },
       "widgets_values": [
         "Este es un ejemplo de generación de voz en español.",
@@ -831,7 +1015,12 @@
         "off",
         1.0,
         20260811,
-        "fixed"
+        "fixed",
+        0,
+        "auto",
+        "base",
+        "auto",
+        0.82
       ],
       "title": "ES 生成"
     },
@@ -874,7 +1063,7 @@
       "properties": {
         "Node name for S&R": "SaveAudio",
         "cnr_id": "comfy-core",
-        "ver": "0.10.0"
+        "ver": "0.11.0"
       },
       "widgets_values": [
         "IndexTTS25_T8/es"
@@ -970,6 +1159,46 @@
           "link": null
         },
         {
+          "name": "quality_retry_count",
+          "type": "INT",
+          "widget": {
+            "name": "quality_retry_count"
+          },
+          "link": null
+        },
+        {
+          "name": "quality_asr_backend",
+          "type": "COMBO",
+          "widget": {
+            "name": "quality_asr_backend"
+          },
+          "link": null
+        },
+        {
+          "name": "quality_asr_model",
+          "type": "COMBO",
+          "widget": {
+            "name": "quality_asr_model"
+          },
+          "link": null
+        },
+        {
+          "name": "quality_asr_device",
+          "type": "COMBO",
+          "widget": {
+            "name": "quality_asr_device"
+          },
+          "link": null
+        },
+        {
+          "name": "quality_threshold",
+          "type": "FLOAT",
+          "widget": {
+            "name": "quality_threshold"
+          },
+          "link": null
+        },
+        {
           "name": "emotion",
           "type": "T8_INDEXTTS25_EMOTION",
           "link": null,
@@ -999,7 +1228,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_Generate",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.10.0"
+        "ver": "0.11.0"
       },
       "widgets_values": [
         "هذا مثال على توليد الكلام باللغة العربية.",
@@ -1010,7 +1239,12 @@
         "off",
         1.0,
         20260811,
-        "fixed"
+        "fixed",
+        0,
+        "auto",
+        "base",
+        "auto",
+        0.82
       ],
       "title": "AR 生成"
     },
@@ -1053,7 +1287,7 @@
       "properties": {
         "Node name for S&R": "SaveAudio",
         "cnr_id": "comfy-core",
-        "ver": "0.10.0"
+        "ver": "0.11.0"
       },
       "widgets_values": [
         "IndexTTS25_T8/ar"

@@ -5,7 +5,7 @@
       "model_name": "IndexTTS-2.5",
       "device": "auto",
       "precision": "auto",
-      "acceleration_mode": "auto_safe",
+      "acceleration_mode": "off",
       "use_cuda_kernel": false,
       "release_after_run": false,
       "recycle_after_runs": 0,
@@ -20,12 +20,6 @@
     }
   },
   "3": {
-    "class_type": "T8_IndexTTS25_Environment",
-    "inputs": {
-      "device": "auto"
-    }
-  },
-  "4": {
     "class_type": "T8_IndexTTS25_Generate",
     "inputs": {
       "model": [
@@ -36,29 +30,29 @@
         "2",
         0
       ],
-      "text": "这是可选加速模式的安全回退测试。",
+      "text": "自动质检会在识别相似度不足时更换随机种子，并保留最佳结果。",
       "language": "ZH",
       "duration_factor": 1.0,
       "target_duration_mode": "off",
       "target_duration_seconds": 0.0,
       "postprocess_preset": "off",
       "postprocess_strength": 1.0,
-      "seed": 20260818,
-      "quality_retry_count": 0,
+      "seed": 20260826,
+      "quality_retry_count": 2,
       "quality_asr_backend": "auto",
       "quality_asr_model": "base",
       "quality_asr_device": "auto",
       "quality_threshold": 0.82
     }
   },
-  "5": {
+  "4": {
     "class_type": "SaveAudio",
     "inputs": {
       "audio": [
-        "4",
+        "3",
         0
       ],
-      "filename_prefix": "IndexTTS25_T8/optional_acceleration"
+      "filename_prefix": "IndexTTS25_T8/quality_retry"
     }
   }
 }
