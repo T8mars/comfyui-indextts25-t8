@@ -20,7 +20,15 @@ IndexTTS 2.5 的 ComfyUI V3 原生节点集成。节点菜单位于：
 
 本目录固定使用 IndexTTS 2.5 推理核心和正式 2.5 模型清单，不会回退或误载 IndexTTS 2.0。
 
-### v0.11.3 稳定性更新
+当前版本基线：**ComfyUI Node 0.11.4 · Desktop 0.11.5 · Core `ee40fa7d` · Model `c39ce5ba`**。
+Desktop 与 Node 是两个独立发行物，因此各自使用独立版本号；Core/Model 是固定的官方代码和权重 revision。
+
+### v0.11.4 稳定性更新
+
+- 首次使用或更换音色时只执行一次 Wav2Vec 编码和一次音频读取/重采样，减少重复的参考音频预处理。
+- 模型加载信息明确显示 Node/Core/Model 版本，运行时节点版本直接读取 `pyproject.toml`，避免版本号漂移。
+- CI 同时验证 Linux 当前环境与 Windows Portable 对应的 Python 3.10 / torch 2.8 环境。
+- GPT 加速的 synthetic-prompt KV Cache 防误命中修复已核验并保留专门回归测试。
 
 - 普通批量台词可直接包含官方 `<文字|读音>` 标注，不再被字段分隔符误切开。
 - JSON/SRT 时间轴严格校验成对起止时间、先后顺序和安全范围；合成前会阻止超过 1 GiB 的异常密集分配。

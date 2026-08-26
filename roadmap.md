@@ -24,6 +24,9 @@
 - [x] Windows Python 3.10 / torch 2.8.0+cu128 精确轮子清单与 SHA-256。
 - [x] FlashAttention 2.8.3 + Triton 3.4.0.post21 的真实 GPT 加速 WAV 回归。
 - [x] DeepSpeed 0.17.5 FP32/BF16 真实 WAV 回归；Linux 保持 BF16，Windows BF16 请求使用兼容性更好的 FP16 workspace 并保留失败回退。
+- [x] synthetic-prompt GPT KV Cache 防误命中，避免重复长提示跨缓存块时断言失败。
+- [x] 去除音色缓存未命中路径的重复 Wav2Vec 前向、文件读取与 16 kHz 重采样。
+- [x] CI 覆盖 Linux 当前环境与 Windows Portable Python 3.10 / torch 2.8 基线。
 - [x] 普通、低显存、流式和后处理输出统一做 20ms 尾部淡出并归零。
 - [x] 官方问题 #792 的中文整词标注提示、音节数校验和固定 seed 音频回归。
 

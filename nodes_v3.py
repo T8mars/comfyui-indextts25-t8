@@ -11,6 +11,7 @@ import torchaudio
 from comfy_api.latest import ComfyExtension, io
 from typing_extensions import override
 
+from .project_meta import PROJECT_VERSION
 from .runtime.inference_adapter import NativeTargetDurationUnsupported, run_inference
 from .runtime.audio_processing import (
     POSTPROCESS_PRESETS,
@@ -367,9 +368,9 @@ class T8IndexTTS25ModelLoader(io.ComfyNode):
         )
         verification = "SHA-256 已校验" if report.hashes_verified else "文件大小已校验"
         info = (
-            f"IndexTTS 2.5 | {model_dir} | device={resolved_device} | "
+            f"IndexTTS 2.5 | node={PROJECT_VERSION} | core={str(manifest['codeRevision'])[:8]} | "
+            f"model={str(manifest['modelRevision'])[:8]} | {model_dir} | device={resolved_device} | "
             f"precision={'bfloat16' if handle.use_bf16 else 'float32'} | {verification} | "
-            f"model revision={manifest['modelRevision'][:12]} | "
             f"accel={acceleration.effective}（{acceleration.reason}）"
             + (f" | {compatibility_note}" if compatibility_note else "")
             + (" | 低显存自动适配" if low_vram else "")

@@ -20,7 +20,15 @@ Creator: **Bilibili: T8star-Aix**.
 
 This repository is locked to the IndexTTS 2.5 inference core and the official 2.5 model manifest. It will not fall back to or accidentally load IndexTTS 2.0.
 
-### v0.11.3 stability update
+Current baseline: **ComfyUI Node 0.11.4 · Desktop 0.11.5 · Core `ee40fa7d` · Model `c39ce5ba`**.
+Desktop and Node are separate deliverables with independent versions; Core/Model identify the pinned official code and weight revisions.
+
+### v0.11.4 stability update
+
+- A cold or changed speaker reference now performs one Wav2Vec pass and one audio load/resample instead of duplicating both operations.
+- Model Loader status explicitly reports Node/Core/Model versions, and the runtime node version is read from `pyproject.toml` to prevent drift.
+- CI covers both the current Linux environment and the Windows Portable Python 3.10 / torch 2.8 baseline.
+- The synthetic-prompt GPT KV-cache false-hit fix remains enabled and has a dedicated regression test.
 
 - Plain batch lines can contain official `<text|pronunciation>` annotations without corrupting field parsing.
 - JSON/SRT timelines validate paired bounds, ordering, and safe ranges; composition rejects abnormal allocations above 1 GiB before allocating memory.

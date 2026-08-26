@@ -11,6 +11,7 @@ def test_package_bootstrap_exposes_bundled_indextts_without_comfy_sys_path():
 import importlib.util
 import os
 import pathlib
+import re
 import sys
 import tempfile
 import types
@@ -35,6 +36,8 @@ spec.loader.exec_module(module)
 import indextts
 assert pathlib.Path(indextts.__file__).resolve() == (root / "indextts" / "__init__.py").resolve()
 assert sys.path[0] == str(root)
+declared = re.search(r'^version\\s*=\\s*"([^"]+)"', (root / "pyproject.toml").read_text(), re.MULTILINE)
+assert declared is not None and module.__version__ == declared.group(1)
 """
     completed = subprocess.run(
         [sys.executable, "-I", "-c", script],

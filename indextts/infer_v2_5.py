@@ -883,14 +883,11 @@ class IndexTTS2:
             attention_mask = attention_mask.to(self.device)
             spk_cond_emb = self.get_emb(input_features, attention_mask)
 
-            # _, S_ref = self.semantic_codec.quantize(spk_cond_emb)
-            S_ref = self.get_emb(input_features, attention_mask)
             ref_mel = self.mel_fn(audio_22k.to(spk_cond_emb.device).float())
             ref_target_lengths = torch.LongTensor([ref_mel.size(2)]).to(ref_mel.device)
 
-            audio_16k = torchaudio.transforms.Resample(sr, 16000)(
-                self._load_and_cut_audio(spk_audio_prompt, 15, verbose)[0]
-            )
+            # Reuse the decoded 16 kHz waveform for CAMPPlus instead of loading
+            # and resampling the same speaker reference a second time.
             feat = torchaudio.compliance.kaldi.fbank(
                 audio_16k.to(ref_mel.device),
                 num_mel_bins=80,
@@ -905,7 +902,6 @@ class IndexTTS2:
             )  # 参考音频的全局style2[1,192]
 
             prompt_condition = self.s2mel.models["length_regulator"](
-                # S_ref,
                 spk_cond_emb,
                 ylens=ref_target_lengths,
                 n_quantizers=3,

@@ -12,14 +12,27 @@ permissions:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    name: ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux current / Python 3.11
+            os: ubuntu-latest
+            python: "3.11"
+            torch-packages: torch torchvision torchaudio
+          - name: Windows portable / Python 3.10 / torch 2.8
+            os: windows-latest
+            python: "3.10"
+            torch-packages: torch==2.8.0 torchvision==0.23.0 torchaudio==2.8.0
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Check out node
         uses: actions/checkout@v7
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python }}
           cache: pip
       - name: Check out current ComfyUI
         uses: actions/checkout@v7
@@ -29,13 +42,14 @@ jobs:
       - name: Install CPU test dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install ${{ matrix.torch-packages }} --index-url https://download.pytorch.org/whl/cpu
           python -m pip install -r .comfyui/requirements.txt -r requirements.txt pytest comfy-cli
       - name: Run tests against ComfyUI V3 API
         env:
           COMFYUI_ROOT: ${{ github.workspace }}/.comfyui
         run: python -m pytest -p no:cacheprovider
       - name: Verify generated workflows are current
+        if: runner.os == 'Linux'
         run: |
           python scripts/build_example_workflows.py
           git diff --exit-code

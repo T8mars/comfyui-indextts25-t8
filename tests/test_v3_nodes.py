@@ -82,6 +82,58 @@ def test_v010_model_loader_widget_values_are_restored():
     assert current[3] == ""
 
 
+def test_model_loader_reports_node_core_and_model_versions(tmp_path, monkeypatch):
+    _load_plugin()
+    from types import SimpleNamespace
+
+    from comfyui_indextts25_t8_test import nodes_v3
+
+    class Report:
+        hashes_verified = False
+
+        def require_valid(self):
+            return None
+
+    monkeypatch.setattr(nodes_v3, "resolve_model", lambda *args: tmp_path)
+    monkeypatch.setattr(nodes_v3, "validate_model_dir", lambda *args, **kwargs: Report())
+    monkeypatch.setattr(nodes_v3, "model_fingerprint", lambda _path: "fingerprint")
+    monkeypatch.setattr(nodes_v3, "_resolve_device", lambda _device: "cpu")
+    monkeypatch.setattr(nodes_v3, "_is_low_vram", lambda _device: False)
+    monkeypatch.setattr(
+        nodes_v3,
+        "resolve_acceleration",
+        lambda *args: SimpleNamespace(
+            use_cuda_kernel=False,
+            use_torch_compile=False,
+            use_accel=False,
+            use_deepspeed=False,
+            requested="off",
+            effective="off",
+            reason="普通模式",
+        ),
+    )
+    monkeypatch.setattr(
+        nodes_v3,
+        "load_manifest",
+        lambda: {"codeRevision": "ee40fa7d6c", "modelRevision": "c39ce5ba98"},
+    )
+
+    result = nodes_v3.T8IndexTTS25ModelLoader.execute(
+        "official",
+        "auto",
+        "auto",
+        "off",
+        False,
+        False,
+        0,
+        False,
+        "",
+    )
+    assert f"node={nodes_v3.PROJECT_VERSION}" in result[1]
+    assert "core=ee40fa7d" in result[1]
+    assert "model=c39ce5ba" in result[1]
+
+
 def test_timeline_asr_and_subtitle_nodes_form_a_complete_editing_chain(monkeypatch):
     _load_plugin()
     from comfyui_indextts25_t8_test import nodes_v3
