@@ -25,6 +25,9 @@ def test_review_transcript_and_waveform_only_asr(monkeypatch):
     monkeypatch.setattr(
         speech_review, "load_asr_model", lambda *args, **kwargs: (FakeWhisper(), "cpu")
     )
+    monkeypatch.setattr(
+        speech_review, "resolve_asr_backend", lambda _backend: "openai_whisper"
+    )
     result = speech_review.transcribe_waveform(
         torch.zeros(2, 22050), 22050, language="EN", model_name="tiny"
     )

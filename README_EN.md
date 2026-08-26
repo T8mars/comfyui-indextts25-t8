@@ -20,7 +20,7 @@ Creator: **Bilibili: T8star-Aix**.
 
 This repository is locked to the IndexTTS 2.5 inference core and the official 2.5 model manifest. It will not fall back to or accidentally load IndexTTS 2.0.
 
-### v0.11.2 stability update
+### v0.11.3 stability update
 
 - Plain batch lines can contain official `<text|pronunciation>` annotations without corrupting field parsing.
 - JSON/SRT timelines validate paired bounds, ordering, and safe ranges; composition rejects abnormal allocations above 1 GiB before allocating memory.
@@ -29,6 +29,7 @@ This repository is locked to the IndexTTS 2.5 inference core and the official 2.
 - Release All clears both IndexTTS and Whisper caches owned by this extension; audio.cpp now exposes Apple Metal.
 - Windows DeepSpeed BF16 requests use the more compatible FP16 inference workspace and still fall back safely if initialization fails.
 - All 27 UI workflows validate widget order/types, and Registry publishing is gated by tests against the current ComfyUI V3 API.
+- Reference-audio caching now writes standard PCM16 WAV directly, including with current `torchaudio` installations that do not include TorchCodec.
 
 ## Implemented nodes
 

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import wave
+
 import numpy as np
 import pytest
 import torch
@@ -21,10 +23,14 @@ def test_validate_comfy_audio_rejects_batch_and_nonfinite():
     with pytest.raises(ValueError, match="batch"):
         validate_comfy_audio({"waveform": torch.zeros(2, 1, 10), "sample_rate": 22050})
     with pytest.raises(ValueError, match="NaN"):
-        validate_comfy_audio({"waveform": torch.tensor([[[float("nan")]]]), "sample_rate": 22050})
+        validate_comfy_audio(
+            {"waveform": torch.tensor([[[float("nan")]]]), "sample_rate": 22050}
+        )
 
 
-def test_reference_audio_is_resampled_truncated_and_content_cached(tmp_path, monkeypatch):
+def test_reference_audio_is_resampled_truncated_and_content_cached(
+    tmp_path, monkeypatch
+):
     monkeypatch.setattr(reference_cache, "_cache_root", lambda: tmp_path)
     monkeypatch.setattr(reference_cache, "MAX_REFERENCE_SECONDS", 0.5)
     source_rate = 16_000
@@ -32,14 +38,16 @@ def test_reference_audio_is_resampled_truncated_and_content_cached(tmp_path, mon
     audio = {"waveform": waveform, "sample_rate": source_rate}
 
     first, notes = reference_cache.comfy_audio_to_reference_wav(audio, kind="speaker")
-    second, second_notes = reference_cache.comfy_audio_to_reference_wav(audio, kind="speaker")
+    second, second_notes = reference_cache.comfy_audio_to_reference_wav(
+        audio, kind="speaker"
+    )
 
-    import torchaudio
-
-    cached, sample_rate = torchaudio.load(str(first))
     assert first == second
     assert notes == second_notes
     assert first.is_file()
-    assert sample_rate == 22_050
-    assert cached.shape == (1, int(22_050 * 0.5))
+    with wave.open(str(first), "rb") as cached:
+        assert cached.getframerate() == 22_050
+        assert cached.getnchannels() == 1
+        assert cached.getsampwidth() == 2
+        assert cached.getnframes() == int(22_050 * 0.5)
     assert any("0.5" in note for note in notes)

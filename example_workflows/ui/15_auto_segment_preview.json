@@ -109,7 +109,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_ModelLoader",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.11.2"
+        "ver": "0.11.3"
       },
       "widgets_values": [
         "IndexTTS-2.5",
@@ -159,7 +159,7 @@
       "properties": {
         "Node name for S&R": "LoadAudio",
         "cnr_id": "comfy-core",
-        "ver": "0.11.2"
+        "ver": "0.11.3"
       },
       "widgets_values": [
         "voice_reference.wav"
@@ -352,7 +352,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_SamplingConfig",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.11.2"
+        "ver": "0.11.3"
       },
       "widgets_values": [
         false,
@@ -436,7 +436,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_TextPreview",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.11.2"
+        "ver": "0.11.3"
       },
       "widgets_values": [
         "This is a deliberately longer English paragraph used to demonstrate language-aware automatic segmentation. The preview node shows every token segment before synthesis and protects the GPT acceleration path when a risky long-text cache pattern is detected.",
@@ -602,7 +602,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_Generate",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.11.2"
+        "ver": "0.11.3"
       },
       "widgets_values": [
         "This is a deliberately longer English paragraph used to demonstrate language-aware automatic segmentation. The preview node shows every token segment before synthesis and protects the GPT acceleration path when a risky long-text cache pattern is detected.",
@@ -660,7 +660,7 @@
       "properties": {
         "Node name for S&R": "SaveAudio",
         "cnr_id": "comfy-core",
-        "ver": "0.11.2"
+        "ver": "0.11.3"
       },
       "widgets_values": [
         "IndexTTS25_T8/auto_segment"

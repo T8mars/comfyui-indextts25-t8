@@ -20,7 +20,7 @@ IndexTTS 2.5 的 ComfyUI V3 原生节点集成。节点菜单位于：
 
 本目录固定使用 IndexTTS 2.5 推理核心和正式 2.5 模型清单，不会回退或误载 IndexTTS 2.0。
 
-### v0.11.2 稳定性更新
+### v0.11.3 稳定性更新
 
 - 普通批量台词可直接包含官方 `<文字|读音>` 标注，不再被字段分隔符误切开。
 - JSON/SRT 时间轴严格校验成对起止时间、先后顺序和安全范围；合成前会阻止超过 1 GiB 的异常密集分配。
@@ -29,6 +29,7 @@ IndexTTS 2.5 的 ComfyUI V3 原生节点集成。节点菜单位于：
 - “全部释放”同时清理本扩展的 IndexTTS 与 Whisper 缓存；audio.cpp 增加 Apple Metal 选项。
 - Windows DeepSpeed 的 BF16 请求自动使用兼容性更好的 FP16 推理 workspace；失败仍安全回退普通模式。
 - 27 组 UI 工作流增加控件顺序/类型校验，并在 Registry 发布前使用当前 ComfyUI V3 API 自动测试。
+- 参考音频缓存改用标准 PCM16 WAV 写入，兼容最新版 `torchaudio` 未安装 TorchCodec 的环境。
 
 ## 已实现节点
 

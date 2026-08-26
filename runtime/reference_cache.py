@@ -3,8 +3,11 @@ from __future__ import annotations
 import hashlib
 import os
 import threading
+import wave
 from pathlib import Path
 from typing import Any
+
+import torch
 
 from .audio_adapter import INDEXTTS_SAMPLE_RATE, validate_comfy_audio
 
@@ -34,13 +37,29 @@ def _cache_root() -> Path:
     return path
 
 
-def comfy_audio_to_reference_wav(audio: dict[str, Any], *, kind: str) -> tuple[Path, tuple[str, ...]]:
+def _save_pcm16_wav(path: Path, waveform: torch.Tensor, sample_rate: int) -> None:
+    """Write a portable PCM16 WAV without relying on TorchCodec."""
+    pcm = (waveform.clamp(-1.0, 1.0) * 32767.0).round().to(dtype=torch.int16)
+    channels = int(pcm.shape[0])
+    interleaved = pcm.transpose(0, 1).contiguous().numpy().tobytes()
+    with wave.open(str(path), "wb") as wav_file:
+        wav_file.setnchannels(channels)
+        wav_file.setsampwidth(2)
+        wav_file.setframerate(int(sample_rate))
+        wav_file.writeframes(interleaved)
+
+
+def comfy_audio_to_reference_wav(
+    audio: dict[str, Any], *, kind: str
+) -> tuple[Path, tuple[str, ...]]:
     waveform = validate_comfy_audio(audio, name=kind)
     sample_rate = int(audio["sample_rate"])
     mono = waveform.mean(dim=1)
     seconds = mono.shape[-1] / sample_rate
     if seconds < MIN_REFERENCE_SECONDS:
-        raise ValueError(f"{kind} 太短（{seconds:.2f} 秒）；至少需要 {MIN_REFERENCE_SECONDS:.2f} 秒。")
+        raise ValueError(
+            f"{kind} 太短（{seconds:.2f} 秒）；至少需要 {MIN_REFERENCE_SECONDS:.2f} 秒。"
+        )
 
     notes: list[str] = []
     max_samples = int(MAX_REFERENCE_SECONDS * sample_rate)
@@ -67,13 +86,11 @@ def comfy_audio_to_reference_wav(audio: dict[str, Any], *, kind: str) -> tuple[P
 
     with _lock_for(key):
         if not target.is_file():
+            temporary = target.with_name(
+                f".{target.stem}-{os.getpid()}-{threading.get_ident()}.tmp.wav"
+            )
             try:
-                import torchaudio
-            except ImportError as exc:
-                raise RuntimeError("缺少 torchaudio，无法保存参考音频。") from exc
-            temporary = target.with_name(f".{target.stem}-{os.getpid()}-{threading.get_ident()}.tmp.wav")
-            try:
-                torchaudio.save(str(temporary), mono, INDEXTTS_SAMPLE_RATE)
+                _save_pcm16_wav(temporary, mono, INDEXTTS_SAMPLE_RATE)
                 os.replace(temporary, target)
             finally:
                 if temporary.exists():
