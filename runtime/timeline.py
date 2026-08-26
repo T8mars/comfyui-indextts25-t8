@@ -9,34 +9,59 @@ from typing import Any, Sequence
 
 import torch
 
-from .dialogue import DialogueLine
+from .dialogue import MAX_TIMELINE_MS, DialogueLine
 
 
-TIMELINE_HEADERS = ["index", "role", "language", "start_ms", "end_ms", "duration_factor", "text"]
+TIMELINE_HEADERS = [
+    "index",
+    "role",
+    "language",
+    "start_ms",
+    "end_ms",
+    "duration_factor",
+    "text",
+]
 
 
 def timeline_rows(lines: Sequence[DialogueLine]) -> list[list[Any]]:
-    return [[line.index, line.role, line.language, line.start_ms, line.end_ms, line.duration_factor, line.text] for line in lines]
+    return [
+        [
+            line.index,
+            line.role,
+            line.language,
+            line.start_ms,
+            line.end_ms,
+            line.duration_factor,
+            line.text,
+        ]
+        for line in lines
+    ]
 
 
 def _optional_ms(value, position: int, label: str) -> int | None:
-    if value in {None, ""}:
+    if value is None or value == "":
         return None
     try:
         result = int(float(value))
     except (TypeError, ValueError, OverflowError) as exc:
         raise ValueError(f"时间轴第 {position} 行{label}必须是整数毫秒。") from exc
-    if result < 0 or result > 86_400_000:
-        raise ValueError(f"时间轴第 {position} 行{label}必须在 0–86400000 毫秒之间。")
+    if result < 0 or result > MAX_TIMELINE_MS:
+        raise ValueError(
+            f"时间轴第 {position} 行{label}必须在 0–{MAX_TIMELINE_MS} 毫秒之间。"
+        )
     return result
 
 
-def apply_timeline_edits(original_lines: Sequence[DialogueLine], rows) -> list[DialogueLine]:
+def apply_timeline_edits(
+    original_lines: Sequence[DialogueLine], rows
+) -> list[DialogueLine]:
     if isinstance(rows, str):
         try:
             rows = json.loads(rows)
         except json.JSONDecodeError as exc:
-            raise ValueError(f"时间轴 JSON 格式错误：{exc.msg}（第 {exc.lineno} 行）") from exc
+            raise ValueError(
+                f"时间轴 JSON 格式错误：{exc.msg}（第 {exc.lineno} 行）"
+            ) from exc
     if isinstance(rows, dict):
         rows = rows.get("lines") or rows.get("data") or []
     if not rows:
@@ -51,7 +76,10 @@ def apply_timeline_edits(original_lines: Sequence[DialogueLine], rows) -> list[D
         if index not in originals or index in seen:
             raise ValueError(f"时间轴第 {position} 行序号重复或不存在：{index}")
         seen.add(index)
-        role, text = str(value.get("role") or "").strip(), str(value.get("text") or "").strip()
+        role, text = (
+            str(value.get("role") or "").strip(),
+            str(value.get("text") or "").strip(),
+        )
         language = str(value.get("language") or "").upper()
         if not role or not text:
             raise ValueError(f"时间轴第 {position} 行角色和台词不能为空。")
@@ -64,7 +92,17 @@ def apply_timeline_edits(original_lines: Sequence[DialogueLine], rows) -> list[D
         factor = float(value.get("duration_factor", 1.0))
         if not 0.5 <= factor <= 2.0:
             raise ValueError(f"时间轴第 {position} 行时长系数必须在 0.5–2.0。")
-        result.append(replace(originals[index], role=role, text=text, language=language, start_ms=start, end_ms=end, duration_factor=factor))
+        result.append(
+            replace(
+                originals[index],
+                role=role,
+                text=text,
+                language=language,
+                start_ms=start,
+                end_ms=end,
+                duration_factor=factor,
+            )
+        )
     return result
 
 
@@ -76,7 +114,9 @@ def format_srt_timestamp(milliseconds: int) -> str:
     return f"{hours:02d}:{minutes:02d}:{seconds:02d},{millis:03d}"
 
 
-def _normalize_choice(value, choices: tuple[str, ...], numeric_choices: tuple[str, ...], default: str) -> tuple[str, str | None]:
+def _normalize_choice(
+    value, choices: tuple[str, ...], numeric_choices: tuple[str, ...], default: str
+) -> tuple[str, str | None]:
     raw = str(value if value is not None else "").strip().lower()
     if raw in choices:
         return raw, None
@@ -90,7 +130,14 @@ def _normalize_choice(value, choices: tuple[str, ...], numeric_choices: tuple[st
     return default, f"无法识别字幕选项 {value!r}，已使用安全默认值 {default!r}。"
 
 
-def rewrite_srt(lines: Sequence[DialogueLine], line_reports: Sequence[dict] | None = None, *, timing_mode: str = "actual", text_mode: str = "asr_passed", include_role: bool = True) -> tuple[str, dict[str, Any]]:
+def rewrite_srt(
+    lines: Sequence[DialogueLine],
+    line_reports: Sequence[dict] | None = None,
+    *,
+    timing_mode: str = "actual",
+    text_mode: str = "asr_passed",
+    include_role: bool = True,
+) -> tuple[str, dict[str, Any]]:
     requested_timing, requested_text = timing_mode, text_mode
     timing_mode, timing_warning = _normalize_choice(
         timing_mode,
@@ -104,24 +151,53 @@ def rewrite_srt(lines: Sequence[DialogueLine], line_reports: Sequence[dict] | No
         ("asr_passed", "asr_all", "original"),
         "asr_passed",
     )
-    reports = {int(item.get("index", position)): item for position, item in enumerate(line_reports or (), 1) if isinstance(item, dict)}
+    reports = {
+        int(item.get("index", position)): item
+        for position, item in enumerate(line_reports or (), 1)
+        if isinstance(item, dict)
+    }
     blocks, rows, cursor = [], [], 0
     for output_index, line in enumerate(lines, 1):
-        report, timeline = reports.get(line.index, {}), (reports.get(line.index, {}).get("timeline") or {})
+        report, timeline = (
+            reports.get(line.index, {}),
+            (reports.get(line.index, {}).get("timeline") or {}),
+        )
         if timing_mode == "actual" and timeline:
-            start, end = int(timeline.get("actual_start_ms", cursor)), int(timeline.get("actual_end_ms", cursor + 1))
+            start, end = (
+                int(timeline.get("actual_start_ms", cursor)),
+                int(timeline.get("actual_end_ms", cursor + 1)),
+            )
         elif line.start_ms is not None and line.end_ms is not None:
             start, end = int(line.start_ms), int(line.end_ms)
         else:
-            start, end = cursor, cursor + max(1, int(report.get("actual_duration_ms", 1000)))
+            start, end = (
+                cursor,
+                cursor + max(1, int(report.get("actual_duration_ms", 1000))),
+            )
         end, cursor = max(start + 1, end), max(cursor, end)
         asr = report.get("asr") or {}
         recognized = str(asr.get("recognized_text") or "").strip()
-        use_asr = bool(recognized and (text_mode == "asr_all" or (text_mode == "asr_passed" and asr.get("passed"))))
+        use_asr = bool(
+            recognized
+            and (
+                text_mode == "asr_all"
+                or (text_mode == "asr_passed" and asr.get("passed"))
+            )
+        )
         text = recognized if use_asr else line.text
         rendered = f"[{line.role}] {text}" if include_role else text
-        blocks.append(f"{output_index}\n{format_srt_timestamp(start)} --> {format_srt_timestamp(end)}\n{rendered}")
-        rows.append({"index": line.index, "start_ms": start, "end_ms": end, "source": "asr" if use_asr else "original", "text": text})
+        blocks.append(
+            f"{output_index}\n{format_srt_timestamp(start)} --> {format_srt_timestamp(end)}\n{rendered}"
+        )
+        rows.append(
+            {
+                "index": line.index,
+                "start_ms": start,
+                "end_ms": end,
+                "source": "asr" if use_asr else "original",
+                "text": text,
+            }
+        )
     warnings = [item for item in (timing_warning, text_warning) if item]
     return "\n\n".join(blocks) + ("\n" if blocks else ""), {
         "timing_mode": timing_mode,
@@ -134,11 +210,22 @@ def rewrite_srt(lines: Sequence[DialogueLine], line_reports: Sequence[dict] | No
     }
 
 
-def timeline_json(lines: Sequence[DialogueLine], line_reports: Sequence[dict] | None = None) -> str:
-    return json.dumps({"lines": [line.to_dict() for line in lines], "reports": list(line_reports or ())}, ensure_ascii=False, indent=2)
+def timeline_json(
+    lines: Sequence[DialogueLine], line_reports: Sequence[dict] | None = None
+) -> str:
+    return json.dumps(
+        {
+            "lines": [line.to_dict() for line in lines],
+            "reports": list(line_reports or ()),
+        },
+        ensure_ascii=False,
+        indent=2,
+    )
 
 
-def render_timeline_image(lines: Sequence[DialogueLine], width: int = 1200, row_height: int = 56) -> torch.Tensor:
+def render_timeline_image(
+    lines: Sequence[DialogueLine], width: int = 1200, row_height: int = 56
+) -> torch.Tensor:
     """Return a standard ComfyUI IMAGE tensor with one colored track per dialogue line."""
     width = max(320, int(width))
     row_height = max(36, int(row_height))
@@ -179,4 +266,12 @@ def render_timeline_image(lines: Sequence[DialogueLine], width: int = 1200, row_
     return image
 
 
-__all__ = ["TIMELINE_HEADERS", "apply_timeline_edits", "format_srt_timestamp", "render_timeline_image", "rewrite_srt", "timeline_json", "timeline_rows"]
+__all__ = [
+    "TIMELINE_HEADERS",
+    "apply_timeline_edits",
+    "format_srt_timestamp",
+    "render_timeline_image",
+    "rewrite_srt",
+    "timeline_json",
+    "timeline_rows",
+]

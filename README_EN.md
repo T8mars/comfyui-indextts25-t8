@@ -20,6 +20,16 @@ Creator: **Bilibili: T8star-Aix**.
 
 This repository is locked to the IndexTTS 2.5 inference core and the official 2.5 model manifest. It will not fall back to or accidentally load IndexTTS 2.0.
 
+### v0.11.2 stability update
+
+- Plain batch lines can contain official `<text|pronunciation>` annotations without corrupting field parsing.
+- JSON/SRT timelines validate paired bounds, ordering, and safe ranges; composition rejects abnormal allocations above 1 GiB before allocating memory.
+- Single-speaker and multi-role ASR review preserve generated audio when a backend is missing or transcription/download fails.
+- v0.10 Model Loader custom-path widget shifts are restored automatically; replacing weights in place now changes the runtime cache identity.
+- Release All clears both IndexTTS and Whisper caches owned by this extension; audio.cpp now exposes Apple Metal.
+- Windows DeepSpeed BF16 requests use the more compatible FP16 inference workspace and still fall back safely if initialization fails.
+- All 27 UI workflows validate widget order/types, and Registry publishing is gated by tests against the current ComfyUI V3 API.
+
 ## Implemented nodes
 
 1. `IndexTTS 2.5 Model Loader · T8star-Aix`
@@ -61,6 +71,7 @@ This repository is locked to the IndexTTS 2.5 inference core and the official 2.
    - Merges role configurations, not multiple eight-dimensional vectors into a new emotion
 10. `IndexTTS 2.5 Batch Dialogue / SRT · T8star-Aix`
     - Parses `role|text|language|duration factor`, JSON arrays, and standard SRT
+    - `<text|pronunciation>` inside a plain batch line is preserved as text; JSON remains available for complex content
     - SRT role syntax supports `[Role] text` and `Role: text`, with a structured preview
     - Dynamic prompt parsing is disabled for the script input, so JSON braces are preserved when queueing
 11. `IndexTTS 2.5 Multi-role / SRT Generation · T8star-Aix`
@@ -85,10 +96,10 @@ This repository is locked to the IndexTTS 2.5 inference core and the official 2.
     - Measures duration, leading/trailing silence, silence ratio, loudness, clipping, estimated SNR, and DC offset
     - Can trim silence and select the highest-energy section of an overlong reference without overwriting the source
 18. `IndexTTS 2.5 Memory Control · T8star-Aix`
-    - Reports this extension's model cache and CUDA memory, and releases idle or all IndexTTS models owned by this extension
+    - Reports IndexTTS/ASR caches and CUDA memory; Release All also clears this extension's Whisper cache
     - Never invokes ComfyUI-wide cleanup or unloads another node's models
 19. `IndexTTS 2.5 audio.cpp Experimental Generation · T8star-Aix`
-    - Isolated optional `audiocpp_cli` + IndexTTS2.5 GGUF route with five languages, speed, and emotion controls
+    - Isolated optional `audiocpp_cli` + IndexTTS2.5 GGUF route with CUDA/CPU/Vulkan/HIP/Metal, five languages, speed, and emotion controls
     - Does not replace Python inference; the CLI and roughly 3.5 GB Q8 GGUF are separate downloads
 
 Output is standard ComfyUI AUDIO at `22050 Hz`, `float32`, and `[1,1,T]`, ready for Save Audio, audio-combine, video, and other native nodes.

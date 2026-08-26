@@ -58,10 +58,14 @@
 示例 25 同样需要可选 Whisper。示例 27 不使用默认 Python 模型加载器，需要先从 audio.cpp 官方发布页
 下载 `audiocpp_cli`，并另行下载 `IndexTTS2.5-GGUF`；打开工作流后把两个示例绝对路径改成自己的位置。
 
+普通批量格式中的正文可以直接包含 `<文字|读音>`，例如
+`旁白|小明<要求|YAO4 QIU2>这个题。|ZH|1.0`；解析器不会把标注中的竖线当成字段分隔符。
+“显存管理”的“全部释放”会同时清理本扩展加载的 IndexTTS 与可选 Whisper 模型。
+
 重新生成全部示例：
 
 ```powershell
 python scripts/build_example_workflows.py
 ```
 
-示例生成器会同时检查节点 ID、连接 ID、输入槽位、输出槽位以及 API 节点引用。
+示例生成器会同时检查节点 ID、连接 ID、输入槽位、输出槽位、控件顺序/类型以及 API 节点引用。

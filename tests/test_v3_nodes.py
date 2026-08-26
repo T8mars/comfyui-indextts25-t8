@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import asyncio
 import importlib.util
+import json
 import sys
 from pathlib import Path
 
 import pytest
+import torch
 
 
 pytest.importorskip("comfy_api.latest")
@@ -56,10 +58,28 @@ def test_registers_all_pure_v3_nodes():
     assert schemas[14].outputs[0].io_type == "AUDIO"
     assert schemas[15].outputs[0].io_type == "STRING"
     assert schemas[16].outputs[0].io_type == "AUDIO"
-    dialogue_script_input = next(item for item in schemas[9].inputs if item.id == "script")
+    dialogue_script_input = next(
+        item for item in schemas[9].inputs if item.id == "script"
+    )
     assert dialogue_script_input.dynamic_prompts is False
     assert dialogue_script_input.as_dict()["dynamicPrompts"] is False
+    audiocpp_backend = next(item for item in schemas[16].inputs if item.id == "backend")
+    assert "metal" in audiocpp_backend.as_dict()["options"]
     assert not hasattr(plugin, "NODE_CLASS_MAPPINGS")
+
+
+def test_v010_model_loader_widget_values_are_restored():
+    _load_plugin()
+    from comfyui_indextts25_t8_test.nodes_v3 import _normalize_model_loader_values
+
+    values = _normalize_model_loader_values(False, r"D:\models\IndexTTS-2.5", "")
+    assert values[:3] == (0, False, r"D:\models\IndexTTS-2.5")
+    assert "v0.10" in values[3]
+    coerced = _normalize_model_loader_values(1, r"D:\models\IndexTTS-2.5", "")
+    assert coerced[:3] == (0, True, r"D:\models\IndexTTS-2.5")
+    current = _normalize_model_loader_values(20, True, r"D:\new-model")
+    assert current[:3] == (20, True, r"D:\new-model")
+    assert current[3] == ""
 
 
 def test_timeline_asr_and_subtitle_nodes_form_a_complete_editing_chain(monkeypatch):
@@ -68,7 +88,9 @@ def test_timeline_asr_and_subtitle_nodes_form_a_complete_editing_chain(monkeypat
     from comfyui_indextts25_t8_test.runtime.dialogue import DialogueLine
     from comfyui_indextts25_t8_test.runtime.types import DialogueScript
 
-    script = DialogueScript([DialogueLine(1, "旁白", "原始字幕", "ZH", 0, 1000, 1.0)], "srt")
+    script = DialogueScript(
+        [DialogueLine(1, "旁白", "原始字幕", "ZH", 0, 1000, 1.0)], "srt"
+    )
     edited = nodes_v3.T8IndexTTS25TimelineEditor.execute(
         script,
         '[{"index":1,"role":"旁白","language":"ZH","start_ms":100,"end_ms":900,"duration_factor":1.0,"text":"修改字幕"}]',
@@ -105,21 +127,36 @@ def test_timeline_asr_and_subtitle_nodes_form_a_complete_editing_chain(monkeypat
     assert "[旁白] 识别字幕" in rewritten[0]
 
 
-def test_dialogue_generation_can_auto_review_and_return_rewritten_srt(tmp_path, monkeypatch):
+def test_dialogue_generation_can_auto_review_and_return_rewritten_srt(
+    tmp_path, monkeypatch
+):
     _load_plugin()
     from comfyui_indextts25_t8_test import nodes_v3
     from comfyui_indextts25_t8_test.runtime.dialogue import DialogueLine
-    from comfyui_indextts25_t8_test.runtime.types import DialogueScript, ModelHandle, RoleLibrary, VoiceProfile
+    from comfyui_indextts25_t8_test.runtime.types import (
+        DialogueScript,
+        ModelHandle,
+        RoleLibrary,
+        VoiceProfile,
+    )
 
     audio = {"waveform": __import__("torch").zeros(1, 1, 22050), "sample_rate": 22050}
-    monkeypatch.setattr(nodes_v3, "run_inference", lambda *args, **kwargs: (audio, "fake inference"))
+    monkeypatch.setattr(
+        nodes_v3, "run_inference", lambda *args, **kwargs: (audio, "fake inference")
+    )
     monkeypatch.setattr(nodes_v3, "asr_available", lambda *args: True)
     monkeypatch.setattr(
         nodes_v3,
         "transcribe_waveform",
-        lambda *args, **kwargs: {"text": "自动校对字幕", "model": "tiny", "device": "cpu"},
+        lambda *args, **kwargs: {
+            "text": "自动校对字幕",
+            "model": "tiny",
+            "device": "cpu",
+        },
     )
-    script = DialogueScript([DialogueLine(1, "角色A", "自动校对字幕", "ZH", 100, 1100)], "srt")
+    script = DialogueScript(
+        [DialogueLine(1, "角色A", "自动校对字幕", "ZH", 100, 1100)], "srt"
+    )
     library = RoleLibrary({"角色A": VoiceProfile("角色A", audio, "ZH")})
     result = nodes_v3.T8IndexTTS25DialogueGenerate.execute(
         ModelHandle(tmp_path, "cpu", False),
@@ -146,19 +183,30 @@ def test_dialogue_generation_can_auto_review_and_return_rewritten_srt(tmp_path, 
     assert report["lines"][0]["asr"]["passed"] is True
     assert "00:00:00,100 --> 00:00:01,100" in result[3]
     assert "[角色A] 自动校对字幕" in result[3]
-    assert "\"reports\"" in result[4]
+    assert '"reports"' in result[4]
 
 
-def test_dialogue_keeps_audio_when_asr_is_unavailable_and_normalizes_old_widgets(tmp_path, monkeypatch):
+def test_dialogue_keeps_audio_when_asr_is_unavailable_and_normalizes_old_widgets(
+    tmp_path, monkeypatch
+):
     _load_plugin()
     from comfyui_indextts25_t8_test import nodes_v3
     from comfyui_indextts25_t8_test.runtime.dialogue import DialogueLine
-    from comfyui_indextts25_t8_test.runtime.types import DialogueScript, ModelHandle, RoleLibrary, VoiceProfile
+    from comfyui_indextts25_t8_test.runtime.types import (
+        DialogueScript,
+        ModelHandle,
+        RoleLibrary,
+        VoiceProfile,
+    )
 
     audio = {"waveform": __import__("torch").zeros(1, 1, 22050), "sample_rate": 22050}
-    monkeypatch.setattr(nodes_v3, "run_inference", lambda *args, **kwargs: (audio, "fake inference"))
+    monkeypatch.setattr(
+        nodes_v3, "run_inference", lambda *args, **kwargs: (audio, "fake inference")
+    )
     monkeypatch.setattr(nodes_v3, "asr_available", lambda *args: False)
-    script = DialogueScript([DialogueLine(1, "角色A", "音频必须保留", "ZH", 0, 1000)], "srt")
+    script = DialogueScript(
+        [DialogueLine(1, "角色A", "音频必须保留", "ZH", 0, 1000)], "srt"
+    )
     library = RoleLibrary({"角色A": VoiceProfile("角色A", audio, "ZH")})
     result = nodes_v3.T8IndexTTS25DialogueGenerate.execute(
         model=ModelHandle(tmp_path, "cpu", False),
@@ -217,7 +265,9 @@ def test_reference_quality_node_can_prepare_and_render_audio():
 
     from comfyui_indextts25_t8_test.nodes_v3 import T8IndexTTS25ReferenceQuality
 
-    waveform = torch.cat((torch.zeros(2000), torch.full((8000,), 0.1), torch.zeros(2000)))
+    waveform = torch.cat(
+        (torch.zeros(2000), torch.full((8000,), 0.1), torch.zeros(2000))
+    )
     result = T8IndexTTS25ReferenceQuality.execute(
         {"waveform": waveform.reshape(1, 1, -1), "sample_rate": 16000},
         True,
@@ -229,7 +279,9 @@ def test_reference_quality_node_can_prepare_and_render_audio():
     assert tuple(result[2].shape) == (1, 280, 1200, 3)
 
 
-def test_single_generation_quality_retry_selects_first_passing_seed(tmp_path, monkeypatch):
+def test_single_generation_quality_retry_selects_first_passing_seed(
+    tmp_path, monkeypatch
+):
     _load_plugin()
     import json
 
@@ -278,6 +330,72 @@ def test_single_generation_quality_retry_selects_first_passing_seed(tmp_path, mo
     assert report["review"]["passed"] is True
 
 
+def test_generate_keeps_audio_when_quality_asr_is_unavailable(tmp_path, monkeypatch):
+    _load_plugin()
+    from comfyui_indextts25_t8_test import nodes_v3
+    from comfyui_indextts25_t8_test.runtime.types import ModelHandle
+
+    audio = {"waveform": torch.zeros(1, 1, 1600), "sample_rate": 16000}
+    monkeypatch.setattr(
+        nodes_v3, "run_inference", lambda *args, **kwargs: (audio, "generated")
+    )
+    monkeypatch.setattr(nodes_v3, "asr_available", lambda *_args: False)
+
+    result = nodes_v3.T8IndexTTS25Generate.execute(
+        model=ModelHandle(tmp_path, "cpu", False),
+        speaker_audio=audio,
+        text="目标文本",
+        language="ZH",
+        duration_factor=1.0,
+        target_duration_mode="off",
+        target_duration_seconds=0.0,
+        postprocess_preset="off",
+        postprocess_strength=1.0,
+        seed=7,
+        quality_retry_count=2,
+    )
+    report = json.loads(result[1].split(" | quality=", 1)[1])
+    assert torch.equal(result[0]["waveform"], audio["waveform"])
+    assert result[0]["sample_rate"] == audio["sample_rate"]
+    assert report["requested"] is True and report["enabled"] is False
+    assert "保留生成音频" in report["warning"]
+
+
+def test_generate_keeps_audio_when_quality_asr_runtime_fails(tmp_path, monkeypatch):
+    _load_plugin()
+    from comfyui_indextts25_t8_test import nodes_v3
+    from comfyui_indextts25_t8_test.runtime.types import ModelHandle
+
+    audio = {"waveform": torch.zeros(1, 1, 1600), "sample_rate": 16000}
+    monkeypatch.setattr(
+        nodes_v3, "run_inference", lambda *args, **kwargs: (audio, "generated")
+    )
+    monkeypatch.setattr(nodes_v3, "asr_available", lambda *_args: True)
+
+    def fail_asr(*_args, **_kwargs):
+        raise RuntimeError("download failed")
+
+    monkeypatch.setattr(nodes_v3, "transcribe_waveform", fail_asr)
+    result = nodes_v3.T8IndexTTS25Generate.execute(
+        model=ModelHandle(tmp_path, "cpu", False),
+        speaker_audio=audio,
+        text="目标文本",
+        language="ZH",
+        duration_factor=1.0,
+        target_duration_mode="off",
+        target_duration_seconds=0.0,
+        postprocess_preset="off",
+        postprocess_strength=1.0,
+        seed=7,
+        quality_retry_count=2,
+    )
+    report = json.loads(result[1].split(" | quality=", 1)[1])
+    assert torch.equal(result[0]["waveform"], audio["waveform"])
+    assert result[0]["sample_rate"] == audio["sample_rate"]
+    assert report["attempt_count"] == 1
+    assert report["attempts"][0]["error"] == "download failed"
+
+
 def test_emotion_vector_is_safely_normalized():
     _load_plugin()
     from comfyui_indextts25_t8_test.nodes_v3 import T8IndexTTS25EmotionControl
@@ -311,7 +429,9 @@ def test_role_library_and_merge_alias_preserve_each_roles_emotion():
     from comfyui_indextts25_t8_test.runtime.types import EmotionConfig, VoiceProfile
 
     audio = {"waveform": __import__("torch").zeros(1, 1, 22050), "sample_rate": 22050}
-    happy = EmotionConfig(mode="vector", vector=(0.6, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.2))
+    happy = EmotionConfig(
+        mode="vector", vector=(0.6, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.2)
+    )
     tense = EmotionConfig(mode="text", text="克制而紧张", strength=0.7)
     voices = {
         "voice_0": VoiceProfile("角色A", audio, "ZH", happy),
@@ -352,12 +472,17 @@ def test_role_emotion_merge_accepts_documented_role_counts(count):
 
     audio = {"waveform": __import__("torch").zeros(1, 1, 1), "sample_rate": 22050}
     result = T8IndexTTS25MergeVoiceEmotions.execute(
-        {f"voice_{index}": VoiceProfile(f"角色{index}", audio) for index in range(count)}
+        {
+            f"voice_{index}": VoiceProfile(f"角色{index}", audio)
+            for index in range(count)
+        }
     )
     assert len(result[0].profiles) == count
 
 
-def test_dialogue_generation_routes_each_roles_emotion_without_leaking(tmp_path, monkeypatch):
+def test_dialogue_generation_routes_each_roles_emotion_without_leaking(
+    tmp_path, monkeypatch
+):
     _load_plugin()
     from comfyui_indextts25_t8_test import nodes_v3
     from comfyui_indextts25_t8_test.runtime.dialogue import DialogueLine
@@ -396,12 +521,12 @@ def test_dialogue_generation_routes_each_roles_emotion_without_leaking(tmp_path,
         ],
         "batch",
     )
-    nodes_v3.T8IndexTTS25DialogueGenerate.execute(
+    result = nodes_v3.T8IndexTTS25DialogueGenerate.execute(
         ModelHandle(tmp_path, "cpu", False),
         library,
         script,
         1,
-        "shift",
+        "overlay",
         False,
         "native",
         180,
@@ -418,6 +543,37 @@ def test_dialogue_generation_routes_each_roles_emotion_without_leaking(tmp_path,
         True,
     )
     assert routed == list(emotions)
+    report = json.loads(result[2])
+    assert report["requested_timeline_policy"] == "overlay"
+    assert report["timeline_policy"] == "shift"
+    assert "避免所有台词重叠" in report["timeline_warning"]
+
+
+def test_memory_control_release_all_includes_asr_cache(monkeypatch):
+    _load_plugin()
+    from comfyui_indextts25_t8_test import nodes_v3
+
+    model_statuses = iter(
+        (
+            {"cached_models": 1, "entries": [], "cuda": {"available": False}},
+            {"cached_models": 0, "entries": [], "cuda": {"available": False}},
+        )
+    )
+    asr_statuses = iter(
+        (
+            {"cached_models": 2, "entries": []},
+            {"cached_models": 0, "entries": []},
+        )
+    )
+    monkeypatch.setattr(nodes_v3.MODEL_CACHE, "status", lambda: next(model_statuses))
+    monkeypatch.setattr(nodes_v3.MODEL_CACHE, "clear", lambda: 1)
+    monkeypatch.setattr(nodes_v3, "asr_cache_status", lambda: next(asr_statuses))
+    monkeypatch.setattr(nodes_v3, "clear_asr_cache", lambda: 2)
+
+    report = json.loads(nodes_v3.T8IndexTTS25MemoryControl.execute("release_all", 0)[0])
+    assert report["released_models"] == 1
+    assert report["released_asr_models"] == 2
+    assert report["asr_after"]["cached_models"] == 0
 
 
 def test_sampling_exposes_auto_segmentation_and_real_pause_controls():
@@ -425,9 +581,25 @@ def test_sampling_exposes_auto_segmentation_and_real_pause_controls():
     from comfyui_indextts25_t8_test.nodes_v3 import T8IndexTTS25SamplingConfig
 
     result = T8IndexTTS25SamplingConfig.execute(
-        False, 0.8, 0.8, 30, 3, 10.0, 0.0, 1500,
-        25, 0.7, 1.0,
-        "auto", 120, 200, "narration", 100, 300, 600, True,
+        False,
+        0.8,
+        0.8,
+        30,
+        3,
+        10.0,
+        0.0,
+        1500,
+        25,
+        0.7,
+        1.0,
+        "auto",
+        120,
+        200,
+        "narration",
+        100,
+        300,
+        600,
+        True,
     )
     config = result[0]
     assert config.effective_segment_tokens("EN") == 60

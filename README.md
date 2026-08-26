@@ -20,6 +20,16 @@ IndexTTS 2.5 的 ComfyUI V3 原生节点集成。节点菜单位于：
 
 本目录固定使用 IndexTTS 2.5 推理核心和正式 2.5 模型清单，不会回退或误载 IndexTTS 2.0。
 
+### v0.11.2 稳定性更新
+
+- 普通批量台词可直接包含官方 `<文字|读音>` 标注，不再被字段分隔符误切开。
+- JSON/SRT 时间轴严格校验成对起止时间、先后顺序和安全范围；合成前会阻止超过 1 GiB 的异常密集分配。
+- 单人和多角色 ASR 校对在后端缺失、下载失败或运行异常时都会保留已经生成的音频。
+- 自动兼容 v0.10 模型加载器工作流的自定义路径错位；覆盖更新同目录权重后会使用新的文件指纹重载。
+- “全部释放”同时清理本扩展的 IndexTTS 与 Whisper 缓存；audio.cpp 增加 Apple Metal 选项。
+- Windows DeepSpeed 的 BF16 请求自动使用兼容性更好的 FP16 推理 workspace；失败仍安全回退普通模式。
+- 27 组 UI 工作流增加控件顺序/类型校验，并在 Registry 发布前使用当前 ComfyUI V3 API 自动测试。
+
 ## 已实现节点
 
 1. `IndexTTS 2.5 模型加载器 · T8star-Aix`
@@ -61,6 +71,7 @@ IndexTTS 2.5 的 ComfyUI V3 原生节点集成。节点菜单位于：
    - 合并的是角色配置列表，不会把多个角色的八维情感数值混成一个新情绪
 10. `IndexTTS 2.5 批量台词 / SRT · T8star-Aix`
    - 解析 `角色|台词|语言|时长系数`、JSON 数组和标准 SRT
+   - 普通批量台词中的 `<文字|读音>` 会作为正文保留；复杂正文也可使用 JSON 格式
    - SRT 支持 `[角色] 台词` 与 `角色：台词`，输出结构化预览
    - 台词输入关闭 ComfyUI 动态提示词解析，JSON 大括号不会在排队时被改写
 11. `IndexTTS 2.5 多角色 / SRT 生成 · T8star-Aix`
@@ -85,10 +96,10 @@ IndexTTS 2.5 的 ComfyUI V3 原生节点集成。节点菜单位于：
    - 检测时长、首尾静音、静音占比、响度、削波、估算信噪比和直流偏移
    - 可在不覆盖原音频的前提下自动裁剪静音，并从超长音频中选取能量最集中的片段
 18. `IndexTTS 2.5 显存管理 · T8star-Aix`
-   - 查看本扩展模型缓存与 CUDA 显存状态；按空闲时间释放或立即释放本扩展模型
+   - 查看本扩展 IndexTTS/ASR 模型缓存与 CUDA 显存状态；“全部释放”同时清理 Whisper 缓存
    - 不调用 ComfyUI 全局清理，不会卸载其他节点正在使用的模型
 19. `IndexTTS 2.5 audio.cpp 实验生成 · T8star-Aix`
-   - 隔离调用可选 `audiocpp_cli` 与 IndexTTS2.5 GGUF，支持五语种、语速、情感文本/向量/参考音频
+   - 隔离调用可选 `audiocpp_cli` 与 IndexTTS2.5 GGUF，支持 CUDA/CPU/Vulkan/HIP/Metal、五语种、语速与情感控制
    - 不替换默认 Python 推理；CLI 和约 3.5GB 的 Q8 GGUF 均需用户另行下载
 
 输出固定为 `22050 Hz`、`float32`、`[1,1,T]` 的标准 ComfyUI AUDIO，可直接连接 Save Audio、

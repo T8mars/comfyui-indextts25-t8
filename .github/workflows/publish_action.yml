@@ -12,8 +12,12 @@ permissions:
   contents: read
 
 jobs:
+  validate:
+    name: Test before publish
+    uses: ./.github/workflows/test_action.yml
   publish-node:
     name: Publish Custom Node to Registry
+    needs: validate
     runs-on: ubuntu-latest
     steps:
       - name: Check out code

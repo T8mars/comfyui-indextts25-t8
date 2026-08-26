@@ -23,7 +23,7 @@
 
 - [x] Windows Python 3.10 / torch 2.8.0+cu128 精确轮子清单与 SHA-256。
 - [x] FlashAttention 2.8.3 + Triton 3.4.0.post21 的真实 GPT 加速 WAV 回归。
-- [x] DeepSpeed 0.17.5 FP32/BF16 真实 WAV 回归，并修正 BF16 被误传成 FP16。
+- [x] DeepSpeed 0.17.5 FP32/BF16 真实 WAV 回归；Linux 保持 BF16，Windows BF16 请求使用兼容性更好的 FP16 workspace 并保留失败回退。
 - [x] 普通、低显存、流式和后处理输出统一做 20ms 尾部淡出并归零。
 - [x] 官方问题 #792 的中文整词标注提示、音节数校验和固定 seed 音频回归。
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -10,6 +11,11 @@ PLUGIN_ROOT = Path(__file__).resolve().parents[1]
 EXAMPLES_ROOT = PLUGIN_ROOT / "example_workflows"
 UI_ROOT = EXAMPLES_ROOT / "ui"
 API_ROOT = EXAMPLES_ROOT / "api"
+PROJECT_VERSION = re.search(
+    r'^version\s*=\s*"([^"]+)"',
+    (PLUGIN_ROOT / "pyproject.toml").read_text(encoding="utf-8"),
+    re.MULTILINE,
+).group(1)
 
 MODEL_NODE = "T8_IndexTTS25_ModelLoader"
 EMOTION_NODE = "T8_IndexTTS25_EmotionControl"
@@ -32,7 +38,9 @@ AUDIOCPP_GENERATE_NODE = "T8_IndexTTS25_AudioCppGenerate"
 ENVIRONMENT_NODE = "T8_IndexTTS25_Environment"
 
 
-def widget_input(name: str, data_type: str, *, optional: bool = False) -> dict[str, Any]:
+def widget_input(
+    name: str, data_type: str, *, optional: bool = False
+) -> dict[str, Any]:
     item: dict[str, Any] = {
         "name": name,
         "type": data_type,
@@ -59,7 +67,7 @@ def properties(node_type: str, *, core: bool = False) -> dict[str, str]:
     return {
         "Node name for S&R": node_type,
         "cnr_id": "comfy-core" if core else "comfyui-indextts25-t8",
-        "ver": "0.11.1",
+        "ver": PROJECT_VERSION,
     }
 
 
@@ -101,21 +109,49 @@ class Workflow:
         self.nodes.append(node)
         return node_id
 
-    def connect(self, origin_id: int, origin_name: str, target_id: int, target_name: str) -> int:
+    def connect(
+        self, origin_id: int, origin_name: str, target_id: int, target_name: str
+    ) -> int:
         origin = self.nodes[origin_id - 1]
         target = self.nodes[target_id - 1]
-        origin_slot = next(i for i, item in enumerate(origin["outputs"]) if item["name"] == origin_name)
-        target_slot = next(i for i, item in enumerate(target["inputs"]) if item["name"] == target_name)
+        origin_slot = next(
+            i for i, item in enumerate(origin["outputs"]) if item["name"] == origin_name
+        )
+        target_slot = next(
+            i for i, item in enumerate(target["inputs"]) if item["name"] == target_name
+        )
         data_type = origin["outputs"][origin_slot]["type"]
         link_id = len(self.links) + 1
-        self.links.append([link_id, origin_id, origin_slot, target_id, target_slot, data_type])
+        self.links.append(
+            [link_id, origin_id, origin_slot, target_id, target_slot, data_type]
+        )
         origin["outputs"][origin_slot]["links"].append(link_id)
         target["inputs"][target_slot]["link"] = link_id
         return link_id
 
+    def set_widget(self, node_id: int, name: str, value: Any) -> None:
+        node = self.nodes[node_id - 1]
+        widget_index = 0
+        for item in node["inputs"]:
+            if "widget" not in item:
+                continue
+            if item["name"] == name:
+                node["widgets_values"][widget_index] = value
+                return
+            widget_index += 1
+            if item["name"] == "seed":
+                widget_index += 1
+        raise KeyError(f"节点 {node_id} 没有控件：{name}")
+
     def as_dict(self) -> dict[str, Any]:
-        width = max((node["pos"][0] + node["size"][0] for node in self.nodes), default=1200) + 80
-        height = max((node["pos"][1] + node["size"][1] for node in self.nodes), default=700) + 80
+        width = (
+            max((node["pos"][0] + node["size"][0] for node in self.nodes), default=1200)
+            + 80
+        )
+        height = (
+            max((node["pos"][1] + node["size"][1] for node in self.nodes), default=700)
+            + 80
+        )
         return {
             "last_node_id": len(self.nodes),
             "last_link_id": len(self.links),
@@ -136,7 +172,9 @@ class Workflow:
         }
 
 
-def add_model(workflow: Workflow, pos=(0, 0), *, release_after_run: bool = False) -> int:
+def add_model(
+    workflow: Workflow, pos=(0, 0), *, release_after_run: bool = False
+) -> int:
     return workflow.add(
         MODEL_NODE,
         pos,
@@ -157,7 +195,9 @@ def add_model(workflow: Workflow, pos=(0, 0), *, release_after_run: bool = False
     )
 
 
-def add_load_audio(workflow: Workflow, filename: str, pos=(0, 340), *, title: str) -> int:
+def add_load_audio(
+    workflow: Workflow, filename: str, pos=(0, 340), *, title: str
+) -> int:
     return workflow.add(
         "LoadAudio",
         pos,
@@ -184,9 +224,23 @@ def add_emotion(workflow: Workflow, mode: str, pos=(440, 0), **values: Any) -> i
         widgets.append(values.get("strength", 0.8))
         size = (390, 220)
     elif mode == "vector":
-        names = ("happy", "angry", "sad", "afraid", "disgusted", "melancholic", "surprised", "calm")
+        names = (
+            "happy",
+            "angry",
+            "sad",
+            "afraid",
+            "disgusted",
+            "melancholic",
+            "surprised",
+            "calm",
+        )
         inputs.extend(widget_input(f"mode.{name}", "FLOAT") for name in names)
-        inputs.extend([widget_input("mode.strength", "FLOAT"), widget_input("mode.use_random", "BOOLEAN")])
+        inputs.extend(
+            [
+                widget_input("mode.strength", "FLOAT"),
+                widget_input("mode.use_random", "BOOLEAN"),
+            ]
+        )
         widgets.extend(values.get(name, 0.0) for name in names)
         widgets.extend([values.get("strength", 1.0), values.get("use_random", False)])
         size = (390, 520)
@@ -265,7 +319,10 @@ def add_sampling(workflow: Workflow, pos=(440, 330), **overrides: Any) -> int:
         pos,
         (390, 760),
         [widget_input(name, data_type) for name, data_type in names_types],
-        [output("sampling", "T8_INDEXTTS25_SAMPLING"), output("sampling_info", "STRING")],
+        [
+            output("sampling", "T8_INDEXTTS25_SAMPLING"),
+            output("sampling_info", "STRING"),
+        ],
         [values[name] for name, _ in names_types],
     )
 
@@ -454,7 +511,9 @@ def add_audiocpp_generate(workflow: Workflow, pos=(420, 0)) -> int:
     )
 
 
-def add_save(workflow: Workflow, prefix: str, pos=(1460, 180), *, title: str | None = None) -> int:
+def add_save(
+    workflow: Workflow, prefix: str, pos=(1460, 180), *, title: str | None = None
+) -> int:
     return workflow.add(
         "SaveAudio",
         pos,
@@ -467,7 +526,9 @@ def add_save(workflow: Workflow, prefix: str, pos=(1460, 180), *, title: str | N
     )
 
 
-def add_voice_profile(workflow: Workflow, role: str, language: str, pos=(400, 0)) -> int:
+def add_voice_profile(
+    workflow: Workflow, role: str, language: str, pos=(400, 0)
+) -> int:
     return workflow.add(
         VOICE_NODE,
         pos,
@@ -489,8 +550,16 @@ def add_role_library(workflow: Workflow, count: int, pos=(800, 40)) -> int:
         ROLE_LIBRARY_NODE,
         pos,
         (360, 140 + count * 35),
-        [slot_input(f"voices.voice_{index}", "T8_INDEXTTS25_VOICE", optional=index > 0) for index in range(count)],
-        [output("role_library", "T8_INDEXTTS25_ROLE_LIBRARY"), output("role_info", "STRING")],
+        [
+            slot_input(
+                f"voices.voice_{index}", "T8_INDEXTTS25_VOICE", optional=index > 0
+            )
+            for index in range(count)
+        ],
+        [
+            output("role_library", "T8_INDEXTTS25_ROLE_LIBRARY"),
+            output("role_info", "STRING"),
+        ],
     )
 
 
@@ -499,13 +568,23 @@ def add_merge_voice_emotions(workflow: Workflow, count: int, pos=(800, 40)) -> i
         MERGE_EMOTIONS_NODE,
         pos,
         (390, 160 + count * 35),
-        [slot_input(f"voices.voice_{index}", "T8_INDEXTTS25_VOICE", optional=index > 0) for index in range(count)],
-        [output("role_library", "T8_INDEXTTS25_ROLE_LIBRARY"), output("role_info", "STRING")],
+        [
+            slot_input(
+                f"voices.voice_{index}", "T8_INDEXTTS25_VOICE", optional=index > 0
+            )
+            for index in range(count)
+        ],
+        [
+            output("role_library", "T8_INDEXTTS25_ROLE_LIBRARY"),
+            output("role_info", "STRING"),
+        ],
         title="合并各角色的音色与独立情感",
     )
 
 
-def add_dialogue_script(workflow: Workflow, script_type: str, script: str, default_role: str, pos=(400, 620)) -> int:
+def add_dialogue_script(
+    workflow: Workflow, script_type: str, script: str, default_role: str, pos=(400, 620)
+) -> int:
     return workflow.add(
         DIALOGUE_SCRIPT_NODE,
         pos,
@@ -516,12 +595,17 @@ def add_dialogue_script(workflow: Workflow, script_type: str, script: str, defau
             widget_input("default_role", "STRING"),
             widget_input("default_language", "COMBO"),
         ],
-        [output("dialogue_script", "T8_INDEXTTS25_DIALOGUE_SCRIPT"), output("script_preview", "STRING")],
+        [
+            output("dialogue_script", "T8_INDEXTTS25_DIALOGUE_SCRIPT"),
+            output("script_preview", "STRING"),
+        ],
         [script_type, script, default_role, "ZH"],
     )
 
 
-def add_dialogue_generate(workflow: Workflow, pos=(1220, 240), *, policy="shift", fit=False) -> int:
+def add_dialogue_generate(
+    workflow: Workflow, pos=(1220, 240), *, policy="shift", fit=False
+) -> int:
     return workflow.add(
         DIALOGUE_GENERATE_NODE,
         pos,
@@ -556,11 +640,32 @@ def add_dialogue_generate(workflow: Workflow, pos=(1220, 240), *, policy="shift"
             output("rewritten_srt", "STRING"),
             output("timeline_report", "STRING"),
         ],
-        [20260818, "fixed", policy, fit, "native", 180, 200, "off", 1.0, False, "auto", "base", "auto", 0.82, "actual", "asr_passed", True, 0],
+        [
+            20260818,
+            "fixed",
+            policy,
+            fit,
+            "native",
+            180,
+            200,
+            "off",
+            1.0,
+            False,
+            "auto",
+            "base",
+            "auto",
+            0.82,
+            "actual",
+            "asr_passed",
+            True,
+            0,
+        ],
     )
 
 
-def add_timeline_editor(workflow: Workflow, edits_json: str = "", pos=(1040, 620)) -> int:
+def add_timeline_editor(
+    workflow: Workflow, edits_json: str = "", pos=(1040, 620)
+) -> int:
     return workflow.add(
         TIMELINE_EDITOR_NODE,
         pos,
@@ -578,7 +683,9 @@ def add_timeline_editor(workflow: Workflow, edits_json: str = "", pos=(1040, 620
     )
 
 
-def add_preview_image(workflow: Workflow, pos=(1760, 650), *, title="可视化时间轴预览") -> int:
+def add_preview_image(
+    workflow: Workflow, pos=(1760, 650), *, title="可视化时间轴预览"
+) -> int:
     return workflow.add(
         "PreviewImage",
         pos,
@@ -591,7 +698,9 @@ def add_preview_image(workflow: Workflow, pos=(1760, 650), *, title="可视化�
     )
 
 
-def add_asr_proofread(workflow: Workflow, expected_text: str, language: str = "ZH", pos=(1460, 40)) -> int:
+def add_asr_proofread(
+    workflow: Workflow, expected_text: str, language: str = "ZH", pos=(1460, 40)
+) -> int:
     return workflow.add(
         ASR_PROOFREAD_NODE,
         pos,
@@ -714,7 +823,9 @@ def api_generate(
     return {"class_type": GENERATE_NODE, "inputs": inputs}
 
 
-def api_pronunciation(text: str, language: str, dictionary: str, *, strict: bool = True) -> dict[str, Any]:
+def api_pronunciation(
+    text: str, language: str, dictionary: str, *, strict: bool = True
+) -> dict[str, Any]:
     return {
         "class_type": PRONUNCIATION_NODE,
         "inputs": {
@@ -726,7 +837,9 @@ def api_pronunciation(text: str, language: str, dictionary: str, *, strict: bool
     }
 
 
-def api_text_preview(model_id: str, text: str, language: str, sampling_id: str | None = None) -> dict[str, Any]:
+def api_text_preview(
+    model_id: str, text: str, language: str, sampling_id: str | None = None
+) -> dict[str, Any]:
     inputs: dict[str, Any] = {
         "model": [model_id, 0],
         "text": text,
@@ -737,7 +850,9 @@ def api_text_preview(model_id: str, text: str, language: str, sampling_id: str |
     return {"class_type": TEXT_PREVIEW_NODE, "inputs": inputs}
 
 
-def api_audio_postprocess(audio_id: str, preset: str, strength: float = 1.0) -> dict[str, Any]:
+def api_audio_postprocess(
+    audio_id: str, preset: str, strength: float = 1.0
+) -> dict[str, Any]:
     return {
         "class_type": AUDIO_POSTPROCESS_NODE,
         "inputs": {
@@ -801,7 +916,16 @@ def api_emotion(mode: str, **values: Any) -> dict[str, Any]:
             }
         )
     elif mode == "vector":
-        for name in ("happy", "angry", "sad", "afraid", "disgusted", "melancholic", "surprised", "calm"):
+        for name in (
+            "happy",
+            "angry",
+            "sad",
+            "afraid",
+            "disgusted",
+            "melancholic",
+            "surprised",
+            "calm",
+        ):
             inputs[f"mode.{name}"] = values.get(name, 0.0)
         inputs["mode.strength"] = values.get("strength", 1.0)
         inputs["mode.use_random"] = values.get("use_random", False)
@@ -832,18 +956,26 @@ def api_voice(
 def api_role_library(voice_ids: list[str]) -> dict[str, Any]:
     return {
         "class_type": ROLE_LIBRARY_NODE,
-        "inputs": {f"voices.voice_{index}": [voice_id, 0] for index, voice_id in enumerate(voice_ids)},
+        "inputs": {
+            f"voices.voice_{index}": [voice_id, 0]
+            for index, voice_id in enumerate(voice_ids)
+        },
     }
 
 
 def api_merge_voice_emotions(voice_ids: list[str]) -> dict[str, Any]:
     return {
         "class_type": MERGE_EMOTIONS_NODE,
-        "inputs": {f"voices.voice_{index}": [voice_id, 0] for index, voice_id in enumerate(voice_ids)},
+        "inputs": {
+            f"voices.voice_{index}": [voice_id, 0]
+            for index, voice_id in enumerate(voice_ids)
+        },
     }
 
 
-def api_dialogue_script(script_type: str, script: str, default_role: str) -> dict[str, Any]:
+def api_dialogue_script(
+    script_type: str, script: str, default_role: str
+) -> dict[str, Any]:
     return {
         "class_type": DIALOGUE_SCRIPT_NODE,
         "inputs": {
@@ -865,7 +997,9 @@ def api_timeline_editor(script_id: str, edits_json: str = "") -> dict[str, Any]:
     }
 
 
-def api_dialogue_generate(model_id: str, library_id: str, script_id: str, *, policy="shift", fit=False) -> dict[str, Any]:
+def api_dialogue_generate(
+    model_id: str, library_id: str, script_id: str, *, policy="shift", fit=False
+) -> dict[str, Any]:
     return {
         "class_type": DIALOGUE_GENERATE_NODE,
         "inputs": {
@@ -941,7 +1075,14 @@ def basic_pair() -> tuple[dict[str, Any], dict[str, Any]]:
     api = {
         "1": api_model(),
         "2": api_audio("voice_reference.wav"),
-        "3": api_generate("1", "2", "欢迎使用 IndexTTS 2.5，来自 B 站：T8star-Aix。", "ZH", 1.0, 20260811),
+        "3": api_generate(
+            "1",
+            "2",
+            "欢迎使用 IndexTTS 2.5，来自 B 站：T8star-Aix。",
+            "ZH",
+            1.0,
+            20260811,
+        ),
         "4": api_save("3", "IndexTTS25_T8/basic"),
     }
     return workflow.as_dict(), api
@@ -953,7 +1094,9 @@ def speed_pair() -> tuple[dict[str, Any], dict[str, Any]]:
     speaker = add_load_audio(workflow, "voice_reference.wav", title="音色参考音频")
     text = "这是 IndexTTS 二点五官方语速适配功能的对比测试。"
     api: dict[str, Any] = {"1": api_model(), "2": api_audio("voice_reference.wav")}
-    for index, (factor, label) in enumerate(((0.7, "fast"), (1.0, "normal"), (1.3, "slow"))):
+    for index, (factor, label) in enumerate(
+        ((0.7, "fast"), (1.0, "normal"), (1.3, "slow"))
+    ):
         y = index * 470
         generate = add_generate(
             workflow,
@@ -964,7 +1107,9 @@ def speed_pair() -> tuple[dict[str, Any], dict[str, Any]]:
             pos=(900, y),
             title=f"时长系数 {factor:.1f} · {label}",
         )
-        save = add_save(workflow, f"IndexTTS25_T8/speed_{factor:.1f}", pos=(1460, y + 130))
+        save = add_save(
+            workflow, f"IndexTTS25_T8/speed_{factor:.1f}", pos=(1460, y + 130)
+        )
         wire_generation(workflow, model, speaker, generate, save)
         generate_id = str(3 + index)
         save_id = str(6 + index)
@@ -977,10 +1122,14 @@ def reference_emotion_pair() -> tuple[dict[str, Any], dict[str, Any]]:
     workflow = Workflow("03 独立情感参考音频")
     model = add_model(workflow)
     speaker = add_load_audio(workflow, "voice_reference.wav", title="音色参考音频")
-    emotion_audio = add_load_audio(workflow, "emotion_reference.wav", pos=(0, 520), title="情感参考音频")
+    emotion_audio = add_load_audio(
+        workflow, "emotion_reference.wav", pos=(0, 520), title="情感参考音频"
+    )
     emotion = add_emotion(workflow, "reference_audio", strength=0.8)
     workflow.connect(emotion_audio, "AUDIO", emotion, "mode.emotion_audio")
-    generate = add_generate(workflow, "虽然经历了许多困难，我们依然看见了新的希望。", "ZH", 1.0, 20260811)
+    generate = add_generate(
+        workflow, "虽然经历了许多困难，我们依然看见了新的希望。", "ZH", 1.0, 20260811
+    )
     save = add_save(workflow, "IndexTTS25_T8/emotion_reference")
     wire_generation(workflow, model, speaker, generate, save, emotion=emotion)
     api = {
@@ -988,26 +1137,54 @@ def reference_emotion_pair() -> tuple[dict[str, Any], dict[str, Any]]:
         "2": api_audio("voice_reference.wav"),
         "3": api_audio("emotion_reference.wav"),
         "4": api_emotion("reference_audio", emotion_audio=["3", 0], strength=0.8),
-        "5": api_generate("1", "2", "虽然经历了许多困难，我们依然看见了新的希望。", "ZH", 1.0, 20260811, emotion_id="4"),
+        "5": api_generate(
+            "1",
+            "2",
+            "虽然经历了许多困难，我们依然看见了新的希望。",
+            "ZH",
+            1.0,
+            20260811,
+            emotion_id="4",
+        ),
         "6": api_save("5", "IndexTTS25_T8/emotion_reference"),
     }
     return workflow.as_dict(), api
 
 
 def vector_emotion_pair() -> tuple[dict[str, Any], dict[str, Any]]:
-    vector = {"happy": 0.55, "surprised": 0.1, "calm": 0.15, "strength": 1.0, "use_random": False}
+    vector = {
+        "happy": 0.55,
+        "surprised": 0.1,
+        "calm": 0.15,
+        "strength": 1.0,
+        "use_random": False,
+    }
     workflow = Workflow("04 八维情感向量")
     model = add_model(workflow)
     speaker = add_load_audio(workflow, "voice_reference.wav", title="音色参考音频")
     emotion = add_emotion(workflow, "vector", **vector)
-    generate = add_generate(workflow, "太好了，这个版本终于加入了真正可控的语速适配功能！", "ZH", 0.95, 20260811)
+    generate = add_generate(
+        workflow,
+        "太好了，这个版本终于加入了真正可控的语速适配功能！",
+        "ZH",
+        0.95,
+        20260811,
+    )
     save = add_save(workflow, "IndexTTS25_T8/emotion_vector")
     wire_generation(workflow, model, speaker, generate, save, emotion=emotion)
     api = {
         "1": api_model(),
         "2": api_audio("voice_reference.wav"),
         "3": api_emotion("vector", **vector),
-        "4": api_generate("1", "2", "太好了，这个版本终于加入了真正可控的语速适配功能！", "ZH", 0.95, 20260811, emotion_id="3"),
+        "4": api_generate(
+            "1",
+            "2",
+            "太好了，这个版本终于加入了真正可控的语速适配功能！",
+            "ZH",
+            0.95,
+            20260811,
+            emotion_id="3",
+        ),
         "5": api_save("4", "IndexTTS25_T8/emotion_vector"),
     }
     return workflow.as_dict(), api
@@ -1019,14 +1196,24 @@ def text_emotion_pair() -> tuple[dict[str, Any], dict[str, Any]]:
     model = add_model(workflow)
     speaker = add_load_audio(workflow, "voice_reference.wav", title="音色参考音频")
     emotion = add_emotion(workflow, "text", emotion_text=emotion_text, strength=0.85)
-    generate = add_generate(workflow, "等了这么久，我们终于可以一起出发了。", "ZH", 1.05, 20260811)
+    generate = add_generate(
+        workflow, "等了这么久，我们终于可以一起出发了。", "ZH", 1.05, 20260811
+    )
     save = add_save(workflow, "IndexTTS25_T8/emotion_text")
     wire_generation(workflow, model, speaker, generate, save, emotion=emotion)
     api = {
         "1": api_model(),
         "2": api_audio("voice_reference.wav"),
         "3": api_emotion("text", emotion_text=emotion_text, strength=0.85),
-        "4": api_generate("1", "2", "等了这么久，我们终于可以一起出发了。", "ZH", 1.05, 20260811, emotion_id="3"),
+        "4": api_generate(
+            "1",
+            "2",
+            "等了这么久，我们终于可以一起出发了。",
+            "ZH",
+            1.05,
+            20260811,
+            emotion_id="3",
+        ),
         "5": api_save("4", "IndexTTS25_T8/emotion_text"),
     }
     return workflow.as_dict(), api
@@ -1078,8 +1265,18 @@ def multilingual_pair() -> tuple[dict[str, Any], dict[str, Any]]:
     api: dict[str, Any] = {"1": api_model(), "2": api_audio("voice_reference.wav")}
     for index, (language, text) in enumerate(cases):
         y = index * 430
-        generate = add_generate(workflow, text, language, 1.0, 20260811, pos=(900, y), title=f"{language} 生成")
-        save = add_save(workflow, f"IndexTTS25_T8/{language.lower()}", pos=(1460, y + 120))
+        generate = add_generate(
+            workflow,
+            text,
+            language,
+            1.0,
+            20260811,
+            pos=(900, y),
+            title=f"{language} 生成",
+        )
+        save = add_save(
+            workflow, f"IndexTTS25_T8/{language.lower()}", pos=(1460, y + 120)
+        )
         wire_generation(workflow, model, speaker, generate, save)
         generate_id = str(3 + index)
         save_id = str(8 + index)
@@ -1098,7 +1295,9 @@ def _pronunciation_pair(
     workflow = Workflow(title)
     model = add_model(workflow)
     speaker = add_load_audio(workflow, "voice_reference.wav", title="音色参考音频")
-    pronunciation = add_pronunciation(workflow, text, language, dictionary, pos=(440, 0))
+    pronunciation = add_pronunciation(
+        workflow, text, language, dictionary, pos=(440, 0)
+    )
     generate = add_generate(workflow, text, language, 1.0, 20260811, pos=(950, 60))
     save = add_save(workflow, prefix, pos=(1510, 170))
     workflow.connect(pronunciation, "annotated_text", generate, "text")
@@ -1143,15 +1342,23 @@ def japanese_pronunciation_pair() -> tuple[dict[str, Any], dict[str, Any]]:
     )
 
 
-def _dialogue_pair(title: str, script_type: str, script: str, *, policy="shift", fit=False) -> tuple[dict[str, Any], dict[str, Any]]:
+def _dialogue_pair(
+    title: str, script_type: str, script: str, *, policy="shift", fit=False
+) -> tuple[dict[str, Any], dict[str, Any]]:
     workflow = Workflow(title)
     model = add_model(workflow, pos=(0, 0))
-    audio_a = add_load_audio(workflow, "role_a.wav", pos=(0, 340), title="角色 A 参考音频")
-    audio_b = add_load_audio(workflow, "role_b.wav", pos=(0, 520), title="角色 B 参考音频")
+    audio_a = add_load_audio(
+        workflow, "role_a.wav", pos=(0, 340), title="角色 A 参考音频"
+    )
+    audio_b = add_load_audio(
+        workflow, "role_b.wav", pos=(0, 520), title="角色 B 参考音频"
+    )
     voice_a = add_voice_profile(workflow, "角色A", "ZH", pos=(400, 0))
     voice_b = add_voice_profile(workflow, "角色B", "ZH", pos=(400, 300))
     library = add_role_library(workflow, 2, pos=(800, 60))
-    script_node = add_dialogue_script(workflow, script_type, script, "角色A", pos=(650, 520))
+    script_node = add_dialogue_script(
+        workflow, script_type, script, "角色A", pos=(650, 520)
+    )
     generate = add_dialogue_generate(workflow, pos=(1220, 220), policy=policy, fit=fit)
     save = add_save(workflow, f"IndexTTS25_T8/{script_type}_dialogue", pos=(1760, 360))
     workflow.connect(audio_a, "AUDIO", voice_a, "speaker_audio")
@@ -1187,9 +1394,24 @@ def multi_role_pair() -> tuple[dict[str, Any], dict[str, Any]]:
 def batch_dialogue_pair() -> tuple[dict[str, Any], dict[str, Any]]:
     script = json.dumps(
         [
-            {"role": "角色A", "text": "第一条批量台词。", "language": "ZH", "duration_factor": 0.9},
-            {"role": "角色A", "text": "第二条批量台词。", "language": "ZH", "duration_factor": 1.0},
-            {"role": "角色B", "text": "最后由另一个角色收尾。", "language": "ZH", "duration_factor": 1.1},
+            {
+                "role": "角色A",
+                "text": "第一条批量台词。",
+                "language": "ZH",
+                "duration_factor": 0.9,
+            },
+            {
+                "role": "角色A",
+                "text": "第二条批量台词。",
+                "language": "ZH",
+                "duration_factor": 1.0,
+            },
+            {
+                "role": "角色B",
+                "text": "最后由另一个角色收尾。",
+                "language": "ZH",
+                "duration_factor": 1.1,
+            },
         ],
         ensure_ascii=False,
         indent=2,
@@ -1227,14 +1449,20 @@ def multi_role_emotions_pair() -> tuple[dict[str, Any], dict[str, Any]]:
     )
     workflow = Workflow("23 多角色独立情感与 Merge Voice Emotions")
     model = add_model(workflow, pos=(0, 0))
-    audio_a = add_load_audio(workflow, "role_a.wav", pos=(0, 340), title="角色 A 音色参考")
-    audio_b = add_load_audio(workflow, "role_b.wav", pos=(0, 520), title="角色 B 音色参考")
+    audio_a = add_load_audio(
+        workflow, "role_a.wav", pos=(0, 340), title="角色 A 音色参考"
+    )
+    audio_b = add_load_audio(
+        workflow, "role_b.wav", pos=(0, 520), title="角色 B 音色参考"
+    )
     emotion_a = add_emotion(workflow, "vector", pos=(400, 0), **vector_a)
     emotion_b = add_emotion(workflow, "vector", pos=(400, 570), **vector_b)
     voice_a = add_voice_profile(workflow, "角色A", "ZH", pos=(840, 40))
     voice_b = add_voice_profile(workflow, "角色B", "ZH", pos=(840, 390))
     merged = add_merge_voice_emotions(workflow, 2, pos=(1240, 160))
-    script_node = add_dialogue_script(workflow, "batch", script, "角色A", pos=(840, 730))
+    script_node = add_dialogue_script(
+        workflow, "batch", script, "角色A", pos=(840, 730)
+    )
     generate = add_dialogue_generate(workflow, pos=(1680, 210))
     save = add_save(workflow, "IndexTTS25_T8/multi_role_emotions", pos=(2240, 390))
     workflow.connect(audio_a, "AUDIO", voice_a, "speaker_audio")
@@ -1266,7 +1494,7 @@ def multi_role_emotions_pair() -> tuple[dict[str, Any], dict[str, Any]]:
 def acceleration_pair() -> tuple[dict[str, Any], dict[str, Any]]:
     workflow = Workflow("14 可选加速与环境诊断")
     model = add_model(workflow)
-    workflow.nodes[model - 1]["widgets_values"][3] = "auto_safe"
+    workflow.set_widget(model, "acceleration_mode", "auto_safe")
     speaker = add_load_audio(workflow, "voice_reference.wav", title="音色参考音频")
     workflow.add(
         ENVIRONMENT_NODE,
@@ -1276,7 +1504,14 @@ def acceleration_pair() -> tuple[dict[str, Any], dict[str, Any]]:
         [output("environment_report", "STRING")],
         ["auto"],
     )
-    generate = add_generate(workflow, "这是可选加速模式的安全回退测试。", "ZH", 1.0, 20260818, pos=(900, 180))
+    generate = add_generate(
+        workflow,
+        "这是可选加速模式的安全回退测试。",
+        "ZH",
+        1.0,
+        20260818,
+        pos=(900, 180),
+    )
     save = add_save(workflow, "IndexTTS25_T8/optional_acceleration")
     wire_generation(workflow, model, speaker, generate, save)
     model_api = api_model()
@@ -1285,7 +1520,9 @@ def acceleration_pair() -> tuple[dict[str, Any], dict[str, Any]]:
         "1": model_api,
         "2": api_audio("voice_reference.wav"),
         "3": {"class_type": ENVIRONMENT_NODE, "inputs": {"device": "auto"}},
-        "4": api_generate("1", "2", "这是可选加速模式的安全回退测试。", "ZH", 1.0, 20260818),
+        "4": api_generate(
+            "1", "2", "这是可选加速模式的安全回退测试。", "ZH", 1.0, 20260818
+        ),
         "5": api_save("4", "IndexTTS25_T8/optional_acceleration"),
     }
     return workflow.as_dict(), api
@@ -1358,8 +1595,14 @@ def target_duration_pair() -> tuple[dict[str, Any], dict[str, Any]]:
         "1": api_model(),
         "2": api_audio("voice_reference.wav"),
         "3": api_generate(
-            "1", "2", text, "ZH", 1.0, 20260822,
-            target_duration_mode="native", target_duration_seconds=5.0,
+            "1",
+            "2",
+            text,
+            "ZH",
+            1.0,
+            20260822,
+            target_duration_mode="native",
+            target_duration_seconds=5.0,
         ),
         "4": api_save("3", "IndexTTS25_T8/target_5s"),
     }
@@ -1370,7 +1613,9 @@ def audio_postprocess_pair() -> tuple[dict[str, Any], dict[str, Any]]:
     workflow = Workflow("18 独立人声后处理")
     model = add_model(workflow)
     speaker = add_load_audio(workflow, "voice_reference.wav", title="音色参考音频")
-    generate = add_generate(workflow, "这是清晰旁白后处理的真实节点连接示例。", "ZH", 1.0, 20260822)
+    generate = add_generate(
+        workflow, "这是清晰旁白后处理的真实节点连接示例。", "ZH", 1.0, 20260822
+    )
     post = add_audio_postprocess(workflow, "clear_narration", 0.8)
     save = add_save(workflow, "IndexTTS25_T8/clear_narration", pos=(1900, 240))
     workflow.connect(model, "model", generate, "model")
@@ -1380,7 +1625,9 @@ def audio_postprocess_pair() -> tuple[dict[str, Any], dict[str, Any]]:
     api = {
         "1": api_model(),
         "2": api_audio("voice_reference.wav"),
-        "3": api_generate("1", "2", "这是清晰旁白后处理的真实节点连接示例。", "ZH", 1.0, 20260822),
+        "3": api_generate(
+            "1", "2", "这是清晰旁白后处理的真实节点连接示例。", "ZH", 1.0, 20260822
+        ),
         "4": api_audio_postprocess("3", "clear_narration", 0.8),
         "5": api_save("4", "IndexTTS25_T8/clear_narration"),
     }
@@ -1444,23 +1691,45 @@ def timeline_editor_pair() -> tuple[dict[str, Any], dict[str, Any]]:
     )
     edits = json.dumps(
         [
-            {"index": 1, "role": "角色A", "language": "ZH", "start_ms": 200, "end_ms": 2000, "duration_factor": 1.0, "text": "第一条编辑后从零点二秒开始。"},
-            {"index": 2, "role": "角色B", "language": "ZH", "start_ms": 2300, "end_ms": 4600, "duration_factor": 0.95, "text": "第二条保留独立时间槽位。"},
+            {
+                "index": 1,
+                "role": "角色A",
+                "language": "ZH",
+                "start_ms": 200,
+                "end_ms": 2000,
+                "duration_factor": 1.0,
+                "text": "第一条编辑后从零点二秒开始。",
+            },
+            {
+                "index": 2,
+                "role": "角色B",
+                "language": "ZH",
+                "start_ms": 2300,
+                "end_ms": 4600,
+                "duration_factor": 0.95,
+                "text": "第二条保留独立时间槽位。",
+            },
         ],
         ensure_ascii=False,
         indent=2,
     )
     workflow = Workflow("21 可视化时间轴编辑")
     model = add_model(workflow, pos=(0, 0))
-    audio_a = add_load_audio(workflow, "role_a.wav", pos=(0, 340), title="角色 A 参考音频")
-    audio_b = add_load_audio(workflow, "role_b.wav", pos=(0, 520), title="角色 B 参考音频")
+    audio_a = add_load_audio(
+        workflow, "role_a.wav", pos=(0, 340), title="角色 A 参考音频"
+    )
+    audio_b = add_load_audio(
+        workflow, "role_b.wav", pos=(0, 520), title="角色 B 参考音频"
+    )
     voice_a = add_voice_profile(workflow, "角色A", "ZH", pos=(400, 0))
     voice_b = add_voice_profile(workflow, "角色B", "ZH", pos=(400, 300))
     library = add_role_library(workflow, 2, pos=(800, 60))
     script_node = add_dialogue_script(workflow, "srt", script, "角色A", pos=(650, 520))
     editor = add_timeline_editor(workflow, edits, pos=(1200, 650))
     preview = add_preview_image(workflow, pos=(1760, 650))
-    generate = add_dialogue_generate(workflow, pos=(1760, 80), policy="overlay", fit=True)
+    generate = add_dialogue_generate(
+        workflow, pos=(1760, 80), policy="overlay", fit=True
+    )
     save = add_save(workflow, "IndexTTS25_T8/timeline_edited", pos=(2320, 920))
     workflow.connect(audio_a, "AUDIO", voice_a, "speaker_audio")
     workflow.connect(audio_b, "AUDIO", voice_b, "speaker_audio")
@@ -1473,9 +1742,13 @@ def timeline_editor_pair() -> tuple[dict[str, Any], dict[str, Any]]:
     workflow.connect(editor, "dialogue_script", generate, "dialogue_script")
     workflow.connect(generate, "audio", save, "audio")
     api = {
-        "1": api_model(), "2": api_audio("role_a.wav"), "3": api_audio("role_b.wav"),
-        "4": api_voice("角色A", "2"), "5": api_voice("角色B", "3"),
-        "6": api_role_library(["4", "5"]), "7": api_dialogue_script("srt", script, "角色A"),
+        "1": api_model(),
+        "2": api_audio("role_a.wav"),
+        "3": api_audio("role_b.wav"),
+        "4": api_voice("角色A", "2"),
+        "5": api_voice("角色B", "3"),
+        "6": api_role_library(["4", "5"]),
+        "7": api_dialogue_script("srt", script, "角色A"),
         "8": api_timeline_editor("7", edits),
         "9": api_dialogue_generate("1", "6", "8", policy="overlay", fit=True),
         "10": api_save("9", "IndexTTS25_T8/timeline_edited"),
@@ -1491,14 +1764,20 @@ def subtitle_rewrite_pair() -> tuple[dict[str, Any], dict[str, Any]]:
     )
     workflow = Workflow("22 ASR 字幕自动回写")
     model = add_model(workflow, pos=(0, 0))
-    audio_a = add_load_audio(workflow, "role_a.wav", pos=(0, 340), title="角色 A 参考音频")
-    audio_b = add_load_audio(workflow, "role_b.wav", pos=(0, 520), title="角色 B 参考音频")
+    audio_a = add_load_audio(
+        workflow, "role_a.wav", pos=(0, 340), title="角色 A 参考音频"
+    )
+    audio_b = add_load_audio(
+        workflow, "role_b.wav", pos=(0, 520), title="角色 B 参考音频"
+    )
     voice_a = add_voice_profile(workflow, "角色A", "ZH", pos=(400, 0))
     voice_b = add_voice_profile(workflow, "角色B", "ZH", pos=(400, 300))
     library = add_role_library(workflow, 2, pos=(800, 60))
     script_node = add_dialogue_script(workflow, "srt", script, "角色A", pos=(650, 520))
-    generate = add_dialogue_generate(workflow, pos=(1220, 100), policy="shift", fit=True)
-    workflow.nodes[generate - 1]["widgets_values"][9] = True
+    generate = add_dialogue_generate(
+        workflow, pos=(1220, 100), policy="shift", fit=True
+    )
+    workflow.set_widget(generate, "asr_enabled", True)
     subtitle = add_subtitle_rewrite(workflow, pos=(1780, 520))
     save = add_save(workflow, "IndexTTS25_T8/subtitle_rewrite", pos=(2300, 120))
     workflow.connect(audio_a, "AUDIO", voice_a, "speaker_audio")
@@ -1514,10 +1793,15 @@ def subtitle_rewrite_pair() -> tuple[dict[str, Any], dict[str, Any]]:
     generate_api = api_dialogue_generate("1", "6", "7", policy="shift", fit=True)
     generate_api["inputs"]["asr_enabled"] = True
     api = {
-        "1": api_model(), "2": api_audio("role_a.wav"), "3": api_audio("role_b.wav"),
-        "4": api_voice("角色A", "2"), "5": api_voice("角色B", "3"),
-        "6": api_role_library(["4", "5"]), "7": api_dialogue_script("srt", script, "角色A"),
-        "8": generate_api, "9": api_subtitle_rewrite("7", "8"),
+        "1": api_model(),
+        "2": api_audio("role_a.wav"),
+        "3": api_audio("role_b.wav"),
+        "4": api_voice("角色A", "2"),
+        "5": api_voice("角色B", "3"),
+        "6": api_role_library(["4", "5"]),
+        "7": api_dialogue_script("srt", script, "角色A"),
+        "8": generate_api,
+        "9": api_subtitle_rewrite("7", "8"),
         "10": api_save("8", "IndexTTS25_T8/subtitle_rewrite"),
     }
     return workflow.as_dict(), api
@@ -1526,7 +1810,9 @@ def subtitle_rewrite_pair() -> tuple[dict[str, Any], dict[str, Any]]:
 def reference_quality_pair() -> tuple[dict[str, Any], dict[str, Any]]:
     workflow = Workflow("24 参考音频质量检测与自动裁剪")
     model = add_model(workflow)
-    speaker = add_load_audio(workflow, "voice_reference.wav", pos=(0, 340), title="待检测参考音频")
+    speaker = add_load_audio(
+        workflow, "voice_reference.wav", pos=(0, 340), title="待检测参考音频"
+    )
     quality = add_reference_quality(workflow, pos=(390, 320))
     preview = add_preview_image(workflow, pos=(880, 520), title="参考音频波形")
     generate = add_generate(
@@ -1548,7 +1834,12 @@ def reference_quality_pair() -> tuple[dict[str, Any], dict[str, Any]]:
         "2": api_audio("voice_reference.wav"),
         "3": api_reference_quality("2"),
         "4": api_generate(
-            "1", "3", "这个示例先检测并优化参考音频，再进行音色克隆。", "ZH", 1.0, 20260826
+            "1",
+            "3",
+            "这个示例先检测并优化参考音频，再进行音色克隆。",
+            "ZH",
+            1.0,
+            20260826,
         ),
         "5": api_save("4", "IndexTTS25_T8/reference_quality"),
         "6": {"class_type": "PreviewImage", "inputs": {"images": ["3", 2]}},
@@ -1562,15 +1853,13 @@ def quality_retry_pair() -> tuple[dict[str, Any], dict[str, Any]]:
     model = add_model(workflow)
     speaker = add_load_audio(workflow, "voice_reference.wav", title="音色参考音频")
     generate = add_generate(workflow, text, "ZH", 1.0, 20260826)
-    workflow.nodes[generate - 1]["widgets_values"][9] = 2
+    workflow.set_widget(generate, "quality_retry_count", 2)
     save = add_save(workflow, "IndexTTS25_T8/quality_retry")
     wire_generation(workflow, model, speaker, generate, save)
     api = {
         "1": api_model(),
         "2": api_audio("voice_reference.wav"),
-        "3": api_generate(
-            "1", "2", text, "ZH", 1.0, 20260826, quality_retry_count=2
-        ),
+        "3": api_generate("1", "2", text, "ZH", 1.0, 20260826, quality_retry_count=2),
         "4": api_save("3", "IndexTTS25_T8/quality_retry"),
     }
     return workflow.as_dict(), api
@@ -1579,7 +1868,7 @@ def quality_retry_pair() -> tuple[dict[str, Any], dict[str, Any]]:
 def memory_control_pair() -> tuple[dict[str, Any], dict[str, Any]]:
     workflow = Workflow("26 长批量模型回收与显存状态")
     model = add_model(workflow)
-    workflow.nodes[model - 1]["widgets_values"][6] = 20
+    workflow.set_widget(model, "recycle_after_runs", 20)
     speaker = add_load_audio(workflow, "voice_reference.wav", title="音色参考音频")
     generate = add_generate(
         workflow,
@@ -1597,7 +1886,12 @@ def memory_control_pair() -> tuple[dict[str, Any], dict[str, Any]]:
         "1": model_api,
         "2": api_audio("voice_reference.wav"),
         "3": api_generate(
-            "1", "2", "模型每完成二十次推理后自动安全重载，状态节点只管理本扩展。", "ZH", 1.0, 20260826
+            "1",
+            "2",
+            "模型每完成二十次推理后自动安全重载，状态节点只管理本扩展。",
+            "ZH",
+            1.0,
+            20260826,
         ),
         "4": api_memory_control("status"),
         "5": api_save("3", "IndexTTS25_T8/memory_control"),
@@ -1656,13 +1950,49 @@ def validate_ui(workflow: dict[str, Any]) -> None:
     assert len(nodes) == len(workflow["nodes"])
     assert workflow["last_node_id"] == max(nodes)
     assert workflow["last_link_id"] == len(workflow["links"])
-    for link_id, origin_id, origin_slot, target_id, target_slot, data_type in workflow["links"]:
+    for link_id, origin_id, origin_slot, target_id, target_slot, data_type in workflow[
+        "links"
+    ]:
         origin = nodes[origin_id]
         target = nodes[target_id]
         assert origin["outputs"][origin_slot]["type"] == data_type
         assert link_id in origin["outputs"][origin_slot]["links"]
         assert target["inputs"][target_slot]["link"] == link_id
         assert target["inputs"][target_slot]["type"] == data_type
+    for node in workflow["nodes"]:
+        widget_inputs = [item for item in node["inputs"] if "widget" in item]
+        if not widget_inputs:
+            assert node.get("widgets_values", []) == []
+            continue
+        values = node.get("widgets_values")
+        assert isinstance(values, list), f"{node['type']} 缺少 widgets_values"
+        expected_count = len(widget_inputs) + sum(
+            item["name"] == "seed" for item in widget_inputs
+        )
+        assert len(values) == expected_count, (
+            f"{node['type']} 控件数量错位：期望 {expected_count}，实际 {len(values)}"
+        )
+        value_index = 0
+        for item in widget_inputs:
+            value = values[value_index]
+            data_type = item["type"]
+            if data_type == "BOOLEAN":
+                assert isinstance(value, bool)
+            elif data_type == "INT":
+                assert isinstance(value, int) and not isinstance(value, bool)
+            elif data_type == "FLOAT":
+                assert isinstance(value, (int, float)) and not isinstance(value, bool)
+            elif data_type in {"STRING", "COMBO", "COMFY_DYNAMICCOMBO_V3"}:
+                assert isinstance(value, str)
+            value_index += 1
+            if item["name"] == "seed":
+                assert values[value_index] in {
+                    "fixed",
+                    "increment",
+                    "decrement",
+                    "randomize",
+                }
+                value_index += 1
 
 
 def validate_api(prompt: dict[str, Any]) -> None:
@@ -1671,7 +2001,11 @@ def validate_api(prompt: dict[str, Any]) -> None:
         assert str(node_id).isdigit()
         assert "class_type" in node and isinstance(node.get("inputs"), dict)
         for value in node["inputs"].values():
-            if isinstance(value, list) and len(value) == 2 and isinstance(value[0], str):
+            if (
+                isinstance(value, list)
+                and len(value) == 2
+                and isinstance(value[0], str)
+            ):
                 assert value[0] in node_ids
                 assert isinstance(value[1], int) and value[1] >= 0
         if node["class_type"] == EMOTION_NODE:
@@ -1694,7 +2028,9 @@ def main() -> int:
             json.dumps(api_prompt, ensure_ascii=False, indent=2) + "\n",
             encoding="utf-8",
         )
-    print(f"Generated {len(EXAMPLES)} UI workflows and {len(EXAMPLES)} API prompts in {EXAMPLES_ROOT}")
+    print(
+        f"Generated {len(EXAMPLES)} UI workflows and {len(EXAMPLES)} API prompts in {EXAMPLES_ROOT}"
+    )
     return 0
 
 

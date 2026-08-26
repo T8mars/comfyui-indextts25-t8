@@ -303,7 +303,8 @@ def build_generation_plan(
     )
     tokenizer = _load_tokenizer(str(Path(model_dir).resolve()))
     prefix = f"<|{normalized_language.lower()}|> "
-    counter = lambda value: _token_len(tokenizer, value)
+    def counter(value):
+        return _token_len(tokenizer, value)
     previews: list[SegmentPreview] = []
     for block_index, chunk in enumerate(chunks, 1):
         parts = split_text_by_tokens(chunk.text, limit, normalized_language, counter)

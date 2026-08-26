@@ -9,8 +9,8 @@ PLUGIN_ROOT = Path(__file__).resolve().parents[1]
 if str(PLUGIN_ROOT) not in sys.path:
     sys.path.insert(0, str(PLUGIN_ROOT))
 
-from runtime.dependency_probe import missing_dependencies
-from services.model_store import load_manifest, validate_model_dir
+from runtime.dependency_probe import missing_dependencies  # noqa: E402
+from services.model_store import load_manifest, validate_model_dir  # noqa: E402
 
 
 def main() -> int:
@@ -45,4 +45,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

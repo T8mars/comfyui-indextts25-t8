@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 import shutil
 from dataclasses import dataclass
 
@@ -75,7 +76,10 @@ def resolve_acceleration(mode: str, device: str, capabilities: dict | None = Non
         ready = modules["flash_attn"] and modules["triton"]
         return AccelerationSelection(requested, requested if ready else "off", use_accel=ready, available=ready, reason=("FlashAttention/Triton 可用" if ready else "未安装可选 FlashAttention/Triton，已回退"))
     ready = modules["deepspeed"]
-    return AccelerationSelection(requested, requested if ready else "off", use_deepspeed=ready, available=ready, reason=("DeepSpeed 可用" if ready else "未安装可选 DeepSpeed，已回退；它不是必需依赖"))
+    ready_reason = "DeepSpeed 可用"
+    if os.name == "nt":
+        ready_reason += "；Windows BF16 请求将使用 FP16 workspace"
+    return AccelerationSelection(requested, requested if ready else "off", use_deepspeed=ready, available=ready, reason=(ready_reason if ready else "未安装可选 DeepSpeed，已回退；它不是必需依赖"))
 
 
 __all__ = ["AccelerationSelection", "MODES", "probe_acceleration", "resolve_acceleration"]

@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from runtime.dialogue import parse_batch_script, parse_srt
+from scripts import build_example_workflows
 
 
 PLUGIN_ROOT = Path(__file__).resolve().parents[1]
@@ -68,12 +69,35 @@ def test_all_ui_and_api_examples_are_present_and_valid():
         assert any(node["class_type"] in generation_types for node in prompt.values())
 
 
+def test_ui_widget_values_keep_declared_order_types_and_release_version():
+    ui_root = PLUGIN_ROOT / "example_workflows" / "ui"
+    for name in EXAMPLES:
+        workflow = _load(ui_root / f"{name}.json")
+        build_example_workflows.validate_ui(workflow)
+        for node in workflow["nodes"]:
+            if node["properties"].get("cnr_id") == "comfyui-indextts25-t8":
+                assert (
+                    node["properties"]["ver"] == build_example_workflows.PROJECT_VERSION
+                )
+
+
 def test_embedded_dialogue_scripts_are_parsed_not_just_outer_workflow_json():
     ui_root = PLUGIN_ROOT / "example_workflows" / "ui"
     api_root = PLUGIN_ROOT / "example_workflows" / "api"
-    for name in ("11_multi_role_dialogue", "12_batch_dialogue_json", "13_srt_multi_role", "21_timeline_editor", "22_subtitle_rewrite", "23_multi_role_emotions"):
+    for name in (
+        "11_multi_role_dialogue",
+        "12_batch_dialogue_json",
+        "13_srt_multi_role",
+        "21_timeline_editor",
+        "22_subtitle_rewrite",
+        "23_multi_role_emotions",
+    ):
         workflow = _load(ui_root / f"{name}.json")
-        ui_node = next(node for node in workflow["nodes"] if node["type"] == "T8_IndexTTS25_DialogueScript")
+        ui_node = next(
+            node
+            for node in workflow["nodes"]
+            if node["type"] == "T8_IndexTTS25_DialogueScript"
+        )
         script_type, script, default_role, default_language = ui_node["widgets_values"]
         parser = parse_srt if script_type == "srt" else parse_batch_script
         assert parser(script, default_role, default_language)
@@ -85,7 +109,11 @@ def test_embedded_dialogue_scripts_are_parsed_not_just_outer_workflow_json():
             if node["class_type"] == "T8_IndexTTS25_DialogueScript"
         )
         parser = parse_srt if api_inputs["script_type"] == "srt" else parse_batch_script
-        assert parser(api_inputs["script"], api_inputs["default_role"], api_inputs["default_language"])
+        assert parser(
+            api_inputs["script"],
+            api_inputs["default_role"],
+            api_inputs["default_language"],
+        )
 
 
 def test_examples_cover_every_emotion_mode_speed_sampling_and_language():
@@ -105,10 +133,19 @@ def test_examples_cover_every_emotion_mode_speed_sampling_and_language():
         for node in prompt.values()
         if node["class_type"] == "T8_IndexTTS25_Generate"
     ]
-    assert {item["language"] for item in generation_inputs} == {"ZH", "EN", "JA", "ES", "AR"}
-    assert {item["duration_factor"] for item in generation_inputs}.issuperset({0.7, 1.0, 1.3})
+    assert {item["language"] for item in generation_inputs} == {
+        "ZH",
+        "EN",
+        "JA",
+        "ES",
+        "AR",
+    }
+    assert {item["duration_factor"] for item in generation_inputs}.issuperset(
+        {0.7, 1.0, 1.3}
+    )
     assert any(
-        node["class_type"] == "T8_IndexTTS25_SamplingConfig" and node["inputs"]["do_sample"]
+        node["class_type"] == "T8_IndexTTS25_SamplingConfig"
+        and node["inputs"]["do_sample"]
         for prompt in prompts
         for node in prompt.values()
     )
@@ -130,8 +167,15 @@ def test_examples_cover_every_emotion_mode_speed_sampling_and_language():
         for node in prompt.values()
         if node["class_type"] == "T8_IndexTTS25_Pronunciation"
     ]
-    assert {node["inputs"]["language"] for node in pronunciation_nodes} == {"ZH", "EN", "JA"}
-    assert any("银行|YIN2 HANG2|ZH" in node["inputs"]["dictionary"] for node in pronunciation_nodes)
+    assert {node["inputs"]["language"] for node in pronunciation_nodes} == {
+        "ZH",
+        "EN",
+        "JA",
+    }
+    assert any(
+        "银行|YIN2 HANG2|ZH" in node["inputs"]["dictionary"]
+        for node in pronunciation_nodes
+    )
 
 
 def test_v3_dynamic_combo_api_inputs_are_flattened():
@@ -188,8 +232,12 @@ def test_api_prompts_expand_with_the_current_comfyui_v3_schema():
             if node_class is None:
                 continue
             live_inputs = node["inputs"]
-            finalized, _, v3_data = _io.get_finalized_class_inputs(node_class.INPUT_TYPES(), live_inputs)
-            recognized = set(finalized.get("required", {})) | set(finalized.get("optional", {}))
+            finalized, _, v3_data = _io.get_finalized_class_inputs(
+                node_class.INPUT_TYPES(), live_inputs
+            )
+            recognized = set(finalized.get("required", {})) | set(
+                finalized.get("optional", {})
+            )
             assert set(live_inputs).issubset(recognized)
             nested = _io.build_nested_inputs(live_inputs, v3_data)
             if node["class_type"] == "T8_IndexTTS25_EmotionControl":
@@ -199,7 +247,27 @@ def test_api_prompts_expand_with_the_current_comfyui_v3_schema():
                 "T8_IndexTTS25_RoleLibrary",
                 "T8_IndexTTS25_MergeVoiceEmotions",
             }:
-                assert set(nested["voices"]) == {key.split(".", 1)[1] for key in live_inputs if key.startswith("voices.voice_")}
+                assert set(nested["voices"]) == {
+                    key.split(".", 1)[1]
+                    for key in live_inputs
+                    if key.startswith("voices.voice_")
+                }
+
+    ui_root = PLUGIN_ROOT / "example_workflows" / "ui"
+    for name in EXAMPLES:
+        workflow = _load(ui_root / f"{name}.json")
+        for node in workflow["nodes"]:
+            node_class = node_classes.get(node["type"])
+            if node_class is None or node["type"] == "T8_IndexTTS25_EmotionControl":
+                continue
+            live = node_class.INPUT_TYPES()
+            live_order = list(live.get("required", {})) + list(live.get("optional", {}))
+            ui_widgets = [item for item in node["inputs"] if "widget" in item]
+            ui_names = [item["name"] for item in ui_widgets]
+            assert ui_names == [item for item in live_order if item in ui_names]
+            for item in ui_widgets:
+                live_type = (live.get("required", {}) | live.get("optional", {}))[item["name"]][0]
+                assert item["type"] == live_type
 
 
 def test_examples_cover_multi_role_batch_srt_and_optional_acceleration():
@@ -218,11 +286,13 @@ def test_examples_cover_multi_role_batch_srt_and_optional_acceleration():
         for node in prompt.values()
     )
     assert any(
-        node["class_type"] == "T8_IndexTTS25_DialogueGenerate" and node["inputs"]["fit_srt_slots"]
+        node["class_type"] == "T8_IndexTTS25_DialogueGenerate"
+        and node["inputs"]["fit_srt_slots"]
         for node in prompts["13_srt_multi_role"].values()
     )
     assert any(
-        node["class_type"] == "T8_IndexTTS25_ModelLoader" and node["inputs"]["acceleration_mode"] == "auto_safe"
+        node["class_type"] == "T8_IndexTTS25_ModelLoader"
+        and node["inputs"]["acceleration_mode"] == "auto_safe"
         for node in prompts["14_optional_acceleration"].values()
     )
     assert any(
@@ -260,10 +330,13 @@ def test_examples_cover_multi_role_batch_srt_and_optional_acceleration():
         for node in prompts["27_audiocpp_experimental"].values()
     )
     role_emotions = prompts["23_multi_role_emotions"]
-    assert sum(
-        node["class_type"] == "T8_IndexTTS25_EmotionControl"
-        for node in role_emotions.values()
-    ) == 2
+    assert (
+        sum(
+            node["class_type"] == "T8_IndexTTS25_EmotionControl"
+            for node in role_emotions.values()
+        )
+        == 2
+    )
     assert any(
         node["class_type"] == "T8_IndexTTS25_MergeVoiceEmotions"
         and len(node["inputs"]) == 2

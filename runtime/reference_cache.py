@@ -6,8 +6,6 @@ import threading
 from pathlib import Path
 from typing import Any
 
-import torch
-
 from .audio_adapter import INDEXTTS_SAMPLE_RATE, validate_comfy_audio
 
 

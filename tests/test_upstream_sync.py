@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import torch
 
 from indextts.gpt import model_v2
-from indextts.infer_v2_5 import QwenEmotion
+from indextts.infer_v2_5 import QwenEmotion, _select_deepspeed_dtype
 from indextts.utils import common, model_download
 
 
@@ -82,9 +82,13 @@ def test_deepspeed_bfloat16_dtype_fix_is_synced(monkeypatch):
         return SimpleNamespace(module=FakeInference())
 
     monkeypatch.setattr(model_v2, "GPT2Config", lambda **kwargs: object())
-    monkeypatch.setattr(model_v2, "GPT2InferenceModel", lambda *args, **kwargs: FakeInference())
+    monkeypatch.setattr(
+        model_v2, "GPT2InferenceModel", lambda *args, **kwargs: FakeInference()
+    )
     monkeypatch.setattr(model_v2.torch.cuda, "is_available", lambda: True)
-    monkeypatch.setitem(sys.modules, "deepspeed", SimpleNamespace(init_inference=init_inference))
+    monkeypatch.setitem(
+        sys.modules, "deepspeed", SimpleNamespace(init_inference=init_inference)
+    )
 
     voice = model_v2.UnifiedVoice.__new__(model_v2.UnifiedVoice)
     voice.max_mel_tokens = 10
@@ -106,3 +110,9 @@ def test_deepspeed_bfloat16_dtype_fix_is_synced(monkeypatch):
         deepspeed_dtype=torch.bfloat16,
     )
     assert captured["dtype"] is torch.bfloat16
+
+
+def test_deepspeed_uses_fp16_for_windows_wheels_without_bf16_workspace():
+    assert _select_deepspeed_dtype(True, True, "nt") is torch.float16
+    assert _select_deepspeed_dtype(True, True, "posix") is torch.bfloat16
+    assert _select_deepspeed_dtype(False, True, "nt") is torch.bfloat16

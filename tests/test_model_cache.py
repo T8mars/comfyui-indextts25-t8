@@ -7,7 +7,9 @@ from runtime.model_cache import CacheEntry, ModelCache
 from runtime.types import ModelHandle
 
 
-def _cached_entry(cache: ModelCache, handle: ModelHandle, *, users: int = 0) -> CacheEntry:
+def _cached_entry(
+    cache: ModelCache, handle: ModelHandle, *, users: int = 0
+) -> CacheEntry:
     entry = CacheEntry(model=object(), users=users)
     cache._entries[handle.cache_key] = entry
     return entry
@@ -20,7 +22,9 @@ def test_release_after_run_waits_for_all_current_users(tmp_path: Path, monkeypat
     entry = CacheEntry(model=model, users=2)
     cache._entries[handle.cache_key] = entry
     disposed = []
-    monkeypatch.setattr(cache, "_dispose", lambda item, device: disposed.append((item, device)))
+    monkeypatch.setattr(
+        cache, "_dispose", lambda item, device: disposed.append((item, device))
+    )
 
     cache.done(handle, entry, release=True)
     assert cache.size() == 1
@@ -91,7 +95,9 @@ def test_recycle_after_runs_releases_at_threshold(tmp_path: Path, monkeypatch):
     handle = ModelHandle(tmp_path, "cpu", False, recycle_after_runs=2)
     entry = _cached_entry(cache, handle, users=1)
     disposed = []
-    monkeypatch.setattr(cache, "_dispose", lambda item, device: disposed.append((item, device)))
+    monkeypatch.setattr(
+        cache, "_dispose", lambda item, device: disposed.append((item, device))
+    )
 
     cache.done(handle, entry)
     assert cache.size() == 1
@@ -117,3 +123,21 @@ def test_idle_eviction_only_releases_unused_entries(tmp_path: Path, monkeypatch)
     assert cache.size() == 1
     assert disposed == [idle]
     assert cache.status()["entries"][0]["users"] == 1
+
+
+def test_model_file_fingerprint_is_part_of_cache_identity(tmp_path: Path):
+    before = ModelHandle(
+        tmp_path,
+        "cpu",
+        False,
+        model_revision="same-manifest-revision",
+        model_fingerprint="files-before",
+    )
+    after = ModelHandle(
+        tmp_path,
+        "cpu",
+        False,
+        model_revision="same-manifest-revision",
+        model_fingerprint="files-after",
+    )
+    assert before.cache_key != after.cache_key

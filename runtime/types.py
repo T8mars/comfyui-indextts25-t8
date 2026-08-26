@@ -22,6 +22,7 @@ class ModelHandle:
     release_after_run: bool = False
     recycle_after_runs: int = 0
     model_revision: str = ""
+    model_fingerprint: str = ""
     low_vram: bool = False
 
     @property
@@ -35,6 +36,7 @@ class ModelHandle:
             self.use_accel,
             self.use_deepspeed,
             self.model_revision,
+            self.model_fingerprint,
             self.low_vram,
         )
 
