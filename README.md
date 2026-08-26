@@ -20,8 +20,14 @@ IndexTTS 2.5 的 ComfyUI V3 原生节点集成。节点菜单位于：
 
 本目录固定使用 IndexTTS 2.5 推理核心和正式 2.5 模型清单，不会回退或误载 IndexTTS 2.0。
 
-当前版本基线：**ComfyUI Node 0.11.4 · Desktop 0.11.5 · Core `ee40fa7d` · Model `c39ce5ba`**。
+当前版本基线：**ComfyUI Node 0.11.5 · Desktop 0.11.5 · Core `ee40fa7d` · Model `c39ce5ba`**。
 Desktop 与 Node 是两个独立发行物，因此各自使用独立版本号；Core/Model 是固定的官方代码和权重 revision。
+
+### v0.11.5 发布保护
+
+- Registry 发布任务按仓库串行排队，避免手动触发与延迟 push 事件并发上传同一版本。
+- 上传前通过官方只读版本接口检查精确版本；Active/Pending 等已存在状态会绿色跳过，只有 404 才允许上传。
+- Registry 查询发生超时、5xx 或返回异常内容时重试并安全停止，不会在状态不明时盲目发布。
 
 ### v0.11.4 稳定性更新
 

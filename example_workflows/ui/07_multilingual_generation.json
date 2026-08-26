@@ -112,7 +112,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_ModelLoader",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.11.4"
+        "ver": "0.11.5"
       },
       "widgets_values": [
         "IndexTTS-2.5",
@@ -166,7 +166,7 @@
       "properties": {
         "Node name for S&R": "LoadAudio",
         "cnr_id": "comfy-core",
-        "ver": "0.11.4"
+        "ver": "0.11.5"
       },
       "widgets_values": [
         "voice_reference.wav"
@@ -332,7 +332,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_Generate",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.11.4"
+        "ver": "0.11.5"
       },
       "widgets_values": [
         "这是中文语音生成示例。",
@@ -391,7 +391,7 @@
       "properties": {
         "Node name for S&R": "SaveAudio",
         "cnr_id": "comfy-core",
-        "ver": "0.11.4"
+        "ver": "0.11.5"
       },
       "widgets_values": [
         "IndexTTS25_T8/zh"
@@ -556,7 +556,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_Generate",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.11.4"
+        "ver": "0.11.5"
       },
       "widgets_values": [
         "This is an English speech generation example.",
@@ -615,7 +615,7 @@
       "properties": {
         "Node name for S&R": "SaveAudio",
         "cnr_id": "comfy-core",
-        "ver": "0.11.4"
+        "ver": "0.11.5"
       },
       "widgets_values": [
         "IndexTTS25_T8/en"
@@ -780,7 +780,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_Generate",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.11.4"
+        "ver": "0.11.5"
       },
       "widgets_values": [
         "これは日本語の音声生成サンプルです。",
@@ -839,7 +839,7 @@
       "properties": {
         "Node name for S&R": "SaveAudio",
         "cnr_id": "comfy-core",
-        "ver": "0.11.4"
+        "ver": "0.11.5"
       },
       "widgets_values": [
         "IndexTTS25_T8/ja"
@@ -1004,7 +1004,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_Generate",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.11.4"
+        "ver": "0.11.5"
       },
       "widgets_values": [
         "Este es un ejemplo de generación de voz en español.",
@@ -1063,7 +1063,7 @@
       "properties": {
         "Node name for S&R": "SaveAudio",
         "cnr_id": "comfy-core",
-        "ver": "0.11.4"
+        "ver": "0.11.5"
       },
       "widgets_values": [
         "IndexTTS25_T8/es"
@@ -1228,7 +1228,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_Generate",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.11.4"
+        "ver": "0.11.5"
       },
       "widgets_values": [
         "هذا مثال على توليد الكلام باللغة العربية.",
@@ -1287,7 +1287,7 @@
       "properties": {
         "Node name for S&R": "SaveAudio",
         "cnr_id": "comfy-core",
-        "ver": "0.11.4"
+        "ver": "0.11.5"
       },
       "widgets_values": [
         "IndexTTS25_T8/ar"

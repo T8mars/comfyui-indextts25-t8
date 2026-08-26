@@ -20,8 +20,14 @@ Creator: **Bilibili: T8star-Aix**.
 
 This repository is locked to the IndexTTS 2.5 inference core and the official 2.5 model manifest. It will not fall back to or accidentally load IndexTTS 2.0.
 
-Current baseline: **ComfyUI Node 0.11.4 · Desktop 0.11.5 · Core `ee40fa7d` · Model `c39ce5ba`**.
+Current baseline: **ComfyUI Node 0.11.5 · Desktop 0.11.5 · Core `ee40fa7d` · Model `c39ce5ba`**.
 Desktop and Node are separate deliverables with independent versions; Core/Model identify the pinned official code and weight revisions.
+
+### v0.11.5 release protection
+
+- Registry publish jobs are serialized per repository, preventing manual dispatches and delayed push events from uploading the same version concurrently.
+- Before uploading, the workflow checks the exact version through the official read-only endpoint; existing Active/Pending versions are skipped successfully, and only a 404 permits publishing.
+- Timeouts, 5xx responses, and malformed Registry responses are retried and then fail closed instead of publishing with unknown state.
 
 ### v0.11.4 stability update
 

@@ -27,6 +27,7 @@
 - [x] synthetic-prompt GPT KV Cache 防误命中，避免重复长提示跨缓存块时断言失败。
 - [x] 去除音色缓存未命中路径的重复 Wav2Vec 前向、文件读取与 16 kHz 重采样。
 - [x] CI 覆盖 Linux 当前环境与 Windows Portable Python 3.10 / torch 2.8 基线。
+- [x] Registry 发布幂等保护：任务串行化，精确版本预检查，已存在版本绿色跳过。
 - [x] 普通、低显存、流式和后处理输出统一做 20ms 尾部淡出并归零。
 - [x] 官方问题 #792 的中文整词标注提示、音节数校验和固定 seed 音频回归。
 
