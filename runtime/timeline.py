@@ -76,9 +76,34 @@ def format_srt_timestamp(milliseconds: int) -> str:
     return f"{hours:02d}:{minutes:02d}:{seconds:02d},{millis:03d}"
 
 
+def _normalize_choice(value, choices: tuple[str, ...], numeric_choices: tuple[str, ...], default: str) -> tuple[str, str | None]:
+    raw = str(value if value is not None else "").strip().lower()
+    if raw in choices:
+        return raw, None
+    try:
+        index = int(float(raw))
+    except (TypeError, ValueError, OverflowError):
+        index = -1
+    if 0 <= index < len(numeric_choices):
+        normalized = numeric_choices[index]
+        return normalized, f"旧工作流字幕选项 {value!r} 已兼容为 {normalized!r}。"
+    return default, f"无法识别字幕选项 {value!r}，已使用安全默认值 {default!r}。"
+
+
 def rewrite_srt(lines: Sequence[DialogueLine], line_reports: Sequence[dict] | None = None, *, timing_mode: str = "actual", text_mode: str = "asr_passed", include_role: bool = True) -> tuple[str, dict[str, Any]]:
-    if timing_mode not in {"original", "actual"} or text_mode not in {"original", "asr_passed", "asr_all"}:
-        raise ValueError("字幕回写模式无效。")
+    requested_timing, requested_text = timing_mode, text_mode
+    timing_mode, timing_warning = _normalize_choice(
+        timing_mode,
+        ("original", "actual"),
+        ("actual", "original"),
+        "actual",
+    )
+    text_mode, text_warning = _normalize_choice(
+        text_mode,
+        ("original", "asr_passed", "asr_all"),
+        ("asr_passed", "asr_all", "original"),
+        "asr_passed",
+    )
     reports = {int(item.get("index", position)): item for position, item in enumerate(line_reports or (), 1) if isinstance(item, dict)}
     blocks, rows, cursor = [], [], 0
     for output_index, line in enumerate(lines, 1):
@@ -97,7 +122,16 @@ def rewrite_srt(lines: Sequence[DialogueLine], line_reports: Sequence[dict] | No
         rendered = f"[{line.role}] {text}" if include_role else text
         blocks.append(f"{output_index}\n{format_srt_timestamp(start)} --> {format_srt_timestamp(end)}\n{rendered}")
         rows.append({"index": line.index, "start_ms": start, "end_ms": end, "source": "asr" if use_asr else "original", "text": text})
-    return "\n\n".join(blocks) + ("\n" if blocks else ""), {"timing_mode": timing_mode, "text_mode": text_mode, "include_role": bool(include_role), "lines": rows}
+    warnings = [item for item in (timing_warning, text_warning) if item]
+    return "\n\n".join(blocks) + ("\n" if blocks else ""), {
+        "timing_mode": timing_mode,
+        "text_mode": text_mode,
+        "include_role": bool(include_role),
+        "requested_timing_mode": requested_timing,
+        "requested_text_mode": requested_text,
+        "warnings": warnings,
+        "lines": rows,
+    }
 
 
 def timeline_json(lines: Sequence[DialogueLine], line_reports: Sequence[dict] | None = None) -> str:

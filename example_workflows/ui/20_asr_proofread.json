@@ -108,7 +108,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_ModelLoader",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.11.0"
+        "ver": "0.11.1"
       },
       "widgets_values": [
         "IndexTTS-2.5",
@@ -158,7 +158,7 @@
       "properties": {
         "Node name for S&R": "LoadAudio",
         "cnr_id": "comfy-core",
-        "ver": "0.11.0"
+        "ver": "0.11.1"
       },
       "widgets_values": [
         "voice_reference.wav"
@@ -325,7 +325,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_Generate",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.11.0"
+        "ver": "0.11.1"
       },
       "widgets_values": [
         "这是 ASR 自动校对示例，节点会识别生成音频并计算相似度和字符错误率。",
@@ -448,7 +448,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_ASRProofread",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.11.0"
+        "ver": "0.11.1"
       },
       "widgets_values": [
         "这是 ASR 自动校对示例，节点会识别生成音频并计算相似度和字符错误率。",
@@ -498,7 +498,7 @@
       "properties": {
         "Node name for S&R": "SaveAudio",
         "cnr_id": "comfy-core",
-        "ver": "0.11.0"
+        "ver": "0.11.1"
       },
       "widgets_values": [
         "IndexTTS25_T8/asr_proofread"

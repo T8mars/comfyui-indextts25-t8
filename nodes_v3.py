@@ -988,6 +988,9 @@ class T8IndexTTS25DialogueGenerate(io.ComfyNode):
                 io.Combo.Input("asr_model", display_name="ASR 模型", options=list(ASR_MODELS), default="base"),
                 io.Combo.Input("asr_device", display_name="ASR 设备", options=["auto", "cuda", "cpu"], default="auto", advanced=True),
                 io.Float.Input("asr_threshold", display_name="ASR 通过阈值", default=0.82, min=0.0, max=1.0, step=0.01),
+                io.Combo.Input("subtitle_timing_mode", display_name="回写字幕时间", options=["actual", "original"], default="actual"),
+                io.Combo.Input("subtitle_text_mode", display_name="回写字幕文本", options=["asr_passed", "asr_all", "original"], default="asr_passed"),
+                io.Boolean.Input("subtitle_include_role", display_name="字幕保留角色前缀", default=True),
                 io.Int.Input(
                     "asr_retry_count",
                     display_name="校对失败自动重试次数",
@@ -996,11 +999,8 @@ class T8IndexTTS25DialogueGenerate(io.ComfyNode):
                     max=3,
                     step=1,
                     advanced=True,
-                    tooltip="每次使用不同 seed 重新生成，保留 ASR 相似度最高的版本；0 表示只校对不重试。",
+                    tooltip="追加在旧版控件之后以兼容已保存工作流；识别失败只写报告，不阻断音频输出。",
                 ),
-                io.Combo.Input("subtitle_timing_mode", display_name="回写字幕时间", options=["actual", "original"], default="actual"),
-                io.Combo.Input("subtitle_text_mode", display_name="回写字幕文本", options=["asr_passed", "asr_all", "original"], default="asr_passed"),
-                io.Boolean.Input("subtitle_include_role", display_name="字幕保留角色前缀", default=True),
             ],
             outputs=[
                 io.Audio.Output("audio", display_name="合并音频"),
@@ -1046,11 +1046,35 @@ class T8IndexTTS25DialogueGenerate(io.ComfyNode):
         missing = missing_roles(dialogue_script.lines, role_library.profiles)
         if missing:
             raise ValueError("以下角色没有连接音色：" + "、".join(missing))
-        review_enabled = bool(asr_enabled or int(asr_retry_count) > 0)
+        asr_warning = ""
+        legacy_retry_value = subtitle_timing_mode
+        legacy_timing_value = str(subtitle_text_mode).strip().lower()
+        legacy_text_value = str(subtitle_include_role).strip().lower()
+        if (
+            legacy_timing_value in {"actual", "original"}
+            and legacy_text_value in {"asr_passed", "asr_all", "original"}
+        ):
+            try:
+                legacy_retry_count = int(float(legacy_retry_value))
+            except (TypeError, ValueError, OverflowError):
+                legacy_retry_count = -1
+            if 0 <= legacy_retry_count <= 3:
+                subtitle_timing_mode = legacy_timing_value
+                subtitle_text_mode = legacy_text_value
+                subtitle_include_role = bool(asr_retry_count)
+                asr_retry_count = legacy_retry_count
+                asr_warning = "已自动还原 v0.11.0 工作流中错位的字幕与 ASR 重试选项。"
+        try:
+            retry_count = max(0, min(3, int(float(asr_retry_count or 0))))
+        except (TypeError, ValueError, OverflowError):
+            retry_count = 0
+            asr_warning = f"旧工作流 ASR 重试次数 {asr_retry_count!r} 无效，已按 0 次处理。"
+        review_requested = bool(asr_enabled or retry_count > 0)
+        review_enabled = review_requested
         if review_enabled and not asr_available(asr_backend):
-            raise RuntimeError(
-                "所选 ASR 后端不可用；请安装 openai-whisper / faster-whisper，或切换后端。"
-            )
+            review_enabled = False
+            unavailable = "所选 ASR 后端不可用；已跳过校对并保留原字幕，音频正常输出。"
+            asr_warning = "；".join(item for item in (asr_warning, unavailable) if item)
         work_handle = replace(model, release_after_run=False)
         clips: list[dict] = []
         line_reports: list[dict] = []
@@ -1123,7 +1147,7 @@ class T8IndexTTS25DialogueGenerate(io.ComfyNode):
                 selected_review: dict | None = None
                 selected_seed = int(seed) + offset
                 if review_enabled:
-                    for retry_index in range(max(0, int(asr_retry_count)) + 1):
+                    for retry_index in range(retry_count + 1):
                         candidate_seed = int(seed) + offset + retry_index * 100_003
                         if retry_index > 0:
                             try:
@@ -1276,13 +1300,24 @@ class T8IndexTTS25DialogueGenerate(io.ComfyNode):
             postprocess_strength,
         )
         waveform = combined_audio["waveform"]
-        rewritten_srt, subtitle_report = rewrite_srt(
-            dialogue_script.lines,
-            line_reports,
-            timing_mode=subtitle_timing_mode,
-            text_mode=subtitle_text_mode,
-            include_role=subtitle_include_role,
-        )
+        try:
+            rewritten_srt, subtitle_report = rewrite_srt(
+                dialogue_script.lines,
+                line_reports,
+                timing_mode=subtitle_timing_mode,
+                text_mode=subtitle_text_mode,
+                include_role=subtitle_include_role,
+            )
+        except Exception as exc:
+            rewritten_srt, subtitle_report = rewrite_srt(
+                dialogue_script.lines,
+                line_reports,
+                timing_mode="actual",
+                text_mode="original",
+                include_role=True,
+            )
+            subtitle_report["error"] = str(exc).strip() or type(exc).__name__
+            subtitle_report["fallback"] = "actual/original/include_role"
         report = {
             "script_type": dialogue_script.script_type,
             "timeline_policy": timeline_policy,
@@ -1290,14 +1325,16 @@ class T8IndexTTS25DialogueGenerate(io.ComfyNode):
             "slot_duration_mode": slot_duration_mode,
             "postprocess": postprocess_report,
             "asr": {
+                "requested": review_requested,
                 "enabled": review_enabled,
                 "backend": asr_backend,
                 "model": asr_model,
                 "device": asr_device,
                 "threshold": float(asr_threshold),
-                "maximum_retries": max(0, int(asr_retry_count)),
+                "maximum_retries": retry_count,
                 "reviewed": sum("asr" in item for item in line_reports),
                 "passed": sum(bool((item.get("asr") or {}).get("passed")) for item in line_reports),
+                "warning": asr_warning,
             },
             "subtitle_rewrite": subtitle_report,
             "sample_rate": sample_rate,

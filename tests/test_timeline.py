@@ -32,6 +32,19 @@ def test_timeline_json_edits_and_srt_rewrite():
         apply_timeline_edits(lines, rows)
 
 
+def test_srt_rewrite_accepts_legacy_numeric_and_shifted_widget_values():
+    lines = [DialogueLine(1, "旁白", "保留原始字幕", "ZH", 0, 1000, 1.0)]
+    rewritten, report = rewrite_srt(
+        lines,
+        [],
+        timing_mode=0,
+        text_mode="actual",
+    )
+    assert "保留原始字幕" in rewritten
+    assert report["timing_mode"] == "actual"
+    assert report["text_mode"] == "asr_passed"
+    assert len(report["warnings"]) == 2
+
 def test_timeline_editor_rejects_unbounded_allocations():
     lines = [DialogueLine(1, "旁白", "测试", "ZH")]
     with pytest.raises(ValueError, match="0–86400000"):

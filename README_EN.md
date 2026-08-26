@@ -345,6 +345,12 @@ Subtitle text modes are:
 - `asr_all`: replace whenever a transcription exists.
 - `asr_passed`: replace only when similarity passes the threshold.
 
+ASR is optional post-generation proofreading. If its backend is unavailable or one line cannot be transcribed,
+the node records a warning, keeps the original subtitle, and still returns the generated audio. Legacy workflows
+that stored subtitle choices as `0 / 1 / 2`, or whose values shifted after a widget-order change, are normalized to
+safe modes automatically. To repair an old node manually, set subtitle timing to `actual` and subtitle text to
+`asr_passed`; if numeric choices remain visible, delete and add the generation node again.
+
 Timeline Editor JSON uses milliseconds per row. This is a complete example; line numbers must be unique and contiguous:
 
 ```json

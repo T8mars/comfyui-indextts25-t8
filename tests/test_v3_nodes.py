@@ -149,6 +149,52 @@ def test_dialogue_generation_can_auto_review_and_return_rewritten_srt(tmp_path, 
     assert "\"reports\"" in result[4]
 
 
+def test_dialogue_keeps_audio_when_asr_is_unavailable_and_normalizes_old_widgets(tmp_path, monkeypatch):
+    _load_plugin()
+    from comfyui_indextts25_t8_test import nodes_v3
+    from comfyui_indextts25_t8_test.runtime.dialogue import DialogueLine
+    from comfyui_indextts25_t8_test.runtime.types import DialogueScript, ModelHandle, RoleLibrary, VoiceProfile
+
+    audio = {"waveform": __import__("torch").zeros(1, 1, 22050), "sample_rate": 22050}
+    monkeypatch.setattr(nodes_v3, "run_inference", lambda *args, **kwargs: (audio, "fake inference"))
+    monkeypatch.setattr(nodes_v3, "asr_available", lambda *args: False)
+    script = DialogueScript([DialogueLine(1, "角色A", "音频必须保留", "ZH", 0, 1000)], "srt")
+    library = RoleLibrary({"角色A": VoiceProfile("角色A", audio, "ZH")})
+    result = nodes_v3.T8IndexTTS25DialogueGenerate.execute(
+        model=ModelHandle(tmp_path, "cpu", False),
+        role_library=library,
+        dialogue_script=script,
+        seed=1,
+        timeline_policy="shift",
+        fit_srt_slots=False,
+        slot_duration_mode="native",
+        fit_tolerance_ms=180,
+        batch_gap_ms=200,
+        postprocess_preset="off",
+        postprocess_strength=1.0,
+        asr_enabled=True,
+        asr_backend="auto",
+        asr_model="base",
+        asr_device="auto",
+        asr_threshold=0.82,
+        subtitle_timing_mode=0,
+        subtitle_text_mode="actual",
+        subtitle_include_role="asr_passed",
+        asr_retry_count=True,
+    )
+    report = __import__("json").loads(result[2])
+    assert result[0]["waveform"].shape[-1] == 22050
+    assert report["asr"]["requested"] is True
+    assert report["asr"]["enabled"] is False
+    assert report["asr"]["maximum_retries"] == 0
+    assert "v0.11.0" in report["asr"]["warning"]
+    assert "音频正常输出" in report["asr"]["warning"]
+    assert report["subtitle_rewrite"]["timing_mode"] == "actual"
+    assert report["subtitle_rewrite"]["text_mode"] == "asr_passed"
+    assert report["subtitle_rewrite"]["include_role"] is True
+    assert "音频必须保留" in result[3]
+
+
 def test_pronunciation_node_outputs_portable_annotated_text():
     _load_plugin()
     from comfyui_indextts25_t8_test.nodes_v3 import T8IndexTTS25Pronunciation

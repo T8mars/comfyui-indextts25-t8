@@ -59,7 +59,7 @@ def properties(node_type: str, *, core: bool = False) -> dict[str, str]:
     return {
         "Node name for S&R": node_type,
         "cnr_id": "comfy-core" if core else "comfyui-indextts25-t8",
-        "ver": "0.11.0",
+        "ver": "0.11.1",
     }
 
 
@@ -544,10 +544,10 @@ def add_dialogue_generate(workflow: Workflow, pos=(1220, 240), *, policy="shift"
             widget_input("asr_model", "COMBO"),
             widget_input("asr_device", "COMBO"),
             widget_input("asr_threshold", "FLOAT"),
-            widget_input("asr_retry_count", "INT"),
             widget_input("subtitle_timing_mode", "COMBO"),
             widget_input("subtitle_text_mode", "COMBO"),
             widget_input("subtitle_include_role", "BOOLEAN"),
+            widget_input("asr_retry_count", "INT"),
         ],
         [
             output("audio", "AUDIO"),
@@ -556,7 +556,7 @@ def add_dialogue_generate(workflow: Workflow, pos=(1220, 240), *, policy="shift"
             output("rewritten_srt", "STRING"),
             output("timeline_report", "STRING"),
         ],
-        [20260818, "fixed", policy, fit, "native", 180, 200, "off", 1.0, False, "auto", "base", "auto", 0.82, 0, "actual", "asr_passed", True],
+        [20260818, "fixed", policy, fit, "native", 180, 200, "off", 1.0, False, "auto", "base", "auto", 0.82, "actual", "asr_passed", True, 0],
     )
 
 
