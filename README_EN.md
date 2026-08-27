@@ -20,7 +20,7 @@ Creator: **Bilibili: T8star-Aix**.
 
 This repository is locked to the IndexTTS 2.5 inference core and the official 2.5 model manifest. It will not fall back to or accidentally load IndexTTS 2.0.
 
-Current baseline: **ComfyUI Node 0.14.0 · Desktop 0.15.0 · Core `ee40fa7d` · Model `c39ce5ba`**.
+Current baseline: **ComfyUI Node 0.14.1 · Desktop 0.15.0 · Core `ee40fa7d` · Model `c39ce5ba`**.
 
 Version 0.14.0 adds an active-mode runtime benchmark, a manual upstream update check, safe conditioning reuse
 across model reloads, and retained multi-candidate quality selection. Desktop 0.15.0 can benchmark acceleration

@@ -51,6 +51,8 @@ def test_registers_all_pure_v3_nodes():
         "T8_IndexTTS25_AudioCppGenerate",
         "T8_IndexTTS25_AudioPostProcess",
         "T8_IndexTTS25_Environment",
+        "T8_IndexTTS25_UpdateCheck",
+        "T8_IndexTTS25_RuntimeBenchmark",
     ]
     assert all(schema.category == "T8star-Aix/Audio/IndexTTS 2.5" for schema in schemas)
     assert schemas[5].outputs[0].io_type == "AUDIO"
@@ -348,7 +350,7 @@ def test_single_generation_quality_retry_selects_first_passing_seed(
     from comfyui_indextts25_t8_test.runtime.types import ModelHandle
 
     generated_seeds = []
-    transcripts = iter(("错误文本", "目标文本"))
+    transcripts = iter(("错误文本", "目标文本", "另一段错误文本"))
 
     def fake_inference(*args, **kwargs):
         generated_seeds.append(int(kwargs["seed"]))
@@ -381,10 +383,12 @@ def test_single_generation_quality_retry_selects_first_passing_seed(
     )
 
     report = json.loads(result[1].split(" | quality=", 1)[1])
-    assert generated_seeds == [7, 100010]
+    assert generated_seeds == [7, 100010, 200013]
     assert report["selected_seed"] == 100010
-    assert report["attempt_count"] == 2
+    assert report["attempt_count"] == 3
+    assert report["additional_candidates"] == 2
     assert report["review"]["passed"] is True
+    assert len(result[2]) == 3
 
 
 def test_generate_keeps_audio_when_quality_asr_is_unavailable(tmp_path, monkeypatch):
@@ -415,7 +419,10 @@ def test_generate_keeps_audio_when_quality_asr_is_unavailable(tmp_path, monkeypa
     assert torch.equal(result[0]["waveform"], audio["waveform"])
     assert result[0]["sample_rate"] == audio["sample_rate"]
     assert report["requested"] is True and report["enabled"] is False
-    assert "保留生成音频" in report["warning"]
+    assert report["attempt_count"] == 3
+    assert report["selection_method"] == "technical"
+    assert len(result[2]) == 3
+    assert "保留全部候选" in report["warning"]
 
 
 def test_generate_keeps_audio_when_quality_asr_runtime_fails(tmp_path, monkeypatch):
@@ -449,8 +456,10 @@ def test_generate_keeps_audio_when_quality_asr_runtime_fails(tmp_path, monkeypat
     report = json.loads(result[1].split(" | quality=", 1)[1])
     assert torch.equal(result[0]["waveform"], audio["waveform"])
     assert result[0]["sample_rate"] == audio["sample_rate"]
-    assert report["attempt_count"] == 1
-    assert report["attempts"][0]["error"] == "download failed"
+    assert report["attempt_count"] == 3
+    assert len(result[2]) == 3
+    assert all(item["error"] == "download failed" for item in report["attempts"])
+    assert "音频技术指标选优" in report["warning"]
 
 
 def test_emotion_vector_is_safely_normalized():

@@ -132,7 +132,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_ModelLoader",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.14.0"
+        "ver": "0.14.1"
       },
       "widgets_values": [
         "IndexTTS-2.5",
@@ -312,7 +312,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_EmotionControl",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.14.0"
+        "ver": "0.14.1"
       },
       "widgets_values": [
         "vector",
@@ -492,7 +492,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_Generate",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.14.0"
+        "ver": "0.14.1"
       },
       "widgets_values": [
         "太好了，这个版本终于加入了真正可控的语速适配功能！",

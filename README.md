@@ -20,7 +20,7 @@ IndexTTS 2.5 的 ComfyUI V3 原生节点集成。节点菜单位于：
 
 本目录固定使用 IndexTTS 2.5 推理核心和正式 2.5 模型清单，不会回退或误载 IndexTTS 2.0。
 
-当前版本基线：**ComfyUI Node 0.14.0 · Desktop 0.15.0 · Core `ee40fa7d` · Model `c39ce5ba`**。
+当前版本基线：**ComfyUI Node 0.14.1 · Desktop 0.15.0 · Core `ee40fa7d` · Model `c39ce5ba`**。
 
 0.14.0 新增当前模式真实性能基准、手动上游更新检查、跨模型重载的安全参考条件缓存，以及保留全部音频的多候选质量筛选；
 Desktop 0.15.0 可依次实测加速模式并给出推荐，所有耗时或联网操作仍必须由用户主动触发。
