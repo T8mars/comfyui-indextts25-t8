@@ -5,7 +5,7 @@
 - 上游代码仓库：`index-tts/index-tts`
 - 固定代码提交：`ee40fa7d6c6b8a2c7f06105f9f1e65775b74868c`
 - 本节点完整模型仓库：`t8star/IndexTTS-2.5-T8`
-- 固定完整模型版本：`45ddbcc709e1219ff044cc51d5873079333d5726`
+- 固定完整模型版本：`faebd7a1e7c8b1727113d079bb0fbe4a4de7c54e`
 - 上游正式模型仓库：`IndexTeam/IndexTTS-2.5`
 - 固定上游模型版本：`c39ce5ba981572cb187443877ff559dfb246ce63`
 - 必需分词器 `bpe.model`：`IndexTeam/IndexTTS-2`，固定版本 `740dcaff396282ffb241903d150ac011cd4b1ede`

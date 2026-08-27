@@ -21,7 +21,12 @@ Creator: **Bilibili: T8star-Aix**.
 
 This repository is locked to the IndexTTS 2.5 inference core and the official 2.5 model manifest. It will not fall back to or accidentally load IndexTTS 2.0.
 
-Current baseline: **ComfyUI Node 0.16.0 · Desktop 0.16.0 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**.
+Current baseline: **ComfyUI Node 0.16.1 · Desktop 0.16.0 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**.
+
+### v0.16.1 model-directory guidance
+
+- The English and Chinese GitHub READMEs and Hugging Face model card now show the separate node/model directory tree, complete Windows paths, and a concrete extra-nesting mistake to avoid.
+- Keep the complete model at `ComfyUI/models/TTS/IndexTTS-2.5/` and the node code at `ComfyUI/custom_nodes/comfyui-indextts25-T8/`.
 
 ### v0.16.0 complete model bundle and opt-in repair
 
@@ -244,11 +249,46 @@ Chinese number/date normalization is optional. On Windows you can install `wetex
 
 ## Model location
 
-Model weights do not belong in the custom node directory. The standard location is:
+Node code and model weights belong in two separate directories:
 
 ```text
-ComfyUI/models/TTS/IndexTTS-2.5/
+ComfyUI/
+├─ custom_nodes/
+│  └─ comfyui-indextts25-T8/       # this GitHub node repository
+└─ models/
+   └─ TTS/
+      └─ IndexTTS-2.5/             # every file from the complete HF repository
+         ├─ config.yaml
+         ├─ bpe.model
+         ├─ gpt.pth
+         ├─ codec.pth
+         ├─ s2mel.pth
+         ├─ feat1.pt
+         ├─ feat2.pt
+         ├─ wav2vec2bert_stats.pt
+         ├─ multilingual_zh_ja_yue_char_del.tiktoken
+         ├─ qwen0.6bemo4-merge/
+         └─ hf_cache/
+            ├─ w2v-bert-2.0/
+            ├─ campplus_cn_common.bin
+            └─ bigvgan/
 ```
+
+Example Windows paths:
+
+```text
+D:\ComfyUI\models\TTS\IndexTTS-2.5\config.yaml
+D:\ComfyUI\models\TTS\IndexTTS-2.5\bpe.model
+D:\ComfyUI\models\TTS\IndexTTS-2.5\hf_cache\bigvgan\bigvgan_generator.pt
+```
+
+`config.yaml`, `bpe.model`, and `gpt.pth` must be direct children of `IndexTTS-2.5`. Do not leave an extra nested directory such as:
+
+```text
+ComfyUI/models/TTS/IndexTTS-2.5/IndexTTS-2.5-T8/config.yaml  # wrong
+```
+
+If a browser download extracts as `IndexTTS-2.5-T8`, rename it to `IndexTTS-2.5` or move all its contents into the standard directory. Restart or refresh ComfyUI after manual placement.
 
 This is the only exception to shipping the whole repository: node code, manifests, scripts, licenses, examples, and tests are included here, while the approximately 7.7 GiB complete model follows ComfyUI's shared model-directory convention.
 
@@ -537,7 +577,7 @@ See [`SECURITY_REVIEW.md`](SECURITY_REVIEW.md) for Registry scan notes and the b
 
 - IndexTTS code: `ee40fa7d6c6b8a2c7f06105f9f1e65775b74868c`
 - Upstream IndexTTS 2.5 model: `c39ce5ba981572cb187443877ff559dfb246ce63`
-- Complete model bundle: `45ddbcc709e1219ff044cc51d5873079333d5726`
+- Complete model bundle: `faebd7a1e7c8b1727113d079bb0fbe4a4de7c54e`
 - Model manifest: `manifests/model_2_5.json`
 
 ## Official project, model downloads, and acknowledgements

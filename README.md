@@ -21,7 +21,12 @@ IndexTTS 2.5 的 ComfyUI V3 原生节点集成。节点菜单位于：
 
 本目录固定使用 IndexTTS 2.5 推理核心和正式 2.5 模型清单，不会回退或误载 IndexTTS 2.0。
 
-当前版本基线：**ComfyUI Node 0.16.0 · Desktop 0.16.0 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**。
+当前版本基线：**ComfyUI Node 0.16.1 · Desktop 0.16.0 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**。
+
+### v0.16.1 模型目录说明
+
+- GitHub 中英文 README 与 Hugging Face 模型卡同步增加节点/模型分离目录树、Windows 完整路径和“多套一层目录”的错误示例。
+- 完整模型仍放在 `ComfyUI/models/TTS/IndexTTS-2.5/`，节点代码放在 `ComfyUI/custom_nodes/comfyui-indextts25-T8/`。
 
 ### v0.16.0 完整模型单仓库与按需修复
 
@@ -259,11 +264,46 @@ Windows 便携版：
 
 ## 模型位置
 
-权重不放在 custom node 目录，标准位置为：
+节点代码和模型权重是两个不同目录，标准位置为：
 
 ```text
-ComfyUI/models/TTS/IndexTTS-2.5/
+ComfyUI/
+├─ custom_nodes/
+│  └─ comfyui-indextts25-T8/       ← 本 GitHub 节点仓库
+└─ models/
+   └─ TTS/
+      └─ IndexTTS-2.5/             ← HF 完整模型仓库的全部文件
+         ├─ config.yaml
+         ├─ bpe.model
+         ├─ gpt.pth
+         ├─ codec.pth
+         ├─ s2mel.pth
+         ├─ feat1.pt
+         ├─ feat2.pt
+         ├─ wav2vec2bert_stats.pt
+         ├─ multilingual_zh_ja_yue_char_del.tiktoken
+         ├─ qwen0.6bemo4-merge/
+         └─ hf_cache/
+            ├─ w2v-bert-2.0/
+            ├─ campplus_cn_common.bin
+            └─ bigvgan/
 ```
+
+Windows 完整路径示例：
+
+```text
+D:\ComfyUI\models\TTS\IndexTTS-2.5\config.yaml
+D:\ComfyUI\models\TTS\IndexTTS-2.5\bpe.model
+D:\ComfyUI\models\TTS\IndexTTS-2.5\hf_cache\bigvgan\bigvgan_generator.pt
+```
+
+`config.yaml`、`bpe.model` 和 `gpt.pth` 必须直接位于 `IndexTTS-2.5` 目录中。不要出现下面这种多套一层的错误路径：
+
+```text
+ComfyUI/models/TTS/IndexTTS-2.5/IndexTTS-2.5-T8/config.yaml  ← 错误
+```
+
+如果从 HF 网页下载并解压后目录名是 `IndexTTS-2.5-T8`，请把它重命名为 `IndexTTS-2.5`，或把里面的全部文件移动到标准目录。手动放置后重启或刷新 ComfyUI。
 
 这是唯一例外：节点所需的代码、清单、脚本、许可证、示例和测试都在本目录；约 7.7 GiB 的完整模型遵循
 ComfyUI 模型目录规范，可由多个工作流共享，避免复制。
@@ -587,7 +627,7 @@ Registry 安全扫描说明与剩余敏感操作的边界见 [`SECURITY_REVIEW.m
 
 - IndexTTS 代码：`ee40fa7d6c6b8a2c7f06105f9f1e65775b74868c`
 - IndexTTS 2.5 上游模型：`c39ce5ba981572cb187443877ff559dfb246ce63`
-- 完整模型仓库：`45ddbcc709e1219ff044cc51d5873079333d5726`
+- 完整模型仓库：`faebd7a1e7c8b1727113d079bb0fbe4a4de7c54e`
 - 模型清单：`manifests/model_2_5.json`
 
 ## 官方项目、模型下载与致谢
