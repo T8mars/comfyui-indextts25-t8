@@ -39,6 +39,7 @@
 | `28_low_vram_fp16.json` | 低显存 FP16、CPU 参考编码器与快速默认情感 | `voice_reference.wav` |
 | `29_runtime_benchmark.json` | 对当前模型加载器实际生效模式测量中位/最佳 RTF 与峰值显存 | `voice_reference.wav` |
 | `30_update_check.json` | 手动检查官方代码、官方模型和节点版本，只输出报告 | 无 |
+| `31_per_line_emotion.json` | 同一个角色逐句切换文本情感、八维向量与角色默认情感 | `role_a.wav`、`role_b.wav` |
 
 ## 使用方法
 
@@ -49,10 +50,12 @@
    `mode.xxx` 扁平路径格式。
 
 角色音色库同样使用 V3 自动增长扁平路径 `voices.voice_0`、`voices.voice_1`。SRT 示例默认使用
-原生长度调节器单次适配字幕槽位，并在最终输出做采样点级收尾；目标时长与自然语速差异过大时仍可能影响听感。
+`pad` 安全适配字幕槽位：短音频补静音、超长音频保留；`native/exact` 才会在最终输出裁剪到精确长度。
 
 示例 23 中，每个“情感控制”先连接到对应的“角色音色”，再由 `Merge Voice Emotions` 汇总角色。
 该节点合并的是角色配置列表，不是把两个角色的八维情绪数值平均到一起。
+示例 31 则只使用同一个 `角色A` 音色，通过每条 JSON 台词里的 `emotion` 字段逐句覆盖情感；省略
+`emotion` 的台词会自动回到角色音色节点保存的默认情感。
 
 示例 20 需要可选的 `openai-whisper`，首次运行会从网络下载所选模型到
 `ComfyUI/models/TTS/Whisper/`。示例 21 的 `start_ms / end_ms` 单位均为毫秒；示例 22 内置的是可直接

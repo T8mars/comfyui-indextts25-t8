@@ -13,8 +13,11 @@ def test_timeline_json_edits_and_srt_rewrite():
     ]
     rows = timeline_rows(lines)
     rows[0][3:5] = [100, 900]
+    rows[0][7] = "text:紧张、急促"
     edited = apply_timeline_edits(lines, rows)
     assert edited[0].slot_ms == 800
+    assert edited[0].emotion_mode == "text"
+    assert edited[0].emotion_text == "紧张、急促"
     assert "\"lines\"" in timeline_json(edited)
 
     reports = [
@@ -23,7 +26,7 @@ def test_timeline_json_edits_and_srt_rewrite():
     ]
     srt, report = rewrite_srt(edited, reports, timing_mode="actual", text_mode="asr_passed")
     assert "00:00:00,050 --> 00:00:00,850" in srt
-    assert "[A] 识别一" in srt
+    assert "[A|emotion=text:紧张、急促] 识别一" in srt
     assert "[B] second" in srt
     assert report["lines"][0]["source"] == "asr"
 

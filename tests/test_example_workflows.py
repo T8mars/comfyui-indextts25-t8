@@ -43,6 +43,7 @@ EXAMPLES = (
     "28_low_vram_fp16",
     "29_runtime_benchmark",
     "30_update_check",
+    "31_per_line_emotion",
 )
 
 

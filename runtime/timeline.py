@@ -9,7 +9,12 @@ from typing import Any, Sequence
 
 import torch
 
-from .dialogue import MAX_TIMELINE_MS, DialogueLine
+from .dialogue import (
+    MAX_TIMELINE_MS,
+    DialogueLine,
+    format_emotion_override,
+    parse_emotion_override,
+)
 
 
 TIMELINE_HEADERS = [
@@ -20,6 +25,7 @@ TIMELINE_HEADERS = [
     "end_ms",
     "duration_factor",
     "text",
+    "emotion",
 ]
 
 
@@ -33,6 +39,7 @@ def timeline_rows(lines: Sequence[DialogueLine]) -> list[list[Any]]:
             line.end_ms,
             line.duration_factor,
             line.text,
+            format_emotion_override(line),
         ]
         for line in lines
     ]
@@ -92,15 +99,42 @@ def apply_timeline_edits(
         factor = float(value.get("duration_factor", 1.0))
         if not 0.5 <= factor <= 2.0:
             raise ValueError(f"时间轴第 {position} 行时长系数必须在 0.5–2.0。")
+        original = originals[index]
+        if "emotion" in value:
+            emotion = parse_emotion_override(value.get("emotion"), index=index)
+        elif any(
+            key in value
+            for key in (
+                "emotion_mode",
+                "emotion_text",
+                "emotion_vector",
+                "emotion_strength",
+                "emotion_use_random",
+            )
+        ):
+            emotion = parse_emotion_override(value, index=index)
+        else:
+            emotion = (
+                original.emotion_mode,
+                original.emotion_text,
+                original.emotion_vector,
+                original.emotion_strength,
+                original.emotion_use_random,
+            )
         result.append(
             replace(
-                originals[index],
+                original,
                 role=role,
                 text=text,
                 language=language,
                 start_ms=start,
                 end_ms=end,
                 duration_factor=factor,
+                emotion_mode=emotion[0],
+                emotion_text=emotion[1],
+                emotion_vector=emotion[2],
+                emotion_strength=emotion[3],
+                emotion_use_random=emotion[4],
             )
         )
     return result
@@ -185,7 +219,12 @@ def rewrite_srt(
             )
         )
         text = recognized if use_asr else line.text
-        rendered = f"[{line.role}] {text}" if include_role else text
+        if include_role:
+            emotion_tag = format_emotion_override(line)
+            role_tag = f"{line.role}|emotion={emotion_tag}" if emotion_tag else line.role
+            rendered = f"[{role_tag}] {text}"
+        else:
+            rendered = text
         blocks.append(
             f"{output_index}\n{format_srt_timestamp(start)} --> {format_srt_timestamp(end)}\n{rendered}"
         )

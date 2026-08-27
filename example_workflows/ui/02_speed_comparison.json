@@ -134,7 +134,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_ModelLoader",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.14.1"
+        "ver": "0.15.0"
       },
       "widgets_values": [
         "IndexTTS-2.5",
@@ -359,7 +359,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_Generate",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.14.1"
+        "ver": "0.15.0"
       },
       "widgets_values": [
         "这是 IndexTTS 二点五官方语速适配功能的对比测试。",
@@ -587,7 +587,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_Generate",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.14.1"
+        "ver": "0.15.0"
       },
       "widgets_values": [
         "这是 IndexTTS 二点五官方语速适配功能的对比测试。",
@@ -815,7 +815,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_Generate",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.14.1"
+        "ver": "0.15.0"
       },
       "widgets_values": [
         "这是 IndexTTS 二点五官方语速适配功能的对比测试。",

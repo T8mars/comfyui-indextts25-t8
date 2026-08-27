@@ -725,7 +725,7 @@ def add_dialogue_generate(
             "fixed",
             policy,
             fit,
-            "native",
+            "pad",
             180,
             200,
             "off",
@@ -1121,7 +1121,7 @@ def api_dialogue_generate(
             "seed": 20260818,
             "timeline_policy": policy,
             "fit_srt_slots": fit,
-            "slot_duration_mode": "native",
+            "slot_duration_mode": "pad",
             "fit_tolerance_ms": 180,
             "batch_gap_ms": 200,
             "postprocess_preset": "off",
@@ -1601,6 +1601,44 @@ def multi_role_emotions_pair() -> tuple[dict[str, Any], dict[str, Any]]:
         "11": api_save("10", "IndexTTS25_T8/multi_role_emotions"),
     }
     return workflow.as_dict(), api
+
+
+def per_line_emotion_pair() -> tuple[dict[str, Any], dict[str, Any]]:
+    script = json.dumps(
+        [
+            {
+                "role": "角色A",
+                "text": "我先平静地把事情说明白。",
+                "language": "ZH",
+                "duration_factor": 1.0,
+                "emotion": {
+                    "mode": "text",
+                    "text": "平静、从容、像正常说明情况",
+                    "strength": 0.75,
+                },
+            },
+            {
+                "role": "角色A",
+                "text": "可是你为什么一直在骗我！",
+                "language": "ZH",
+                "duration_factor": 1.0,
+                "emotion": {
+                    "mode": "vector",
+                    "vector": [0.0, 0.8, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                    "strength": 0.85,
+                },
+            },
+            {
+                "role": "角色A",
+                "text": "这一句没有 emotion 字段，会继承角色默认情感。",
+                "language": "ZH",
+                "duration_factor": 1.0,
+            },
+        ],
+        ensure_ascii=False,
+        indent=2,
+    )
+    return _dialogue_pair("31 同一角色逐句情感覆盖", "batch", script)
 
 
 def acceleration_pair() -> tuple[dict[str, Any], dict[str, Any]]:
@@ -2131,6 +2169,7 @@ EXAMPLES = {
     "28_low_vram_fp16": low_vram_fp16_pair,
     "29_runtime_benchmark": runtime_benchmark_pair,
     "30_update_check": update_check_pair,
+    "31_per_line_emotion": per_line_emotion_pair,
 }
 
 

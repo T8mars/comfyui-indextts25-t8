@@ -43,6 +43,24 @@ def test_plain_batch_preserves_pronunciation_annotation_delimiters():
     assert lines[1].duration_factor == pytest.approx(0.9)
 
 
+def test_same_role_supports_per_line_emotion_overrides():
+    lines = parse_batch_script(
+        "旁白|先平静介绍。|ZH|1.0|text:平静、从容\n"
+        "旁白|随后突然生气。|ZH|1.0|vector:0,0.8,0,0,0,0,0,0\n"
+        "旁白|恢复角色默认。|ZH|1.0"
+    )
+    assert [line.emotion_mode for line in lines] == ["text", "vector", "inherit"]
+    assert lines[0].emotion_text == "平静、从容"
+    assert lines[1].emotion_vector[1] == pytest.approx(0.8)
+
+    srt_line = parse_srt(
+        "1\n00:00:00,000 --> 00:00:02,000\n"
+        "[旁白|emotion=text:惊讶、激动] 怎么会这样？"
+    )[0]
+    assert srt_line.role == "旁白"
+    assert srt_line.emotion_text == "惊讶、激动"
+
+
 @pytest.mark.parametrize(
     "payload",
     [

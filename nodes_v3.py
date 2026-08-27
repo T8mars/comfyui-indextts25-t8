@@ -1074,6 +1074,42 @@ def _emotion_mode_label(emotion: EmotionConfig | None) -> str:
     }.get(emotion.mode, emotion.mode)
 
 
+def _resolve_line_emotion(line, profile: VoiceProfile) -> tuple[EmotionConfig | None, str]:
+    """Return the line override, or the saved role emotion when it is inherited."""
+
+    mode = str(getattr(line, "emotion_mode", "inherit") or "inherit")
+    if mode == "inherit":
+        return profile.emotion, "role_default"
+    if mode == "speaker":
+        return (
+            EmotionConfig(mode="speaker", strength=float(line.emotion_strength)),
+            "line_override",
+        )
+    if mode == "vector":
+        vector = getattr(line, "emotion_vector", None)
+        if vector is None or len(vector) != 8:
+            raise ValueError(f"第 {line.index} 条台词的八维情感向量无效。")
+        return (
+            EmotionConfig(
+                mode="vector",
+                vector=tuple(float(item) for item in vector),
+                strength=float(line.emotion_strength),
+                use_random=bool(line.emotion_use_random),
+            ),
+            "line_override",
+        )
+    if mode == "text":
+        return (
+            EmotionConfig(
+                mode="text",
+                text=str(line.emotion_text or line.text),
+                strength=float(line.emotion_strength),
+            ),
+            "line_override",
+        )
+    raise ValueError(f"第 {line.index} 条台词使用了未知情感模式：{mode}")
+
+
 def _voice_profiles(value) -> list[VoiceProfile]:
     if isinstance(value, VoiceProfile):
         return [value]
@@ -1189,7 +1225,9 @@ class T8IndexTTS25DialogueScript(io.ComfyNode):
             category=CATEGORY,
             search_aliases=["SRT", "字幕配音", "批量台词", "dialogue script"],
             description=(
-                "批量格式：角色|台词|语言|时长系数；SRT 支持 [角色] 台词 或 角色: 台词。"
+                "批量格式：角色|台词|语言|时长系数|逐句情感；最后一列支持 text:描述 或 "
+                "vector:喜,怒,哀,惧,厌恶,低落,惊喜,平静。SRT 可写 "
+                "[角色|emotion=text:生气、激动] 台词；留空继承角色默认情感。"
             ),
             inputs=[
                 io.Combo.Input(
@@ -1203,9 +1241,13 @@ class T8IndexTTS25DialogueScript(io.ComfyNode):
                     display_name="批量台词或 SRT",
                     multiline=True,
                     dynamic_prompts=False,
-                    default="旁白|欢迎使用多角色批量配音。|ZH|1.0\n角色A|这是第二句。|ZH|0.9",
+                    default=(
+                        "旁白|先用平静语气介绍。|ZH|1.0|text:平静、从容\n"
+                        "旁白|同一个角色突然非常生气！|ZH|1.0|vector:0,0.8,0,0,0,0,0,0\n"
+                        "旁白|这一句恢复角色默认情感。|ZH|1.0"
+                    ),
                     tooltip=(
-                        "支持 角色|台词|语言|时长系数、JSON 数组或 SRT。"
+                        "支持 角色|台词|语言|时长系数|逐句情感、JSON 数组或 SRT。"
                         "此输入已关闭 ComfyUI 动态提示词解析，JSON 的大括号不会被改写。"
                     ),
                 ),
@@ -1308,6 +1350,11 @@ class T8IndexTTS25TimelineEditor(io.ComfyNode):
                 "end_ms",
                 "duration_factor",
                 "text",
+                "emotion_mode",
+                "emotion_text",
+                "emotion_vector",
+                "emotion_strength",
+                "emotion_use_random",
             ],
             "lines": [line.to_dict() for line in lines],
         }
@@ -1358,8 +1405,11 @@ class T8IndexTTS25DialogueGenerate(io.ComfyNode):
                     "slot_duration_mode",
                     display_name="字幕槽位收尾模式",
                     options=["native", "natural", "pad", "exact"],
-                    default="native",
-                    tooltip="native 原生单次控制（推荐）；natural 二次适配；pad/exact 为兼容收尾。",
+                    default="pad",
+                    tooltip=(
+                        "pad（推荐）短则补静音、超长保留；natural 不裁剪；"
+                        "native/exact 最后可能裁掉超过槽位的句尾。"
+                    ),
                 ),
                 io.Int.Input(
                     "fit_tolerance_ms",
@@ -1541,6 +1591,7 @@ class T8IndexTTS25DialogueGenerate(io.ComfyNode):
             for offset, line in enumerate(dialogue_script.lines):
                 profile = role_library.profiles[line.role]
                 language = line.language or profile.language
+                resolved_emotion, emotion_source = _resolve_line_emotion(line, profile)
                 native_slot = bool(
                     fit_srt_slots and line.slot_ms and slot_duration_mode == "native"
                 )
@@ -1553,7 +1604,7 @@ class T8IndexTTS25DialogueGenerate(io.ComfyNode):
                         language,
                         line.duration_factor,
                         int(seed) + offset,
-                        emotion=profile.emotion,
+                        emotion=resolved_emotion,
                         sampling=sampling,
                         target_duration_seconds=(line.slot_ms / 1000.0)
                         if native_slot
@@ -1569,7 +1620,7 @@ class T8IndexTTS25DialogueGenerate(io.ComfyNode):
                         language,
                         line.duration_factor,
                         int(seed) + offset,
-                        emotion=profile.emotion,
+                        emotion=resolved_emotion,
                         sampling=sampling,
                     )
                 actual_ms = audio["waveform"].shape[-1] * 1000 / audio["sample_rate"]
@@ -1596,7 +1647,7 @@ class T8IndexTTS25DialogueGenerate(io.ComfyNode):
                             language,
                             fitted,
                             int(seed) + offset,
-                            emotion=profile.emotion,
+                            emotion=resolved_emotion,
                             sampling=sampling,
                         )
                         used_factor = fitted
@@ -1628,7 +1679,7 @@ class T8IndexTTS25DialogueGenerate(io.ComfyNode):
                                     language,
                                     used_factor,
                                     candidate_seed,
-                                    emotion=profile.emotion,
+                                    emotion=resolved_emotion,
                                     sampling=sampling,
                                     target_duration_seconds=(line.slot_ms / 1000.0)
                                     if native_slot
@@ -1642,7 +1693,7 @@ class T8IndexTTS25DialogueGenerate(io.ComfyNode):
                                     language,
                                     used_factor,
                                     candidate_seed,
-                                    emotion=profile.emotion,
+                                    emotion=resolved_emotion,
                                     sampling=sampling,
                                 )
                             candidate_adjustment = duration_adjustment
@@ -1746,6 +1797,10 @@ class T8IndexTTS25DialogueGenerate(io.ComfyNode):
                     "native_duration": native_slot,
                     "native_duration_fallback": native_fallback,
                     "duration_adjustment": duration_adjustment,
+                    "emotion_source": emotion_source,
+                    "effective_emotion_mode": (
+                        resolved_emotion.mode if resolved_emotion is not None else "speaker"
+                    ),
                     "status": status,
                 }
                 if review_enabled:
@@ -2214,7 +2269,7 @@ class T8IndexTTS25AudioCppGenerate(io.ComfyNode):
                 ),
                 io.Float.Input(
                     "duration_factor",
-                    display_name="时长系数（无单位）",
+                    display_name="官方时长适配倍率（无单位）",
                     default=1.0,
                     min=0.5,
                     max=2.0,
@@ -2425,7 +2480,7 @@ class T8IndexTTS25RuntimeBenchmark(io.ComfyNode):
                 ),
                 io.Float.Input(
                     "duration_factor",
-                    display_name="时长系数",
+                    display_name="官方时长适配倍率",
                     default=1.0,
                     min=0.5,
                     max=2.0,
@@ -2569,20 +2624,26 @@ class T8IndexTTS25Generate(io.ComfyNode):
                 ),
                 io.Float.Input(
                     "duration_factor",
-                    display_name="时长系数（越小越快）",
+                    display_name="官方时长适配倍率（越小越短）",
                     default=1.0,
                     min=0.5,
                     max=2.0,
                     step=0.05,
                     display_mode=io.NumberDisplay.slider,
-                    tooltip="官方语速适配：0.5 更快、1.0 原速、2.0 更慢。",
+                    tooltip=(
+                        "控制目标声学长度，不等同于自然语气语速；建议 0.8–1.25，"
+                        "极端值可能拉长或失真。"
+                    ),
                 ),
                 io.Combo.Input(
                     "target_duration_mode",
                     display_name="目标时长模式",
                     options=["off", "native", "natural", "pad", "exact"],
                     default="off",
-                    tooltip="native 为原生单次控制（推荐）；natural 二次推理；pad/exact 为兼容后处理。",
+                    tooltip=(
+                        "natural/pad 不裁掉超长句；native/exact 会在最后精确裁剪，"
+                        "只适合必须严格对齐且确认台词能完整放入的场景。"
+                    ),
                 ),
                 io.Float.Input(
                     "target_duration_seconds",

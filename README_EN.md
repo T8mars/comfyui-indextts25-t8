@@ -20,10 +20,18 @@ Creator: **Bilibili: T8star-Aix**.
 
 This repository is locked to the IndexTTS 2.5 inference core and the official 2.5 model manifest. It will not fall back to or accidentally load IndexTTS 2.0.
 
-Current baseline: **ComfyUI Node 0.14.1 · Desktop 0.15.0 · Core `ee40fa7d` · Model `c39ce5ba`**.
+Current baseline: **ComfyUI Node 0.15.0 · Desktop 0.16.0 · Core `ee40fa7d` · Model `c39ce5ba`**.
+
+### v0.15.0 per-line emotion and tail-safe subtitle slots
+
+- The same role can override text emotion or an eight-dimensional vector on every batch, JSON, SRT, or timeline line; omitted values inherit the Voice Profile default.
+- New `31_per_line_emotion.json` demonstrates one voice switching between calm, angry, and inherited emotion line by line.
+- Subtitle-slot defaults now use `pad`, preserving overlong tails; `native/exact` explicitly warn that they can trim.
+- Desktop 0.16.0 streams through bundled PyAV and no longer requires system FFmpeg/FFprobe.
+- `duration_factor` is now consistently described as official acoustic-duration adaptation rather than natural prosodic speaking rate.
 
 Version 0.14.0 adds an active-mode runtime benchmark, a manual upstream update check, safe conditioning reuse
-across model reloads, and retained multi-candidate quality selection. Desktop 0.15.0 can benchmark acceleration
+across model reloads, and retained multi-candidate quality selection. Desktop 0.16.0 can benchmark acceleration
 modes sequentially and recommend one; every expensive or network operation remains explicitly user-triggered. The formal model manifest keeps
 the shared `bpe.model` tokenizer pinned to `IndexTeam/IndexTTS-2`; both download paths fetch and verify it.
 Desktop and Node are separate deliverables with independent versions; Core/Model identify the pinned official code and weight revisions.
@@ -103,7 +111,7 @@ Desktop and Node are separate deliverables with independent versions; Core/Model
 6. `IndexTTS 2.5 Speech Generation · T8star-Aix`
    - Standard ComfyUI `AUDIO` input and output
    - Chinese, English, Japanese, Spanish, and Arabic entry points
-   - Voice cloning, seed, and the official `duration_factor=0.5–2.0` duration/speed adaptation
+   - Voice cloning, seed, and official `duration_factor=0.5–2.0` acoustic-duration adaptation; this is not natural prosodic speaking rate, and extreme values may sound stretched
    - Target duration through one-pass native length regulation, natural second-pass adaptation, silence padding, or exact compatibility mode
    - Optional voice clarity, clear narration, de-harsh, warmth, and peak-normalization post-processing
    - Generates one to four retained candidates and exposes an AUDIO list; selection combines ASR similarity with waveform quality when ASR is available and falls back to waveform quality alone
@@ -115,13 +123,14 @@ Desktop and Node are separate deliverables with independent versions; Core/Model
    - Compatibility/search name matching the community term `Merge Voice Emotions`; output is identical to Voice / Emotion Merge
    - Merges role configurations, not multiple eight-dimensional vectors into a new emotion
 10. `IndexTTS 2.5 Batch Dialogue / SRT · T8star-Aix`
-    - Parses `role|text|language|duration factor`, JSON arrays, and standard SRT
+    - Parses `role|text|language|duration factor|per-line emotion`, JSON arrays, and standard SRT
+    - Every line can override the same role's emotion with a text description or eight-dimensional vector; an empty value inherits the role default
     - `<text|pronunciation>` inside a plain batch line is preserved as text; JSON remains available for complex content
-    - SRT role syntax supports `[Role] text` and `Role: text`, with a structured preview
+    - SRT supports `[Role] text`, `Role: text`, and `[Role|emotion=text:angry] text`, with a structured preview
     - Dynamic prompt parsing is disabled for the script input, so JSON braces are preserved when queueing
 11. `IndexTTS 2.5 Multi-role / SRT Generation · T8star-Aix`
     - Per-line inference, per-line AUDIO list, merged AUDIO, and a JSON report
-    - `shift` conflict resolution or `overlay` timeline mixing; subtitle slots use native one-pass adaptation by default, with a legacy second-pass compatibility option
+    - `shift` conflict resolution or `overlay` timeline mixing; subtitle slots default to tail-safe `pad`, while `native/exact` are reserved for hard slots where trimming is acceptable
     - Optional per-line ASR retry, with every seed, score, and final selection recorded in the task report
 12. `IndexTTS 2.5 Voice Post-processing · T8star-Aix`
     - Processes any ComfyUI AUDIO independently, with wet/dry strength and target peak, without FFmpeg
@@ -130,7 +139,7 @@ Desktop and Node are separate deliverables with independent versions; Core/Model
     - Reports installed torch/CUDA Runtime/FlashAttention/Triton/DeepSpeed/Ninja versions, then recommends precision, reference placement, and a safe mode
     - Never installs optional dependencies and keeps preflight availability distinct from the mode that actually initializes after startup
 14. `IndexTTS 2.5 Timeline Editor · T8star-Aix`
-    - Accepts a batch/SRT script and editable JSON to change per-line start, end, role, language, and duration factor in milliseconds
+    - Accepts a batch/SRT script and editable JSON to change per-line start, end, role, language, duration factor, and emotion override
     - Outputs a strictly validated script, structured JSON, and a standard `IMAGE` timeline preview
 15. `IndexTTS 2.5 ASR Proofreading · T8star-Aix`
     - Uses optional local OpenAI Whisper or faster-whisper to transcribe AUDIO and compare it with target text
@@ -292,23 +301,48 @@ Emotion Control B ──► Voice Profile B │
 Reference Audio B ──►                 ┘
 ```
 
-Each line reads only the emotion stored for its assigned role. See `23_multi_role_emotions.json` for a complete runnable graph. Here, “merge” means collecting role configurations. To mix “60% sadness + 40% anger” into one eight-dimensional emotion, set both dimensions in a single Emotion Control node.
+Each line inherits the emotion stored for its assigned role unless that line supplies an override. See
+`23_multi_role_emotions.json` for role defaults and `31_per_line_emotion.json` for one role changing emotion
+from line to line. Here, “merge” means collecting role configurations. To mix “60% sadness + 40% anger”
+into one eight-dimensional emotion, set both dimensions in one vector.
 
-Batch text uses one line per utterance. Language and duration factor are optional:
+Batch text uses one line per utterance. Language, duration factor, and per-line emotion are optional:
 
 ```text
-Role A|You finally made it.|EN|1.0
-Role B|Good. Let's begin.|EN|0.9
+Role A|Let me explain this calmly first.|EN|1.0|text:calm and composed
+Role A|Why have you been lying to me!|EN|1.0|vector:0,0.8,0,0,0,0,0,0
+Role A|This line returns to the role default.|EN|1.0
 ```
 
 JSON is also supported:
 
 ```json
 [
-  {"role": "Role A", "text": "First line.", "language": "EN", "duration_factor": 1.0},
-  {"role": "Role B", "text": "Second line.", "language": "EN", "duration_factor": 0.9}
+  {
+    "role": "Role A",
+    "text": "Let me explain this calmly first.",
+    "language": "EN",
+    "duration_factor": 1.0,
+    "emotion": {"mode": "text", "text": "calm and composed", "strength": 0.75}
+  },
+  {
+    "role": "Role A",
+    "text": "Why have you been lying to me!",
+    "language": "EN",
+    "duration_factor": 1.0,
+    "emotion": {
+      "mode": "vector",
+      "vector": [0, 0.8, 0, 0, 0, 0, 0, 0],
+      "strength": 0.85
+    }
+  }
 ]
 ```
+
+Vector order is always **happy, angry, sad, afraid, disgusted, melancholic, surprised, calm**, with each
+value in `0–1`. Supported line modes are `inherit / speaker / text / vector`: omitted or `inherit` uses
+the Voice Profile default, `speaker` follows the speaker reference, `text` uses a description, and
+`vector` uses the eight values.
 
 JSON can be pasted directly or loaded with an example workflow. Since v0.5.1, dynamic prompt parsing is explicitly disabled for this input; older behavior could interpret JSON braces as dynamic prompts and fail with `Expecting ',' delimiter` when queueing.
 
@@ -317,14 +351,17 @@ SRT example:
 ```srt
 1
 00:00:00,500 --> 00:00:02,600
-[Role A] This is the first subtitle.
+[Role A|emotion=text:calm and composed] This is the first subtitle.
 
 2
 00:00:02,800 --> 00:00:05,000
-Role B: This is the second subtitle.
+[Role A|emotion=vector:0,0.8,0,0,0,0,0,0] The same role is angry now.
 ```
 
-`shift` delays conflicting clips to avoid overlap. `overlay` preserves original SRT start times and safely mixes overlaps. “Fit subtitle slot” defaults to `native`, assigning target frames directly to the length regulator in one inference pass and finishing at sample precision. When connected to an older external inference core without `target_duration`, the node falls back to the legacy second-pass `duration_factor` method and reports it. Extreme target-duration differences can still reduce naturalness.
+`shift` delays conflicting clips to avoid overlap. `overlay` preserves original SRT start times and safely
+mixes overlaps. “Fit subtitle slot” defaults to tail-safe `pad`: short clips receive silence, while long clips
+are preserved. `native` sends target frames directly to the length regulator but still pads or trims at the
+end; `exact` also trims. Use those two only when hard alignment is more important than preserving a tail.
 
 ### Automatic segmentation, pauses, and target duration
 
@@ -342,9 +379,9 @@ Punctuation presets split text into independent speech blocks, making them more 
 Speech Generation provides five target-duration modes:
 
 - `off`: use only the original `duration_factor`.
-- `native`: distribute the total duration to the length regulator by text weight in one pass, including external pauses; recommended first.
+- `native`: distribute the total duration to the length regulator by text weight in one pass, then finish exactly; an overlong tail may be trimmed.
 - `natural`: measure a first pass, calculate a new factor within 0.5–2.0, and infer a second time without trimming.
-- `pad`: perform natural adaptation, pad short output with silence, and retain long output with a report warning.
+- `pad`: perform natural adaptation, pad short output with silence, and retain long output with a report warning; this is the safe subtitle-slot default.
 - `exact`: perform natural adaptation, then pad or hard-trim to the exact sample; trimming may cut the tail and is intended for hard subtitle slots.
 
 Built-in post-processing presets are `voice_clarity / clear_narration / deharsh / warm / normalize`. Select one directly on Speech Generation or use the standalone Voice Post-processing node for A/B comparison. `off` does not alter the waveform.

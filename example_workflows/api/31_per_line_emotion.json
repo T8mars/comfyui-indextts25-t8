@@ -29,38 +29,6 @@
     }
   },
   "4": {
-    "class_type": "T8_IndexTTS25_EmotionControl",
-    "inputs": {
-      "mode": "vector",
-      "mode.happy": 0.55,
-      "mode.angry": 0.0,
-      "mode.sad": 0.0,
-      "mode.afraid": 0.0,
-      "mode.disgusted": 0.0,
-      "mode.melancholic": 0.0,
-      "mode.surprised": 0.1,
-      "mode.calm": 0.15,
-      "mode.strength": 1.0,
-      "mode.use_random": false
-    }
-  },
-  "5": {
-    "class_type": "T8_IndexTTS25_EmotionControl",
-    "inputs": {
-      "mode": "vector",
-      "mode.happy": 0.0,
-      "mode.angry": 0.15,
-      "mode.sad": 0.45,
-      "mode.afraid": 0.0,
-      "mode.disgusted": 0.0,
-      "mode.melancholic": 0.0,
-      "mode.surprised": 0.0,
-      "mode.calm": 0.1,
-      "mode.strength": 0.9,
-      "mode.use_random": false
-    }
-  },
-  "6": {
     "class_type": "T8_IndexTTS25_VoiceProfile",
     "inputs": {
       "role_name": "角色A",
@@ -68,14 +36,10 @@
         "2",
         0
       ],
-      "language": "ZH",
-      "emotion": [
-        "4",
-        0
-      ]
+      "language": "ZH"
     }
   },
-  "7": {
+  "5": {
     "class_type": "T8_IndexTTS25_VoiceProfile",
     "inputs": {
       "role_name": "角色B",
@@ -83,36 +47,32 @@
         "3",
         0
       ],
-      "language": "ZH",
-      "emotion": [
+      "language": "ZH"
+    }
+  },
+  "6": {
+    "class_type": "T8_IndexTTS25_RoleLibrary",
+    "inputs": {
+      "voices.voice_0": [
+        "4",
+        0
+      ],
+      "voices.voice_1": [
         "5",
         0
       ]
     }
   },
-  "8": {
-    "class_type": "T8_IndexTTS25_MergeVoiceEmotions",
-    "inputs": {
-      "voices.voice_0": [
-        "6",
-        0
-      ],
-      "voices.voice_1": [
-        "7",
-        0
-      ]
-    }
-  },
-  "9": {
+  "7": {
     "class_type": "T8_IndexTTS25_DialogueScript",
     "inputs": {
       "script_type": "batch",
-      "script": "角色A|太好了，我们终于找到出口了！|ZH|0.95\n角色B|别高兴得太早，我听见后面还有脚步声。|ZH|1.05\n角色A|那就冷静一点，我们一起离开这里。|ZH|1.0",
+      "script": "[\n  {\n    \"role\": \"角色A\",\n    \"text\": \"我先平静地把事情说明白。\",\n    \"language\": \"ZH\",\n    \"duration_factor\": 1.0,\n    \"emotion\": {\n      \"mode\": \"text\",\n      \"text\": \"平静、从容、像正常说明情况\",\n      \"strength\": 0.75\n    }\n  },\n  {\n    \"role\": \"角色A\",\n    \"text\": \"可是你为什么一直在骗我！\",\n    \"language\": \"ZH\",\n    \"duration_factor\": 1.0,\n    \"emotion\": {\n      \"mode\": \"vector\",\n      \"vector\": [\n        0.0,\n        0.8,\n        0.0,\n        0.0,\n        0.0,\n        0.0,\n        0.0,\n        0.0\n      ],\n      \"strength\": 0.85\n    }\n  },\n  {\n    \"role\": \"角色A\",\n    \"text\": \"这一句没有 emotion 字段，会继承角色默认情感。\",\n    \"language\": \"ZH\",\n    \"duration_factor\": 1.0\n  }\n]",
       "default_role": "角色A",
       "default_language": "ZH"
     }
   },
-  "10": {
+  "8": {
     "class_type": "T8_IndexTTS25_DialogueGenerate",
     "inputs": {
       "model": [
@@ -120,11 +80,11 @@
         0
       ],
       "role_library": [
-        "8",
+        "6",
         0
       ],
       "dialogue_script": [
-        "9",
+        "7",
         0
       ],
       "seed": 20260818,
@@ -146,14 +106,14 @@
       "subtitle_include_role": true
     }
   },
-  "11": {
+  "9": {
     "class_type": "SaveAudio",
     "inputs": {
       "audio": [
-        "10",
+        "8",
         0
       ],
-      "filename_prefix": "IndexTTS25_T8/multi_role_emotions"
+      "filename_prefix": "IndexTTS25_T8/batch_dialogue"
     }
   }
 }

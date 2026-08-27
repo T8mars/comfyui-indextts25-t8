@@ -584,6 +584,17 @@ def test_dialogue_generation_routes_each_roles_emotion_without_leaking(
         [
             DialogueLine(index + 1, f"角色{index}", f"第{index + 1}句", "ZH")
             for index in range(len(emotions))
+        ]
+        + [
+            DialogueLine(
+                len(emotions) + 1,
+                "角色0",
+                "同一个角色逐句改成生气",
+                "ZH",
+                emotion_mode="vector",
+                emotion_vector=(0.0, 0.8, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+                emotion_strength=0.65,
+            )
         ],
         "batch",
     )
@@ -608,11 +619,15 @@ def test_dialogue_generation_routes_each_roles_emotion_without_leaking(
         "original",
         True,
     )
-    assert routed == list(emotions)
+    assert routed[:4] == list(emotions)
+    assert routed[4].mode == "vector"
+    assert routed[4].vector[1] == pytest.approx(0.8)
+    assert routed[4].strength == pytest.approx(0.65)
     report = json.loads(result[2])
     assert report["requested_timeline_policy"] == "overlay"
     assert report["timeline_policy"] == "shift"
     assert "避免所有台词重叠" in report["timeline_warning"]
+    assert report["lines"][4]["emotion_source"] == "line_override"
 
 
 def test_memory_control_release_all_includes_asr_cache(monkeypatch):

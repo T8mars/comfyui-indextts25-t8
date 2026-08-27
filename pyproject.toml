@@ -1,6 +1,6 @@
 [project]
 name = "indextts25-t8"
-version = "0.14.1"
+version = "0.15.0"
 description = "ComfyUI V3 nodes for the official IndexTTS 2.5 model, by T8star-Aix"
 readme = "README.md"
 requires-python = ">=3.10"

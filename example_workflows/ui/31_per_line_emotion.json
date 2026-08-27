@@ -1,6 +1,6 @@
 {
-  "last_node_id": 11,
-  "last_link_id": 10,
+  "last_node_id": 9,
+  "last_link_id": 8,
   "nodes": [
     {
       "id": 1,
@@ -120,7 +120,7 @@
           "name": "model",
           "type": "T8_INDEXTTS25_MODEL",
           "links": [
-            7
+            5
           ]
         },
         {
@@ -401,7 +401,7 @@
           "name": "role_library",
           "type": "T8_INDEXTTS25_ROLE_LIBRARY",
           "links": [
-            8
+            6
           ]
         },
         {
@@ -469,7 +469,7 @@
           "name": "dialogue_script",
           "type": "T8_INDEXTTS25_DIALOGUE_SCRIPT",
           "links": [
-            5
+            7
           ]
         },
         {
@@ -484,129 +484,41 @@
         "ver": "0.15.0"
       },
       "widgets_values": [
-        "srt",
-        "1\n00:00:00,000 --> 00:00:02,000\n[角色A] 第一条编辑后从零点二秒开始。\n\n2\n00:00:02,200 --> 00:00:04,500\n[角色B] 第二条保留独立时间槽位。",
+        "batch",
+        "[\n  {\n    \"role\": \"角色A\",\n    \"text\": \"我先平静地把事情说明白。\",\n    \"language\": \"ZH\",\n    \"duration_factor\": 1.0,\n    \"emotion\": {\n      \"mode\": \"text\",\n      \"text\": \"平静、从容、像正常说明情况\",\n      \"strength\": 0.75\n    }\n  },\n  {\n    \"role\": \"角色A\",\n    \"text\": \"可是你为什么一直在骗我！\",\n    \"language\": \"ZH\",\n    \"duration_factor\": 1.0,\n    \"emotion\": {\n      \"mode\": \"vector\",\n      \"vector\": [\n        0.0,\n        0.8,\n        0.0,\n        0.0,\n        0.0,\n        0.0,\n        0.0,\n        0.0\n      ],\n      \"strength\": 0.85\n    }\n  },\n  {\n    \"role\": \"角色A\",\n    \"text\": \"这一句没有 emotion 字段，会继承角色默认情感。\",\n    \"language\": \"ZH\",\n    \"duration_factor\": 1.0\n  }\n]",
         "角色A",
         "ZH"
       ]
     },
     {
       "id": 8,
-      "type": "T8_IndexTTS25_TimelineEditor",
-      "pos": [
-        1200,
-        650
-      ],
-      "size": [
-        520,
-        330
-      ],
-      "flags": {},
-      "order": 7,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "dialogue_script",
-          "type": "T8_INDEXTTS25_DIALOGUE_SCRIPT",
-          "link": 5
-        },
-        {
-          "name": "timeline_edits_json",
-          "type": "STRING",
-          "widget": {
-            "name": "timeline_edits_json"
-          },
-          "link": null
-        }
-      ],
-      "outputs": [
-        {
-          "name": "dialogue_script",
-          "type": "T8_INDEXTTS25_DIALOGUE_SCRIPT",
-          "links": [
-            9
-          ]
-        },
-        {
-          "name": "timeline_preview",
-          "type": "STRING",
-          "links": []
-        },
-        {
-          "name": "timeline_image",
-          "type": "IMAGE",
-          "links": [
-            6
-          ]
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "T8_IndexTTS25_TimelineEditor",
-        "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.15.0"
-      },
-      "widgets_values": [
-        "[\n  {\n    \"index\": 1,\n    \"role\": \"角色A\",\n    \"language\": \"ZH\",\n    \"start_ms\": 200,\n    \"end_ms\": 2000,\n    \"duration_factor\": 1.0,\n    \"text\": \"第一条编辑后从零点二秒开始。\"\n  },\n  {\n    \"index\": 2,\n    \"role\": \"角色B\",\n    \"language\": \"ZH\",\n    \"start_ms\": 2300,\n    \"end_ms\": 4600,\n    \"duration_factor\": 0.95,\n    \"text\": \"第二条保留独立时间槽位。\"\n  }\n]"
-      ]
-    },
-    {
-      "id": 9,
-      "type": "PreviewImage",
-      "pos": [
-        1760,
-        650
-      ],
-      "size": [
-        420,
-        360
-      ],
-      "flags": {},
-      "order": 8,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "images",
-          "type": "IMAGE",
-          "link": 6
-        }
-      ],
-      "outputs": [],
-      "properties": {
-        "Node name for S&R": "PreviewImage",
-        "cnr_id": "comfy-core"
-      },
-      "widgets_values": [],
-      "title": "可视化时间轴预览"
-    },
-    {
-      "id": 10,
       "type": "T8_IndexTTS25_DialogueGenerate",
       "pos": [
-        1760,
-        80
+        1220,
+        220
       ],
       "size": [
         500,
         850
       ],
       "flags": {},
-      "order": 9,
+      "order": 7,
       "mode": 0,
       "inputs": [
         {
           "name": "model",
           "type": "T8_INDEXTTS25_MODEL",
-          "link": 7
+          "link": 5
         },
         {
           "name": "role_library",
           "type": "T8_INDEXTTS25_ROLE_LIBRARY",
-          "link": 8
+          "link": 6
         },
         {
           "name": "dialogue_script",
           "type": "T8_INDEXTTS25_DIALOGUE_SCRIPT",
-          "link": 9
+          "link": 7
         },
         {
           "name": "sampling",
@@ -756,7 +668,7 @@
           "name": "audio",
           "type": "AUDIO",
           "links": [
-            10
+            8
           ]
         },
         {
@@ -788,8 +700,8 @@
       "widgets_values": [
         20260818,
         "fixed",
-        "overlay",
-        true,
+        "shift",
+        false,
         "pad",
         180,
         200,
@@ -807,24 +719,24 @@
       ]
     },
     {
-      "id": 11,
+      "id": 9,
       "type": "SaveAudio",
       "pos": [
-        2320,
-        920
+        1760,
+        360
       ],
       "size": [
         320,
         130
       ],
       "flags": {},
-      "order": 10,
+      "order": 8,
       "mode": 0,
       "inputs": [
         {
           "name": "audio",
           "type": "AUDIO",
-          "link": 10
+          "link": 8
         },
         {
           "name": "filename_prefix",
@@ -847,7 +759,7 @@
         "cnr_id": "comfy-core"
       },
       "widgets_values": [
-        "IndexTTS25_T8/timeline_edited"
+        "IndexTTS25_T8/batch_dialogue"
       ]
     }
   ],
@@ -886,61 +798,45 @@
     ],
     [
       5,
-      7,
-      0,
-      8,
-      0,
-      "T8_INDEXTTS25_DIALOGUE_SCRIPT"
-    ],
-    [
-      6,
-      8,
-      2,
-      9,
-      0,
-      "IMAGE"
-    ],
-    [
-      7,
       1,
       0,
-      10,
+      8,
       0,
       "T8_INDEXTTS25_MODEL"
     ],
     [
-      8,
+      6,
       6,
       0,
-      10,
+      8,
       1,
       "T8_INDEXTTS25_ROLE_LIBRARY"
     ],
     [
-      9,
-      8,
+      7,
+      7,
       0,
-      10,
+      8,
       2,
       "T8_INDEXTTS25_DIALOGUE_SCRIPT"
     ],
     [
-      10,
-      10,
+      8,
+      8,
       0,
-      11,
+      9,
       0,
       "AUDIO"
     ]
   ],
   "groups": [
     {
-      "title": "21 可视化时间轴编辑 · B站：T8star-Aix",
+      "title": "31 同一角色逐句情感覆盖 · B站：T8star-Aix",
       "bounding": [
         -40,
         -60,
-        2720,
-        1130
+        2160,
+        1150
       ],
       "color": "#3f789e",
       "font_size": 24,
