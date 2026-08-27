@@ -98,6 +98,14 @@
           "link": null
         },
         {
+          "name": "persistent_reference_cache",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "persistent_reference_cache"
+          },
+          "link": null
+        },
+        {
           "name": "custom_model_path",
           "type": "STRING",
           "widget": {
@@ -124,7 +132,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_ModelLoader",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.13.0"
+        "ver": "0.14.0"
       },
       "widgets_values": [
         "IndexTTS-2.5",
@@ -137,6 +145,7 @@
         false,
         "auto",
         false,
+        true,
         ""
       ]
     },
@@ -367,7 +376,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_SamplingConfig",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.13.0"
+        "ver": "0.14.0"
       },
       "widgets_values": [
         false,
@@ -545,12 +554,17 @@
           "name": "generation_info",
           "type": "STRING",
           "links": []
+        },
+        {
+          "name": "all_candidates",
+          "type": "AUDIO",
+          "links": []
         }
       ],
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_Generate",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.13.0"
+        "ver": "0.14.0"
       },
       "widgets_values": [
         "这个示例使用四十步扩散、零点八五引导强度和零点八温度，适合比较稳定旁白。",

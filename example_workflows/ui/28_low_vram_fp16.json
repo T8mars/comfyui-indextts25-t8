@@ -98,6 +98,14 @@
           "link": null
         },
         {
+          "name": "persistent_reference_cache",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "persistent_reference_cache"
+          },
+          "link": null
+        },
+        {
           "name": "custom_model_path",
           "type": "STRING",
           "widget": {
@@ -124,7 +132,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_ModelLoader",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.13.0"
+        "ver": "0.14.0"
       },
       "widgets_values": [
         "IndexTTS-2.5",
@@ -136,6 +144,7 @@
         0,
         false,
         "cpu",
+        true,
         true,
         ""
       ]
@@ -216,7 +225,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_Environment",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.13.0"
+        "ver": "0.14.0"
       },
       "widgets_values": [
         "auto"
@@ -376,12 +385,17 @@
           "name": "generation_info",
           "type": "STRING",
           "links": []
+        },
+        {
+          "name": "all_candidates",
+          "type": "AUDIO",
+          "links": []
         }
       ],
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_Generate",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.13.0"
+        "ver": "0.14.0"
       },
       "widgets_values": [
         "这是低显存模式示例：GPT 使用半精度，参考编码器放在 CPU，默认情感复用音色条件。",

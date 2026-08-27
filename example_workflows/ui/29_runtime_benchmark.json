@@ -1,5 +1,5 @@
 {
-  "last_node_id": 5,
+  "last_node_id": 4,
   "last_link_id": 3,
   "nodes": [
     {
@@ -138,7 +138,7 @@
         "IndexTTS-2.5",
         "auto",
         "auto",
-        "auto_safe",
+        "off",
         false,
         false,
         0,
@@ -154,7 +154,7 @@
       "type": "LoadAudio",
       "pos": [
         0,
-        340
+        430
       ],
       "size": [
         330,
@@ -189,61 +189,21 @@
       "widgets_values": [
         "voice_reference.wav"
       ],
-      "title": "音色参考音频"
+      "title": "固定参考音频"
     },
     {
       "id": 3,
-      "type": "T8_IndexTTS25_Environment",
+      "type": "T8_IndexTTS25_RuntimeBenchmark",
       "pos": [
-        440,
-        0
+        900,
+        40
       ],
       "size": [
-        390,
-        140
+        500,
+        470
       ],
       "flags": {},
       "order": 2,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "device",
-          "type": "COMBO",
-          "widget": {
-            "name": "device"
-          },
-          "link": null
-        }
-      ],
-      "outputs": [
-        {
-          "name": "environment_report",
-          "type": "STRING",
-          "links": []
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "T8_IndexTTS25_Environment",
-        "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.14.0"
-      },
-      "widgets_values": [
-        "auto"
-      ]
-    },
-    {
-      "id": 4,
-      "type": "T8_IndexTTS25_Generate",
-      "pos": [
-        900,
-        180
-      ],
-      "size": [
-        470,
-        560
-      ],
-      "flags": {},
-      "order": 3,
       "mode": 0,
       "inputs": [
         {
@@ -281,34 +241,18 @@
           "link": null
         },
         {
-          "name": "target_duration_mode",
-          "type": "COMBO",
+          "name": "repeat_count",
+          "type": "INT",
           "widget": {
-            "name": "target_duration_mode"
+            "name": "repeat_count"
           },
           "link": null
         },
         {
-          "name": "target_duration_seconds",
-          "type": "FLOAT",
+          "name": "warmup",
+          "type": "BOOLEAN",
           "widget": {
-            "name": "target_duration_seconds"
-          },
-          "link": null
-        },
-        {
-          "name": "postprocess_preset",
-          "type": "COMBO",
-          "widget": {
-            "name": "postprocess_preset"
-          },
-          "link": null
-        },
-        {
-          "name": "postprocess_strength",
-          "type": "FLOAT",
-          "widget": {
-            "name": "postprocess_strength"
+            "name": "warmup"
           },
           "link": null
         },
@@ -317,46 +261,6 @@
           "type": "INT",
           "widget": {
             "name": "seed"
-          },
-          "link": null
-        },
-        {
-          "name": "quality_retry_count",
-          "type": "INT",
-          "widget": {
-            "name": "quality_retry_count"
-          },
-          "link": null
-        },
-        {
-          "name": "quality_asr_backend",
-          "type": "COMBO",
-          "widget": {
-            "name": "quality_asr_backend"
-          },
-          "link": null
-        },
-        {
-          "name": "quality_asr_model",
-          "type": "COMBO",
-          "widget": {
-            "name": "quality_asr_model"
-          },
-          "link": null
-        },
-        {
-          "name": "quality_asr_device",
-          "type": "COMBO",
-          "widget": {
-            "name": "quality_asr_device"
-          },
-          "link": null
-        },
-        {
-          "name": "quality_threshold",
-          "type": "FLOAT",
-          "widget": {
-            "name": "quality_threshold"
           },
           "link": null
         },
@@ -382,43 +286,36 @@
           ]
         },
         {
-          "name": "generation_info",
+          "name": "benchmark_report",
           "type": "STRING",
           "links": []
         },
         {
-          "name": "all_candidates",
-          "type": "AUDIO",
+          "name": "summary",
+          "type": "STRING",
           "links": []
         }
       ],
       "properties": {
-        "Node name for S&R": "T8_IndexTTS25_Generate",
+        "Node name for S&R": "T8_IndexTTS25_RuntimeBenchmark",
         "cnr_id": "comfyui-indextts25-t8",
         "ver": "0.14.0"
       },
       "widgets_values": [
-        "这是可选加速模式的安全回退测试。",
+        "这是 IndexTTS 2.5 真实性能基准。所有运行使用相同文本、参考音频和随机种子。",
         "ZH",
         1.0,
-        "off",
-        0.0,
-        "off",
-        1.0,
-        20260818,
-        "fixed",
-        0,
-        "auto",
-        "base",
-        "auto",
-        0.82
+        2,
+        true,
+        20250827,
+        "fixed"
       ]
     },
     {
-      "id": 5,
+      "id": 4,
       "type": "SaveAudio",
       "pos": [
-        1460,
+        1480,
         180
       ],
       "size": [
@@ -426,7 +323,7 @@
         130
       ],
       "flags": {},
-      "order": 4,
+      "order": 3,
       "mode": 0,
       "inputs": [
         {
@@ -455,7 +352,7 @@
         "cnr_id": "comfy-core"
       },
       "widgets_values": [
-        "IndexTTS25_T8/optional_acceleration"
+        "IndexTTS25_T8/runtime_benchmark"
       ]
     }
   ],
@@ -464,7 +361,7 @@
       1,
       1,
       0,
-      4,
+      3,
       0,
       "T8_INDEXTTS25_MODEL"
     ],
@@ -472,27 +369,27 @@
       2,
       2,
       0,
-      4,
+      3,
       1,
       "AUDIO"
     ],
     [
       3,
-      4,
+      3,
       0,
-      5,
+      4,
       0,
       "AUDIO"
     ]
   ],
   "groups": [
     {
-      "title": "14 可选加速与环境诊断 · B站：T8star-Aix",
+      "title": "29 当前加速模式真实性能基准 · B站：T8star-Aix",
       "bounding": [
         -40,
         -60,
-        1860,
-        820
+        1880,
+        640
       ],
       "color": "#3f789e",
       "font_size": 24,

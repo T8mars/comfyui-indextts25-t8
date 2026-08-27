@@ -80,6 +80,13 @@ class ModelCache:
                 "device": handle.device,
                 "reference_device": handle.reference_device,
                 "reuse_spk_cond_for_emo": handle.reuse_spk_cond_for_emo,
+                "reference_cache_dir": (
+                    str(handle.reference_cache_dir) if handle.reference_cache_dir else None
+                ),
+                "reference_cache_namespace": (
+                    f"{handle.model_revision}:{handle.model_fingerprint}:"
+                    f"{handle.reference_device}:{'bf16' if handle.use_bf16 else 'fp16' if handle.use_fp16 else 'fp32'}"
+                ),
                 "use_cuda_kernel": handle.use_cuda_kernel,
                 "use_deepspeed": handle.use_deepspeed,
                 "use_accel": handle.use_accel,

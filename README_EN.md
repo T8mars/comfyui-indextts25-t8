@@ -20,13 +20,21 @@ Creator: **Bilibili: T8star-Aix**.
 
 This repository is locked to the IndexTTS 2.5 inference core and the official 2.5 model manifest. It will not fall back to or accidentally load IndexTTS 2.0.
 
-Current baseline: **ComfyUI Node 0.13.0 · Desktop 0.14.0 · Core `ee40fa7d` · Model `c39ce5ba`**.
+Current baseline: **ComfyUI Node 0.14.0 · Desktop 0.15.0 · Core `ee40fa7d` · Model `c39ce5ba`**.
 
-Version 0.13.0 adds the installed torch, CUDA Runtime, FlashAttention, Triton, DeepSpeed, and Ninja versions
-to the no-model environment report. Desktop 0.14.0 shows expected availability and fallback reasons for every
-acceleration mode before startup and exports a one-click JSON diagnostic report. The formal model manifest keeps
+Version 0.14.0 adds an active-mode runtime benchmark, a manual upstream update check, safe conditioning reuse
+across model reloads, and retained multi-candidate quality selection. Desktop 0.15.0 can benchmark acceleration
+modes sequentially and recommend one; every expensive or network operation remains explicitly user-triggered. The formal model manifest keeps
 the shared `bpe.model` tokenizer pinned to `IndexTeam/IndexTTS-2`; both download paths fetch and verify it.
 Desktop and Node are separate deliverables with independent versions; Core/Model identify the pinned official code and weight revisions.
+
+### v0.14.0 runtime benchmark, candidates, and cache update
+
+- Runtime Benchmark uses the same reference, text, and seed, then reports median/best RTF and peak VRAM for the mode that actually initialized. Change the Model Loader mode and rerun to compare fairly.
+- Speech Generation retains every requested candidate and exposes them as an AUDIO list. With local ASR it combines transcript similarity and waveform quality; without ASR it still selects by clipping, silence, DC offset, and related technical checks.
+- Model Loader enables a persistent conditioning cache by default. Content, model revision/fingerprint, precision, and reference device isolate entries; files use `safetensors`, are capped at 128 entries, and can be disabled in advanced settings.
+- Update Check manually compares the official code, Hugging Face model, and node version. It reports only and never downloads or overwrites anything.
+- Desktop 0.15.0 sequentially benchmarks acceleration modes before startup and can apply its recommendation; it never starts the service automatically.
 
 ### v0.13.0 acceleration diagnostics update
 
@@ -72,6 +80,7 @@ Desktop and Node are separate deliverables with independent versions; Core/Model
    - Validates official model file sizes, with optional full SHA-256 verification
    - `auto / CUDA / CPU` device selection and `auto / bfloat16 / float16 / float32` precision
    - `auto / same / cpu` reference-encoder placement and optional default-emotion condition reuse
+   - Persistent `safetensors` reference-conditioning cache enabled by default, with an advanced opt-out
    - Global lazy cache, per-model inference lock, and optional unload after generation or safe recycle every N runs
 2. `IndexTTS 2.5 Emotion Control · T8star-Aix`
    - Follow the speaker reference
@@ -97,7 +106,7 @@ Desktop and Node are separate deliverables with independent versions; Core/Model
    - Voice cloning, seed, and the official `duration_factor=0.5–2.0` duration/speed adaptation
    - Target duration through one-pass native length regulation, natural second-pass adaptation, silence padding, or exact compatibility mode
    - Optional voice clarity, clear narration, de-harsh, warmth, and peak-normalization post-processing
-   - Optional local-ASR quality retries that change the seed and retain the highest-similarity result
+   - Generates one to four retained candidates and exposes an AUDIO list; selection combines ASR similarity with waveform quality when ASR is available and falls back to waveform quality alone
 7. `IndexTTS 2.5 Voice Profile · T8star-Aix`
    - Packages a role name, standard AUDIO, default language, and optional role-specific emotion into a workflow voice profile
 8. `IndexTTS 2.5 Voice / Emotion Merge · T8star-Aix`
@@ -138,6 +147,12 @@ Desktop and Node are separate deliverables with independent versions; Core/Model
 19. `IndexTTS 2.5 audio.cpp Experimental Generation · T8star-Aix`
     - Isolated optional `audiocpp_cli` + IndexTTS2.5 GGUF route with CUDA/CPU/Vulkan/HIP/Metal, five languages, speed, and emotion controls
     - Does not replace Python inference; the CLI and roughly 3.5 GB Q8 GGUF are separate downloads
+20. `IndexTTS 2.5 Runtime Benchmark · T8star-Aix`
+    - Warms up and measures the Model Loader mode that actually initialized, returning median/best RTF and CUDA peak VRAM
+    - Keeps text, reference audio, and seed fixed; change the loader acceleration mode and rerun for a fair comparison
+21. `IndexTTS 2.5 Update Check · T8star-Aix`
+    - Manually checks the official main branch, official Hugging Face model, and node version
+    - Returns JSON and a summary only; never downloads models, modifies the node, or runs automatically
 
 Output is standard ComfyUI AUDIO at `22050 Hz`, `float32`, and `[1,1,T]`, ready for Save Audio, audio-combine, video, and other native nodes.
 
@@ -437,7 +452,7 @@ Bilibili|B IY1 . L IY1 . B IY1 . L IY1|EN
 
 The dictionary is embedded in workflow JSON and travels with the workflow. Existing manual annotations always win; dictionary replacements use longest match first and never rewrite inside `<text|pronunciation>`. Strict validation is enabled by default and fails before queueing. When disabled, invalid entries remain unchanged and are recorded in the report. This node requires no additional G2P model and never mutates the cached model's global glossary.
 
-See `example_workflows/README.md` for 28 ready-to-open UI workflows and 28 API prompts covering basic cloning, speed comparison, emotion reference audio, eight-dimensional emotion, text emotion, random-sampling long text, five-language generation, Chinese polyphonic characters, English CMU phonemes, Japanese Kana, multi-role dialogue, JSON batch lines, SRT, acceleration diagnostics, segmentation preview, explicit pauses, native target duration, advanced CFM parameters, audio post-processing, ASR proofreading, timeline editing, subtitle rewriting, independent per-role emotions, reference-audio quality, ASR retries, model recycling, the experimental audio.cpp backend, and low-VRAM FP16. Upload `voice_reference.wav` and, for emotion-audio examples, `emotion_reference.wav` to ComfyUI input first.
+See `example_workflows/README.md` for 30 ready-to-open UI workflows and 30 API prompts covering basic cloning, speed comparison, emotion reference audio, eight-dimensional emotion, text emotion, random-sampling long text, five-language generation, Chinese polyphonic characters, English CMU phonemes, Japanese Kana, multi-role dialogue, JSON batch lines, SRT, acceleration diagnostics, segmentation preview, explicit pauses, native target duration, advanced CFM parameters, audio post-processing, ASR proofreading, timeline editing, subtitle rewriting, independent per-role emotions, reference-audio quality, retained candidate selection, model recycling, the experimental audio.cpp backend, low-VRAM FP16, runtime benchmarking, and manual update checks. Upload `voice_reference.wav` and, for emotion-audio examples, `emotion_reference.wav` to ComfyUI input first.
 
 ### Optional audio.cpp experimental backend
 

@@ -65,4 +65,6 @@ def test_low_vram_constructor_options_are_backward_compatible() -> None:
         "use_fp16",
         "reference_device",
         "reuse_spk_cond_for_emo",
+        "reference_cache_dir",
+        "reference_cache_namespace",
     ]

@@ -41,6 +41,8 @@ EXAMPLES = (
     "26_memory_control",
     "27_audiocpp_experimental",
     "28_low_vram_fp16",
+    "29_runtime_benchmark",
+    "30_update_check",
 )
 
 
@@ -65,6 +67,8 @@ def test_all_ui_and_api_examples_are_present_and_valid():
             "T8_IndexTTS25_DialogueGenerate",
             "T8_IndexTTS25_AudioPostProcess",
             "T8_IndexTTS25_AudioCppGenerate",
+            "T8_IndexTTS25_RuntimeBenchmark",
+            "T8_IndexTTS25_UpdateCheck",
         }
         assert any(node["type"] in generation_types for node in workflow["nodes"])
         assert any(node["class_type"] in generation_types for node in prompt.values())
@@ -226,6 +230,8 @@ def test_api_prompts_expand_with_the_current_comfyui_v3_schema():
         "T8_IndexTTS25_AudioCppGenerate": nodes_module.T8IndexTTS25AudioCppGenerate,
         "T8_IndexTTS25_AudioPostProcess": nodes_module.T8IndexTTS25AudioPostProcess,
         "T8_IndexTTS25_Environment": nodes_module.T8IndexTTS25Environment,
+        "T8_IndexTTS25_RuntimeBenchmark": nodes_module.T8IndexTTS25RuntimeBenchmark,
+        "T8_IndexTTS25_UpdateCheck": nodes_module.T8IndexTTS25UpdateCheck,
     }
     api_root = PLUGIN_ROOT / "example_workflows" / "api"
     for name in EXAMPLES:

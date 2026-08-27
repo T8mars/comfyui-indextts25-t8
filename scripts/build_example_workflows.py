@@ -36,6 +36,8 @@ REFERENCE_QUALITY_NODE = "T8_IndexTTS25_ReferenceQuality"
 MEMORY_CONTROL_NODE = "T8_IndexTTS25_MemoryControl"
 AUDIOCPP_GENERATE_NODE = "T8_IndexTTS25_AudioCppGenerate"
 ENVIRONMENT_NODE = "T8_IndexTTS25_Environment"
+RUNTIME_BENCHMARK_NODE = "T8_IndexTTS25_RuntimeBenchmark"
+UPDATE_CHECK_NODE = "T8_IndexTTS25_UpdateCheck"
 
 
 def widget_input(
@@ -198,6 +200,7 @@ def add_model(
             widget_input("verify_hashes", "BOOLEAN"),
             widget_input("reference_device", "COMBO"),
             widget_input("reuse_spk_cond_for_emo", "BOOLEAN"),
+            widget_input("persistent_reference_cache", "BOOLEAN"),
             # ComfyUI V3 finalizes required inputs before optional inputs even
             # when the optional field is declared earlier by the node class.
             widget_input("custom_model_path", "STRING", optional=True),
@@ -214,6 +217,7 @@ def add_model(
             False,
             reference_device,
             reuse_spk_cond_for_emo,
+            True,
             "",
         ],
     )
@@ -388,7 +392,11 @@ def add_generate(
             slot_input("emotion", "T8_INDEXTTS25_EMOTION", optional=True),
             slot_input("sampling", "T8_INDEXTTS25_SAMPLING", optional=True),
         ],
-        [output("audio", "AUDIO"), output("generation_info", "STRING")],
+        [
+            output("audio", "AUDIO"),
+            output("generation_info", "STRING"),
+            output("all_candidates", "AUDIO"),
+        ],
         [
             text,
             language,
@@ -503,6 +511,54 @@ def add_memory_control(workflow: Workflow, pos=(440, 0), action="status") -> int
         [widget_input("action", "COMBO"), widget_input("idle_seconds", "FLOAT")],
         [output("memory_report", "STRING")],
         [action, 300.0],
+    )
+
+
+def add_runtime_benchmark(workflow: Workflow, pos=(900, 40)) -> int:
+    return workflow.add(
+        RUNTIME_BENCHMARK_NODE,
+        pos,
+        (500, 470),
+        [
+            slot_input("model", "T8_INDEXTTS25_MODEL"),
+            slot_input("speaker_audio", "AUDIO"),
+            widget_input("text", "STRING"),
+            widget_input("language", "COMBO"),
+            widget_input("duration_factor", "FLOAT"),
+            widget_input("repeat_count", "INT"),
+            widget_input("warmup", "BOOLEAN"),
+            widget_input("seed", "INT"),
+            slot_input("emotion", "T8_INDEXTTS25_EMOTION", optional=True),
+            slot_input("sampling", "T8_INDEXTTS25_SAMPLING", optional=True),
+        ],
+        [
+            output("audio", "AUDIO"),
+            output("benchmark_report", "STRING"),
+            output("summary", "STRING"),
+        ],
+        [
+            "这是 IndexTTS 2.5 真实性能基准。所有运行使用相同文本、参考音频和随机种子。",
+            "ZH",
+            1.0,
+            2,
+            True,
+            20250827,
+            "fixed",
+        ],
+    )
+
+
+def add_update_check(workflow: Workflow, pos=(0, 0)) -> int:
+    return workflow.add(
+        UPDATE_CHECK_NODE,
+        pos,
+        (440, 220),
+        [
+            widget_input("refresh_token", "INT"),
+            widget_input("timeout_seconds", "FLOAT"),
+        ],
+        [output("report", "STRING"), output("summary", "STRING")],
+        [0, 12.0],
     )
 
 
@@ -807,6 +863,7 @@ def api_model(
             "custom_model_path": "",
             "reference_device": reference_device,
             "reuse_spk_cond_for_emo": reuse_spk_cond_for_emo,
+            "persistent_reference_cache": True,
         },
     }
 
@@ -853,6 +910,29 @@ def api_generate(
     if sampling_id:
         inputs["sampling"] = [sampling_id, 0]
     return {"class_type": GENERATE_NODE, "inputs": inputs}
+
+
+def api_runtime_benchmark(model_id: str, speaker_id: str) -> dict[str, Any]:
+    return {
+        "class_type": RUNTIME_BENCHMARK_NODE,
+        "inputs": {
+            "model": [model_id, 0],
+            "speaker_audio": [speaker_id, 0],
+            "text": "这是 IndexTTS 2.5 真实性能基准。所有运行使用相同文本、参考音频和随机种子。",
+            "language": "ZH",
+            "duration_factor": 1.0,
+            "repeat_count": 2,
+            "warmup": True,
+            "seed": 20250827,
+        },
+    }
+
+
+def api_update_check() -> dict[str, Any]:
+    return {
+        "class_type": UPDATE_CHECK_NODE,
+        "inputs": {"refresh_token": 0, "timeout_seconds": 12.0},
+    }
 
 
 def api_pronunciation(
@@ -1880,8 +1960,8 @@ def reference_quality_pair() -> tuple[dict[str, Any], dict[str, Any]]:
 
 
 def quality_retry_pair() -> tuple[dict[str, Any], dict[str, Any]]:
-    text = "自动质检会在识别相似度不足时更换随机种子，并保留最佳结果。"
-    workflow = Workflow("25 ASR 自动质检失败重试")
+    text = "多候选生成会更换随机种子，保留全部音频，并自动选出综合质量最佳的结果。"
+    workflow = Workflow("25 多候选生成与自动质量筛选")
     model = add_model(workflow)
     speaker = add_load_audio(workflow, "voice_reference.wav", title="音色参考音频")
     generate = add_generate(workflow, text, "ZH", 1.0, 20260826)
@@ -1895,6 +1975,29 @@ def quality_retry_pair() -> tuple[dict[str, Any], dict[str, Any]]:
         "4": api_save("3", "IndexTTS25_T8/quality_retry"),
     }
     return workflow.as_dict(), api
+
+
+def runtime_benchmark_pair() -> tuple[dict[str, Any], dict[str, Any]]:
+    workflow = Workflow("29 当前加速模式真实性能基准")
+    model = add_model(workflow)
+    speaker = add_load_audio(workflow, "voice_reference.wav", pos=(0, 430), title="固定参考音频")
+    benchmark = add_runtime_benchmark(workflow, pos=(900, 40))
+    save = add_save(workflow, "IndexTTS25_T8/runtime_benchmark", pos=(1480, 180))
+    workflow.connect(model, "model", benchmark, "model")
+    workflow.connect(speaker, "AUDIO", benchmark, "speaker_audio")
+    workflow.connect(benchmark, "audio", save, "audio")
+    return workflow.as_dict(), {
+        "1": api_model(),
+        "2": api_audio("voice_reference.wav"),
+        "3": api_runtime_benchmark("1", "2"),
+        "4": api_save("3", "IndexTTS25_T8/runtime_benchmark"),
+    }
+
+
+def update_check_pair() -> tuple[dict[str, Any], dict[str, Any]]:
+    workflow = Workflow("30 手动检查官方代码模型与节点更新")
+    add_update_check(workflow, pos=(0, 0))
+    return workflow.as_dict(), {"1": api_update_check()}
 
 
 def memory_control_pair() -> tuple[dict[str, Any], dict[str, Any]]:
@@ -2026,6 +2129,8 @@ EXAMPLES = {
     "26_memory_control": memory_control_pair,
     "27_audiocpp_experimental": audiocpp_pair,
     "28_low_vram_fp16": low_vram_fp16_pair,
+    "29_runtime_benchmark": runtime_benchmark_pair,
+    "30_update_check": update_check_pair,
 }
 
 

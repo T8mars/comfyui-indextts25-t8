@@ -31,6 +31,7 @@ from indextts.utils.tokenizer import get_tokenizer, lang_to_token
 from indextts.utils.ja_g2p import JapaneseG2PProcessor
 from indextts.utils.nemo_tn import normalize_text as nemo_text_normalize
 from indextts.utils.precision import resolve_gpt_precision
+from indextts.utils.reference_condition_cache import ReferenceConditionCache
 
 from indextts.s2mel.modules.commons import load_checkpoint2, MyModel
 from indextts.s2mel.modules.bigvgan import bigvgan
@@ -113,6 +114,8 @@ class IndexTTS2:
         use_fp16=False,
         reference_device=None,
         reuse_spk_cond_for_emo=False,
+        reference_cache_dir=None,
+        reference_cache_namespace="",
     ):
         """
         Args:
@@ -133,6 +136,8 @@ class IndexTTS2:
                 encoders. Defaults to the synthesis device; ``"cpu"`` saves persistent VRAM.
             reuse_spk_cond_for_emo (bool): reuse speaker conditioning only for implicit
                 default emotion. This saves reference work but can slightly change output.
+            reference_cache_dir (str): optional safe on-disk cache for extracted reference tensors.
+            reference_cache_namespace (str): model/runtime fingerprint used to isolate cache entries.
         """
         if device is not None:
             self.device = device
@@ -166,6 +171,9 @@ class IndexTTS2:
             str(reference_device) if reference_device is not None else str(self.device)
         )
         self.reuse_spk_cond_for_emo = bool(reuse_spk_cond_for_emo)
+        self.reference_condition_cache = ReferenceConditionCache(
+            reference_cache_dir, reference_cache_namespace
+        )
         if self.reference_device != str(self.device):
             print(
                 f">> Reference encoders use {self.reference_device}; "
@@ -450,6 +458,24 @@ class IndexTTS2:
                 self.cache_mel = None
                 self._empty_cuda_cache()
 
+            cached = self.reference_condition_cache.load(
+                "speaker", spk_audio_prompt, self.device
+            )
+            if cached is not None and all(
+                name in cached for name in ("spk_cond", "style", "prompt", "mel")
+            ):
+                self.cache_spk_cond = cached["spk_cond"]
+                self.cache_s2mel_style = cached["style"]
+                self.cache_s2mel_prompt = cached["prompt"]
+                self.cache_mel = cached["mel"]
+                self.cache_spk_audio_prompt = spk_audio_prompt
+                return (
+                    self.cache_spk_cond,
+                    self.cache_s2mel_style,
+                    self.cache_s2mel_prompt,
+                    self.cache_mel,
+                )
+
             audio, sr = self._load_and_cut_audio(spk_audio_prompt, 15, verbose)
             audio_22k = torchaudio.transforms.Resample(sr, 22050)(audio)
             audio_16k = torchaudio.transforms.Resample(sr, 16000)(audio)
@@ -477,6 +503,16 @@ class IndexTTS2:
             self.cache_s2mel_prompt = prompt_condition
             self.cache_spk_audio_prompt = spk_audio_prompt
             self.cache_mel = ref_mel
+            self.reference_condition_cache.save(
+                "speaker",
+                spk_audio_prompt,
+                {
+                    "spk_cond": spk_cond_emb,
+                    "style": style,
+                    "prompt": prompt_condition,
+                    "mel": ref_mel,
+                },
+            )
 
         return (
             self.cache_spk_cond,
@@ -494,11 +530,21 @@ class IndexTTS2:
             if self.cache_emo_cond is not None:
                 self.cache_emo_cond = None
                 self._empty_cuda_cache()
+            cached = self.reference_condition_cache.load(
+                "emotion", emo_audio_prompt, self.device
+            )
+            if cached is not None and "emo_cond" in cached:
+                self.cache_emo_cond = cached["emo_cond"]
+                self.cache_emo_audio_prompt = emo_audio_prompt
+                return self.cache_emo_cond
             emo_audio, _ = self._load_and_cut_audio(
                 emo_audio_prompt, 15, verbose, sr=16000
             )
             self.cache_emo_cond = self._get_reference_embedding(emo_audio)
             self.cache_emo_audio_prompt = emo_audio_prompt
+            self.reference_condition_cache.save(
+                "emotion", emo_audio_prompt, {"emo_cond": self.cache_emo_cond}
+            )
         return self.cache_emo_cond
 
     def _should_reuse_spk_cond_for_emo(

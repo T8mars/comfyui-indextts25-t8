@@ -27,6 +27,7 @@ class ModelHandle:
     model_revision: str = ""
     model_fingerprint: str = ""
     low_vram: bool = False
+    reference_cache_dir: Path | None = None
 
     @property
     def cache_key(self) -> tuple:
@@ -44,6 +45,7 @@ class ModelHandle:
             self.model_revision,
             self.model_fingerprint,
             self.low_vram,
+            str(self.reference_cache_dir.resolve()) if self.reference_cache_dir else "",
         )
 
 

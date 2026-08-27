@@ -1,0 +1,86 @@
+{
+  "last_node_id": 1,
+  "last_link_id": 0,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "T8_IndexTTS25_UpdateCheck",
+      "pos": [
+        0,
+        0
+      ],
+      "size": [
+        440,
+        220
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "refresh_token",
+          "type": "INT",
+          "widget": {
+            "name": "refresh_token"
+          },
+          "link": null
+        },
+        {
+          "name": "timeout_seconds",
+          "type": "FLOAT",
+          "widget": {
+            "name": "timeout_seconds"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "report",
+          "type": "STRING",
+          "links": []
+        },
+        {
+          "name": "summary",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "T8_IndexTTS25_UpdateCheck",
+        "cnr_id": "comfyui-indextts25-t8",
+        "ver": "0.14.0"
+      },
+      "widgets_values": [
+        0,
+        12.0
+      ]
+    }
+  ],
+  "links": [],
+  "groups": [
+    {
+      "title": "30 手动检查官方代码模型与节点更新 · B站：T8star-Aix",
+      "bounding": [
+        -40,
+        -60,
+        520,
+        300
+      ],
+      "color": "#3f789e",
+      "font_size": 24,
+      "flags": {}
+    }
+  ],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.9,
+      "offset": [
+        80,
+        60
+      ]
+    }
+  },
+  "version": 0.4
+}

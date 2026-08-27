@@ -23,7 +23,7 @@
     }
   },
   "3": {
-    "class_type": "T8_IndexTTS25_Generate",
+    "class_type": "T8_IndexTTS25_RuntimeBenchmark",
     "inputs": {
       "model": [
         "1",
@@ -33,19 +33,12 @@
         "2",
         0
       ],
-      "text": "欢迎使用 IndexTTS 2.5，来自 B 站：T8star-Aix。",
+      "text": "这是 IndexTTS 2.5 真实性能基准。所有运行使用相同文本、参考音频和随机种子。",
       "language": "ZH",
       "duration_factor": 1.0,
-      "target_duration_mode": "off",
-      "target_duration_seconds": 0.0,
-      "postprocess_preset": "off",
-      "postprocess_strength": 1.0,
-      "seed": 20260811,
-      "quality_retry_count": 0,
-      "quality_asr_backend": "auto",
-      "quality_asr_model": "base",
-      "quality_asr_device": "auto",
-      "quality_threshold": 0.82
+      "repeat_count": 2,
+      "warmup": true,
+      "seed": 20250827
     }
   },
   "4": {
@@ -55,7 +48,7 @@
         "3",
         0
       ],
-      "filename_prefix": "IndexTTS25_T8/basic"
+      "filename_prefix": "IndexTTS25_T8/runtime_benchmark"
     }
   }
 }
