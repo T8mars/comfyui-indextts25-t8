@@ -12,7 +12,7 @@ PLUGIN_ROOT = Path(__file__).resolve().parents[1]
 MANIFEST_PATH = PLUGIN_ROOT / "manifests" / "model_2_5.json"
 MODEL_FOLDER_NAME = "IndexTTS-2.5"
 MISSING_MODEL_OPTION = "[未找到] 请将模型放入 models/TTS/IndexTTS-2.5"
-MODEL_REPOSITORY_URL = "https://huggingface.co/t8star/IndexTTS-2.5-T8"
+MODEL_REPOSITORY_URL = "https://huggingface.co/t8star/IndexTTS-2.5-Comfy"
 _HASH_CACHE: dict[tuple[str, int, int], str] = {}
 
 

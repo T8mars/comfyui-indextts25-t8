@@ -41,7 +41,7 @@ def test_manifest_is_pinned_to_formal_index_tts_25():
     assert manifest["codeRevision"] == "ee40fa7d6c6b8a2c7f06105f9f1e65775b74868c"
     assert re.fullmatch(r"[0-9a-f]{40}", manifest["modelRevision"])
     assert manifest["files"]["config.yaml"]["sha256"] == "18adf417be3e8f5e2e48e30f7420c719170a6870619436250f360d626877870e"
-    assert manifest["modelRepository"] == "t8star/IndexTTS-2.5-T8"
+    assert manifest["modelRepository"] == "t8star/IndexTTS-2.5-Comfy"
     assert manifest["upstreamModelRepository"] == "IndexTeam/IndexTTS-2.5"
     assert manifest["upstreamModelRevision"] == "c39ce5ba981572cb187443877ff559dfb246ce63"
     assert manifest["files"]["bpe.model"] == {
@@ -51,7 +51,7 @@ def test_manifest_is_pinned_to_formal_index_tts_25():
         "sourceRevision": "740dcaff396282ffb241903d150ac011cd4b1ede",
     }
     assert downloader._file_source(manifest, "bpe.model") == (
-        "t8star/IndexTTS-2.5-T8",
+        "t8star/IndexTTS-2.5-Comfy",
         manifest["modelRevision"],
     )
     auxiliary = {
@@ -95,7 +95,7 @@ def test_huggingface_download_repairs_only_requested_bundle_files(
     tmp_path: Path, monkeypatch
 ):
     manifest = {
-        "modelRepository": "t8star/IndexTTS-2.5-T8",
+        "modelRepository": "t8star/IndexTTS-2.5-Comfy",
         "modelRevision": "a" * 40,
         "files": {
             "config.yaml": _metadata(b"config"),
@@ -123,7 +123,7 @@ def test_huggingface_download_repairs_only_requested_bundle_files(
         "huggingface",
         missing=("bpe.model", "hf_cache/helper.bin"),
     )
-    assert captured["repo_id"] == "t8star/IndexTTS-2.5-T8"
+    assert captured["repo_id"] == "t8star/IndexTTS-2.5-Comfy"
     assert captured["revision"] == "a" * 40
     assert "bpe.model" in captured["allow_patterns"]
     assert "hf_cache/helper.bin" in captured["allow_patterns"]

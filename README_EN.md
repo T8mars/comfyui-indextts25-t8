@@ -13,7 +13,7 @@ Creator: **Bilibili: T8star-Aix**.
 - Bilibili: [T8star-Aix](https://space.bilibili.com/385085361)
 - YouTube: [T8star-Aix](https://www.youtube.com/@T8star-Aix/)
 - Hugging Face: [t8star](https://huggingface.co/t8star)
-- Complete IndexTTS 2.5 bundle: [t8star/IndexTTS-2.5-T8](https://huggingface.co/t8star/IndexTTS-2.5-T8)
+- Complete IndexTTS 2.5 bundle: [t8star/IndexTTS-2.5-Comfy](https://huggingface.co/t8star/IndexTTS-2.5-Comfy)
 - API sign-up (affiliate link): [api.seedance.nz](https://api.seedance.nz/sign-up?aff=5f4w)
 - Online AI apps (RunningHub): [T8star-Aix profile](https://www.runninghub.ai/zh-cn/user-center/1907375370302308353/userPost?inviteCode=rh-v1121)
 - ComfyUI portable package: [Quark Drive](https://pan.quark.cn/s/264edb7e36bd)
@@ -21,7 +21,12 @@ Creator: **Bilibili: T8star-Aix**.
 
 This repository is locked to the IndexTTS 2.5 inference core and the official 2.5 model manifest. It will not fall back to or accidentally load IndexTTS 2.0.
 
-Current baseline: **ComfyUI Node 0.16.1 · Desktop 0.16.0 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**.
+Current baseline: **ComfyUI Node 0.16.2 · Desktop 0.16.0 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**.
+
+### v0.16.2 renamed model repository
+
+- The complete Hugging Face model repository is now `t8star/IndexTTS-2.5-Comfy`; the downloader, manifest, and documentation all use the new address.
+- The repository name does not change the standard ComfyUI location. Keep the model files directly under `ComfyUI/models/TTS/IndexTTS-2.5/`.
 
 ### v0.16.1 model-directory guidance
 
@@ -30,7 +35,7 @@ Current baseline: **ComfyUI Node 0.16.1 · Desktop 0.16.0 · Core `ee40fa7d` · 
 
 ### v0.16.0 complete model bundle and opt-in repair
 
-- Added `t8star/IndexTTS-2.5-T8`, a single complete repository containing the unmodified official 2.5 main model, the required `bpe.model` from the official 2.0 model repository, and the Wav2Vec2-BERT, CAMPPlus, and BigVGAN runtime assets.
+- Added `t8star/IndexTTS-2.5-Comfy`, a single complete repository containing the unmodified official 2.5 main model, the required `bpe.model` from the official 2.0 model repository, and the Wav2Vec2-BERT, CAMPPlus, and BigVGAN runtime assets.
 - Model Loader now offers “download/repair the complete model when missing.” It is off by default and requires explicit license acceptance before downloading approximately 7.7 GiB.
 - The downloader pins revisions, verifies the SHA-256 manifest, and repairs only missing or damaged files. A manually downloaded complete repository works directly as well.
 - The official `IndexTeam/IndexTTS-2.5` repository currently has no `bpe.model`, so that snapshot alone is correctly reported as incomplete; the user's destination directory is not the problem.
@@ -285,10 +290,10 @@ D:\ComfyUI\models\TTS\IndexTTS-2.5\hf_cache\bigvgan\bigvgan_generator.pt
 `config.yaml`, `bpe.model`, and `gpt.pth` must be direct children of `IndexTTS-2.5`. Do not leave an extra nested directory such as:
 
 ```text
-ComfyUI/models/TTS/IndexTTS-2.5/IndexTTS-2.5-T8/config.yaml  # wrong
+ComfyUI/models/TTS/IndexTTS-2.5/IndexTTS-2.5-Comfy/config.yaml  # wrong
 ```
 
-If a browser download extracts as `IndexTTS-2.5-T8`, rename it to `IndexTTS-2.5` or move all its contents into the standard directory. Restart or refresh ComfyUI after manual placement.
+If a browser download extracts as `IndexTTS-2.5-Comfy`, rename it to `IndexTTS-2.5` or move all its contents into the standard directory. Restart or refresh ComfyUI after manual placement.
 
 This is the only exception to shipping the whole repository: node code, manifests, scripts, licenses, examples, and tests are included here, while the approximately 7.7 GiB complete model follows ComfyUI's shared model-directory convention.
 
@@ -316,7 +321,7 @@ python ComfyUI/custom_nodes/comfyui-indextts25-T8/scripts/download_models.py `
 You can also download the complete directory with the Hugging Face CLI:
 
 ```powershell
-hf download t8star/IndexTTS-2.5-T8 `
+hf download t8star/IndexTTS-2.5-Comfy `
   --local-dir "ComfyUI/models/TTS/IndexTTS-2.5"
 ```
 
@@ -577,13 +582,13 @@ See [`SECURITY_REVIEW.md`](SECURITY_REVIEW.md) for Registry scan notes and the b
 
 - IndexTTS code: `ee40fa7d6c6b8a2c7f06105f9f1e65775b74868c`
 - Upstream IndexTTS 2.5 model: `c39ce5ba981572cb187443877ff559dfb246ce63`
-- Complete model bundle: `faebd7a1e7c8b1727113d079bb0fbe4a4de7c54e`
+- Complete model bundle: `14166a7401f9f87f53770a1784390e8c0e9da15a`
 - Model manifest: `manifests/model_2_5.json`
 
 ## Official project, model downloads, and acknowledgements
 
 - Official IndexTTS repository: [index-tts/index-tts](https://github.com/index-tts/index-tts)
-- Complete model for this node (recommended): [t8star/IndexTTS-2.5-T8](https://huggingface.co/t8star/IndexTTS-2.5-T8)
+- Complete model for this node (recommended): [t8star/IndexTTS-2.5-Comfy](https://huggingface.co/t8star/IndexTTS-2.5-Comfy)
 - IndexTTS 2.5 model on ModelScope: [IndexTeam/IndexTTS-2.5](https://modelscope.cn/models/IndexTeam/IndexTTS-2.5)
 - IndexTTS 2.5 model on Hugging Face: [IndexTeam/IndexTTS-2.5](https://huggingface.co/IndexTeam/IndexTTS-2.5)
 

@@ -13,7 +13,7 @@ IndexTTS 2.5 的 ComfyUI V3 原生节点集成。节点菜单位于：
 - B 站：[T8star-Aix](https://space.bilibili.com/385085361)
 - YouTube：[T8star-Aix](https://www.youtube.com/@T8star-Aix/)
 - Hugging Face：[t8star](https://huggingface.co/t8star)
-- IndexTTS 2.5 完整模型：[t8star/IndexTTS-2.5-T8](https://huggingface.co/t8star/IndexTTS-2.5-T8)
+- IndexTTS 2.5 完整模型：[t8star/IndexTTS-2.5-Comfy](https://huggingface.co/t8star/IndexTTS-2.5-Comfy)
 - API 注册（推广链接）：[api.seedance.nz](https://api.seedance.nz/sign-up?aff=5f4w)
 - 在线 AI 应用（RunningHub）：[T8star-Aix 用户主页](https://www.runninghub.ai/zh-cn/user-center/1907375370302308353/userPost?inviteCode=rh-v1121)
 - ComfyUI 整合包：[夸克网盘下载](https://pan.quark.cn/s/264edb7e36bd)
@@ -21,7 +21,12 @@ IndexTTS 2.5 的 ComfyUI V3 原生节点集成。节点菜单位于：
 
 本目录固定使用 IndexTTS 2.5 推理核心和正式 2.5 模型清单，不会回退或误载 IndexTTS 2.0。
 
-当前版本基线：**ComfyUI Node 0.16.1 · Desktop 0.16.0 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**。
+当前版本基线：**ComfyUI Node 0.16.2 · Desktop 0.16.0 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**。
+
+### v0.16.2 模型仓库新名称
+
+- Hugging Face 完整模型仓库已更名为 `t8star/IndexTTS-2.5-Comfy`，下载器、模型清单和文档同步使用新地址。
+- 仓库名称改变不影响 ComfyUI 标准目录；模型仍应直接放在 `ComfyUI/models/TTS/IndexTTS-2.5/`。
 
 ### v0.16.1 模型目录说明
 
@@ -30,7 +35,7 @@ IndexTTS 2.5 的 ComfyUI V3 原生节点集成。节点菜单位于：
 
 ### v0.16.0 完整模型单仓库与按需修复
 
-- 新增完整模型仓库 `t8star/IndexTTS-2.5-T8`：在未修改原始权重的前提下，把官方 2.5 主模型、来自官方 2.0 仓库的必需 `bpe.model`，以及推理必需的 Wav2Vec2-BERT、CAMPPlus、BigVGAN 放在同一目录结构中。
+- 新增完整模型仓库 `t8star/IndexTTS-2.5-Comfy`：在未修改原始权重的前提下，把官方 2.5 主模型、来自官方 2.0 仓库的必需 `bpe.model`，以及推理必需的 Wav2Vec2-BERT、CAMPPlus、BigVGAN 放在同一目录结构中。
 - 模型加载器新增“缺失时自动下载/修复完整模型”；默认关闭，只有用户同时勾选许可证确认后才联网下载，约需 7.7 GiB。
 - 下载器按固定 revision 与 SHA-256 清单检查并只修复缺失或损坏的文件，手动下载完整仓库也可直接使用。
 - 官方 `IndexTeam/IndexTTS-2.5` 仓库目前没有 `bpe.model`，所以只下载该仓库会被本节点正确判定为目录不完整；这不是用户目录放错。
@@ -300,10 +305,10 @@ D:\ComfyUI\models\TTS\IndexTTS-2.5\hf_cache\bigvgan\bigvgan_generator.pt
 `config.yaml`、`bpe.model` 和 `gpt.pth` 必须直接位于 `IndexTTS-2.5` 目录中。不要出现下面这种多套一层的错误路径：
 
 ```text
-ComfyUI/models/TTS/IndexTTS-2.5/IndexTTS-2.5-T8/config.yaml  ← 错误
+ComfyUI/models/TTS/IndexTTS-2.5/IndexTTS-2.5-Comfy/config.yaml  ← 错误
 ```
 
-如果从 HF 网页下载并解压后目录名是 `IndexTTS-2.5-T8`，请把它重命名为 `IndexTTS-2.5`，或把里面的全部文件移动到标准目录。手动放置后重启或刷新 ComfyUI。
+如果从 HF 网页下载并解压后目录名是 `IndexTTS-2.5-Comfy`，请把它重命名为 `IndexTTS-2.5`，或把里面的全部文件移动到标准目录。手动放置后重启或刷新 ComfyUI。
 
 这是唯一例外：节点所需的代码、清单、脚本、许可证、示例和测试都在本目录；约 7.7 GiB 的完整模型遵循
 ComfyUI 模型目录规范，可由多个工作流共享，避免复制。
@@ -333,7 +338,7 @@ python ComfyUI/custom_nodes/comfyui-indextts25-T8/scripts/download_models.py `
 也可使用 Hugging Face CLI 直接下载完整目录：
 
 ```powershell
-hf download t8star/IndexTTS-2.5-T8 `
+hf download t8star/IndexTTS-2.5-Comfy `
   --local-dir "ComfyUI/models/TTS/IndexTTS-2.5"
 ```
 
@@ -627,13 +632,13 @@ Registry 安全扫描说明与剩余敏感操作的边界见 [`SECURITY_REVIEW.m
 
 - IndexTTS 代码：`ee40fa7d6c6b8a2c7f06105f9f1e65775b74868c`
 - IndexTTS 2.5 上游模型：`c39ce5ba981572cb187443877ff559dfb246ce63`
-- 完整模型仓库：`faebd7a1e7c8b1727113d079bb0fbe4a4de7c54e`
+- 完整模型仓库：`14166a7401f9f87f53770a1784390e8c0e9da15a`
 - 模型清单：`manifests/model_2_5.json`
 
 ## 官方项目、模型下载与致谢
 
 - IndexTTS 官方仓库：[index-tts/index-tts](https://github.com/index-tts/index-tts)
-- 本节点完整模型（推荐）：[t8star/IndexTTS-2.5-T8](https://huggingface.co/t8star/IndexTTS-2.5-T8)
+- 本节点完整模型（推荐）：[t8star/IndexTTS-2.5-Comfy](https://huggingface.co/t8star/IndexTTS-2.5-Comfy)
 - IndexTTS 2.5 模型（ModelScope）：[IndexTeam/IndexTTS-2.5](https://modelscope.cn/models/IndexTeam/IndexTTS-2.5)
 - IndexTTS 2.5 模型（Hugging Face）：[IndexTeam/IndexTTS-2.5](https://huggingface.co/IndexTeam/IndexTTS-2.5)
 

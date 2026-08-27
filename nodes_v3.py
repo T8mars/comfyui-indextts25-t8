@@ -362,7 +362,7 @@ class T8IndexTTS25ModelLoader(io.ComfyNode):
                     display_name="缺失时自动下载/修复完整模型",
                     default=False,
                     tooltip=(
-                        "默认关闭。启用后会从 t8star/IndexTTS-2.5-T8 下载主模型、"
+                        "默认关闭。启用后会从 t8star/IndexTTS-2.5-Comfy 下载主模型、"
                         "bpe.model 与运行所需辅助模型，完整目录约 7.7 GiB。"
                     ),
                 ),
