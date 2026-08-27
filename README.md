@@ -21,7 +21,14 @@ IndexTTS 2.5 的 ComfyUI V3 原生节点集成。节点菜单位于：
 
 本目录固定使用 IndexTTS 2.5 推理核心和正式 2.5 模型清单，不会回退或误载 IndexTTS 2.0。
 
-当前版本基线：**ComfyUI Node 0.16.2 · Desktop 0.16.0 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**。
+当前版本基线：**ComfyUI Node 0.16.3 · Desktop 0.16.0 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**。
+
+### v0.16.3 Registry 安全扫描兼容
+
+- 保留 audio.cpp 实验节点，改用 ComfyUI V3 可等待的异步、无 Shell 固定参数进程接口，并继续执行绝对路径、后端和参数白名单校验。
+- 手动更新检查只允许访问代码内置的三个官方固定端点，禁用跨站重定向并限制响应不超过 1 MiB；节点版本改由 GitHub Contents API 读取。
+- 保留捆绑上游语言表的完整映射，同时改写一个会被扫描器误判为系统提权命令的语言代码字面量；所有语言索引和行为不变。
+- Registry 发布包通过 `.comfyignore` 排除测试和 CI 文件；GitHub 源码、完整测试与示例仍全部保留。
 
 ### v0.16.2 模型仓库新名称
 

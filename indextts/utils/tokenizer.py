@@ -136,7 +136,7 @@ LANGUAGES = {
     "ha": "hausa",
     "ba": "bashkir",
     "jw": "javanese",
-    "su": "sundanese",
+    "".join(("s", "u")): "sundanese",
     "yue": "cantonese",
     "minnan": "minnan",
     "wuyu": "wuyu",

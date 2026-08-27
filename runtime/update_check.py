@@ -1,16 +1,20 @@
 from __future__ import annotations
 
+import base64
 import json
 import re
-import urllib.request
 from datetime import datetime, timezone
+
+from huggingface_hub import get_session
 
 
 URLS = {
     "official_code": "https://api.github.com/repos/index-tts/index-tts/commits/main",
     "official_model": "https://huggingface.co/api/models/IndexTeam/IndexTTS-2.5",
-    "node_project": "https://raw.githubusercontent.com/T8mars/comfyui-indextts25-t8/main/pyproject.toml",
+    "node_project": "https://api.github.com/repos/T8mars/comfyui-indextts25-t8/contents/pyproject.toml?ref=main",
 }
+
+MAX_RESPONSE_BYTES = 1_048_576
 
 
 def compare_versions(left: str, right: str) -> int:
@@ -25,15 +29,22 @@ def compare_versions(left: str, right: str) -> int:
 
 
 def _fetch(url: str, timeout_seconds: float) -> str:
-    request = urllib.request.Request(
+    if url not in URLS.values():
+        raise ValueError("更新检查只允许访问内置的官方固定端点。")
+    response = get_session().get(
         url,
         headers={
             "User-Agent": "comfyui-indextts25-t8-update-check",
             "Accept": "application/json, text/plain;q=0.9, */*;q=0.8",
         },
+        timeout=max(1.0, float(timeout_seconds)),
+        allow_redirects=False,
     )
-    with urllib.request.urlopen(request, timeout=float(timeout_seconds)) as response:
-        return response.read().decode("utf-8")
+    response.raise_for_status()
+    body = bytes(response.content)
+    if len(body) > MAX_RESPONSE_BYTES:
+        raise ValueError("更新检查响应超过 1 MiB 安全上限。")
+    return body.decode("utf-8")
 
 
 def check_updates(
@@ -64,10 +75,18 @@ def check_updates(
         if "official_model" in values:
             errors.append("official_model: 返回格式无效")
     if "node_project" in values:
-        match = re.search(r'^version\s*=\s*["\']([^"\']+)["\']', values["node_project"], re.M)
+        try:
+            payload = json.loads(values["node_project"])
+            project_text = base64.b64decode(
+                str(payload["content"]).replace("\n", ""), validate=True
+            ).decode("utf-8")
+        except Exception:
+            project_text = ""
+            errors.append("node_project: 返回格式无效")
+        match = re.search(r'^version\s*=\s*["\']([^"\']+)["\']', project_text, re.M)
         if match:
             latest_node = match.group(1)
-        else:
+        elif project_text:
             errors.append("node_project: 未找到版本号")
 
     pinned_code = str(manifest.get("codeRevision", ""))

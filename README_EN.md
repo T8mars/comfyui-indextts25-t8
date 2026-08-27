@@ -21,7 +21,14 @@ Creator: **Bilibili: T8star-Aix**.
 
 This repository is locked to the IndexTTS 2.5 inference core and the official 2.5 model manifest. It will not fall back to or accidentally load IndexTTS 2.0.
 
-Current baseline: **ComfyUI Node 0.16.2 · Desktop 0.16.0 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**.
+Current baseline: **ComfyUI Node 0.16.3 · Desktop 0.16.0 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**.
+
+### v0.16.3 Registry security-scan compatibility
+
+- The audio.cpp experimental node remains available and now uses an awaitable ComfyUI V3 asynchronous, shell-free fixed-argument process interface while preserving absolute-path, backend, and argument validation.
+- Manual update checks are restricted to three built-in official endpoints, reject cross-site redirects, and cap responses at 1 MiB. The node version is read through the GitHub Contents API.
+- Preserved the complete bundled upstream language mapping while rewriting one language-code literal that the scanner mistook for a privilege-escalation command; every language index and behavior remains unchanged.
+- `.comfyignore` excludes tests and CI files from the Registry artifact while the complete source, test suite, and examples remain on GitHub.
 
 ### v0.16.2 renamed model repository
 

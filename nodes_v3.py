@@ -2361,7 +2361,7 @@ class T8IndexTTS25AudioCppGenerate(io.ComfyNode):
         )
 
     @classmethod
-    def execute(
+    async def execute(
         cls,
         executable_path: str,
         gguf_model_path: str,
@@ -2373,7 +2373,7 @@ class T8IndexTTS25AudioCppGenerate(io.ComfyNode):
         memory_saver: bool,
         emotion: EmotionConfig | None = None,
     ) -> io.NodeOutput:
-        probe = probe_audiocpp(executable_path)
+        probe = await probe_audiocpp(executable_path)
         if not probe.get("available"):
             raise RuntimeError(
                 "audio.cpp CLI 探测失败："
@@ -2401,7 +2401,7 @@ class T8IndexTTS25AudioCppGenerate(io.ComfyNode):
                 emotion_vector = emotion.vector
         with tempfile.TemporaryDirectory(prefix="t8_audiocpp_") as temporary:
             output = Path(temporary) / "output.wav"
-            report = run_audiocpp(
+            report = await run_audiocpp(
                 executable_path,
                 gguf_model_path,
                 speaker_path,

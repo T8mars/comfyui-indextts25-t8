@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import subprocess
+import asyncio
 import time
 from pathlib import Path
 from typing import Any, Sequence
@@ -20,25 +20,41 @@ def _path(value, label: str, *, file: bool | None = None) -> Path:
     return path
 
 
-def probe(executable, timeout: float = 15.0) -> dict[str, Any]:
+async def _run_process(command: Sequence[str], timeout: float) -> tuple[int, str, str]:
+    """Run a fixed argument vector without a command shell."""
+
+    process = await asyncio.create_subprocess_exec(
+        *command,
+        stdout=-1,
+        stderr=-1,
+    )
+    try:
+        stdout, stderr = await asyncio.wait_for(
+            process.communicate(), timeout=max(1.0, float(timeout))
+        )
+    except TimeoutError:
+        process.kill()
+        await process.communicate()
+        raise TimeoutError(f"audio.cpp 运行超过 {float(timeout):.1f} 秒，已终止。")
+    return (
+        int(process.returncode or 0),
+        stdout.decode("utf-8", errors="replace"),
+        stderr.decode("utf-8", errors="replace"),
+    )
+
+
+async def probe(executable, timeout: float = 15.0) -> dict[str, Any]:
     try:
         binary = _path(executable, "audio.cpp 可执行文件", file=True)
-        completed = subprocess.run(
-            [str(binary), "--help"],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=max(1.0, float(timeout)),
-            check=False,
-            shell=False,
+        returncode, stdout, stderr = await _run_process(
+            [str(binary), "--help"], timeout
         )
-        output = (completed.stdout + "\n" + completed.stderr).strip()
+        output = (stdout + "\n" + stderr).strip()
         compatible = "--family" in output and "--voice-ref" in output
         return {
-            "available": completed.returncode == 0 and compatible,
+            "available": returncode == 0 and compatible,
             "compatible_cli": compatible,
-            "returncode": completed.returncode,
+            "returncode": returncode,
             "executable": str(binary),
             "summary": output[:2000],
         }
@@ -99,31 +115,24 @@ def build_command(
     return command
 
 
-def run(*args, timeout: float = 3600, **kwargs) -> dict[str, Any]:
+async def run(*args, timeout: float = 3600, **kwargs) -> dict[str, Any]:
     command = build_command(*args, **kwargs)
     output = Path(command[command.index("--out") + 1])
     started = time.perf_counter()
-    completed = subprocess.run(
-        command,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        timeout=max(30.0, float(timeout)),
-        check=False,
-        shell=False,
+    returncode, stdout, stderr = await _run_process(
+        command, max(30.0, float(timeout))
     )
-    if completed.returncode != 0 or not output.is_file():
-        detail = (completed.stderr or completed.stdout).strip()
-        raise RuntimeError(f"audio.cpp 推理失败（exit={completed.returncode}）：{detail[-3000:]}")
+    if returncode != 0 or not output.is_file():
+        detail = (stderr or stdout).strip()
+        raise RuntimeError(f"audio.cpp 推理失败（exit={returncode}）：{detail[-3000:]}")
     return {
         "output_path": str(output),
         "elapsed_seconds": round(time.perf_counter() - started, 3),
         "backend": kwargs.get("backend"),
         "family": "index_tts2",
         "experimental": True,
-        "stdout": completed.stdout[-2000:],
-        "stderr": completed.stderr[-2000:],
+        "stdout": stdout[-2000:],
+        "stderr": stderr[-2000:],
     }
 
 

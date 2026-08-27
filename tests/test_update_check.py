@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+import base64
 import json
 
+import pytest
+
+import runtime.update_check as update_check
 from runtime.update_check import URLS, check_updates, compare_versions
 
 
@@ -14,7 +18,13 @@ def test_check_updates_reports_each_source() -> None:
     values = {
         URLS["official_code"]: json.dumps({"sha": "new-code"}),
         URLS["official_model"]: json.dumps({"sha": "same-model"}),
-        URLS["node_project"]: '[project]\nversion = "0.14.0"\n',
+        URLS["node_project"]: json.dumps(
+            {
+                "content": base64.b64encode(
+                    b'[project]\nversion = "0.14.0"\n'
+                ).decode("ascii")
+            }
+        ),
     }
 
     def fetcher(url: str, timeout: float) -> str:
@@ -33,3 +43,35 @@ def test_check_updates_reports_each_source() -> None:
     assert report["official_code"]["update_available"] is True
     assert report["official_model"]["update_available"] is False
     assert report["official_model"]["pinned"] == "same-model"
+
+
+def test_fetch_rejects_non_builtin_endpoint() -> None:
+    with pytest.raises(ValueError, match="固定端点"):
+        update_check._fetch("https://example.com/untrusted", 2.0)
+
+
+def test_fetch_disables_redirects_and_caps_response(monkeypatch) -> None:
+    captured = {}
+
+    class FakeResponse:
+        content = b"{}"
+
+        def raise_for_status(self) -> None:
+            return None
+
+    class FakeSession:
+        def get(self, url, **kwargs):
+            captured["url"] = url
+            captured["kwargs"] = kwargs
+            return FakeResponse()
+
+    monkeypatch.setattr(update_check, "get_session", lambda: FakeSession())
+
+    assert update_check._fetch(URLS["official_code"], 2.0) == "{}"
+    assert captured["url"] == URLS["official_code"]
+    assert captured["kwargs"]["allow_redirects"] is False
+    assert captured["kwargs"]["timeout"] == 2.0
+
+    FakeResponse.content = b"x" * (update_check.MAX_RESPONSE_BYTES + 1)
+    with pytest.raises(ValueError, match="1 MiB"):
+        update_check._fetch(URLS["official_code"], 2.0)
