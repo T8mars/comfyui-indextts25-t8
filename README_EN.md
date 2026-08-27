@@ -20,12 +20,20 @@ Creator: **Bilibili: T8star-Aix**.
 
 This repository is locked to the IndexTTS 2.5 inference core and the official 2.5 model manifest. It will not fall back to or accidentally load IndexTTS 2.0.
 
-Current baseline: **ComfyUI Node 0.12.2 · Desktop 0.13.1 · Core `ee40fa7d` · Model `c39ce5ba`**.
+Current baseline: **ComfyUI Node 0.13.0 · Desktop 0.14.0 · Core `ee40fa7d` · Model `c39ce5ba`**.
 
-Version 0.12.2 fixes an omission in the formal model manifest. IndexTTS 2.5 continues to reuse the
-`bpe.model` tokenizer from `IndexTeam/IndexTTS-2`; both Hugging Face and ModelScope download paths now
-fetch it from a pinned revision, verify it, and reject incomplete model directories before loading.
+Version 0.13.0 adds the installed torch, CUDA Runtime, FlashAttention, Triton, DeepSpeed, and Ninja versions
+to the no-model environment report. Desktop 0.14.0 shows expected availability and fallback reasons for every
+acceleration mode before startup and exports a one-click JSON diagnostic report. The formal model manifest keeps
+the shared `bpe.model` tokenizer pinned to `IndexTeam/IndexTTS-2`; both download paths fetch and verify it.
 Desktop and Node are separate deliverables with independent versions; Core/Model identify the pinned official code and weight revisions.
+
+### v0.13.0 acceleration diagnostics update
+
+- Environment diagnostics now report exact installed dependency versions without loading the IndexTTS model, separating missing packages from runtime initialization failures.
+- The Desktop launcher can refresh BigVGAN CUDA, Torch Compile, GPT acceleration, and DeepSpeed preflight results and explains each expected enablement or fallback.
+- A JSON report exports the system, GPU, model validation, selected runtime settings, pinned revisions, and troubleshooting notes for issue reports.
+- Preflight availability is not claimed as actual activation; the startup log and WebUI environment report remain authoritative. Optional DeepSpeed AIO/cuFile warnings do not determine speech-inference success.
 
 ### v0.12.0 low-VRAM and precision update
 
@@ -110,7 +118,8 @@ Desktop and Node are separate deliverables with independent versions; Core/Model
     - Processes any ComfyUI AUDIO independently, with wet/dry strength and target peak, without FFmpeg
 13. `IndexTTS 2.5 Environment and Optional Acceleration · T8star-Aix`
     - Checks native BF16, FP16, VRAM, the CUDA toolchain, Triton, FlashAttention, and DeepSpeed without loading the model
-    - Recommends precision, reference placement, and a safe acceleration mode; never installs optional dependencies
+    - Reports installed torch/CUDA Runtime/FlashAttention/Triton/DeepSpeed/Ninja versions, then recommends precision, reference placement, and a safe mode
+    - Never installs optional dependencies and keeps preflight availability distinct from the mode that actually initializes after startup
 14. `IndexTTS 2.5 Timeline Editor · T8star-Aix`
     - Accepts a batch/SRT script and editable JSON to change per-line start, end, role, language, and duration factor in milliseconds
     - Outputs a strictly validated script, structured JSON, and a standard `IMAGE` timeline preview

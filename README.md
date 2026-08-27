@@ -20,11 +20,19 @@ IndexTTS 2.5 的 ComfyUI V3 原生节点集成。节点菜单位于：
 
 本目录固定使用 IndexTTS 2.5 推理核心和正式 2.5 模型清单，不会回退或误载 IndexTTS 2.0。
 
-当前版本基线：**ComfyUI Node 0.12.2 · Desktop 0.13.1 · Core `ee40fa7d` · Model `c39ce5ba`**。
+当前版本基线：**ComfyUI Node 0.13.0 · Desktop 0.14.0 · Core `ee40fa7d` · Model `c39ce5ba`**。
 
-0.12.2 修复正式模型清单遗漏：IndexTTS 2.5 继续复用 `IndexTeam/IndexTTS-2` 的 `bpe.model` 分词器，
-Hugging Face 与 ModelScope 下载器现在会从固定 revision 自动补齐并校验该文件，模型加载前也会明确拦截不完整目录。
+0.13.0 为无模型环境诊断补充 torch、CUDA Runtime、FlashAttention、Triton、DeepSpeed 和 Ninja 的实际安装版本；
+Desktop 0.14.0 在启动器中直接显示每种加速的预计可用状态、回退原因，并可一键导出 JSON 诊断报告。
+正式模型清单继续固定复用 `IndexTeam/IndexTTS-2` 的 `bpe.model` 分词器，Hugging Face 与 ModelScope 下载器会自动补齐并校验该文件。
 Desktop 与 Node 是两个独立发行物，因此各自使用独立版本号；Core/Model 是固定的官方代码和权重 revision。
+
+### v0.13.0 加速诊断更新
+
+- “环境与可选加速”在不加载模型的情况下报告准确的已安装依赖版本，便于区分“没有安装”和“运行时初始化失败”。
+- Desktop 启动器可重新检测 BigVGAN CUDA、Torch Compile、GPT 加速和 DeepSpeed，并逐项解释预计启用或回退原因。
+- JSON 诊断报告包含系统、硬件、模型校验、所选运行参数、固定代码/模型 revision 与排错说明，方便用户直接随 Issue 提交。
+- 预检只代表依赖具备；真正生效模式仍以启动日志和 WebUI 环境诊断为准。DeepSpeed 的 AIO/cuFile 可选扩展警告不影响语音推理判定。
 
 ### v0.12.0 低显存与精度更新
 
@@ -109,7 +117,8 @@ Desktop 与 Node 是两个独立发行物，因此各自使用独立版本号；
    - 独立处理任意 ComfyUI AUDIO，支持强度混合和目标峰值，不依赖 FFmpeg
 13. `IndexTTS 2.5 环境与可选加速 · T8star-Aix`
    - 不加载模型即可检查原生 BF16、FP16、显存、CUDA 工具链、Triton、FlashAttention、DeepSpeed
-   - 输出推荐精度、参考编码器位置和安全加速模式；只报告能力，不安装任何附加依赖
+   - 输出 torch/CUDA Runtime/FlashAttention/Triton/DeepSpeed/Ninja 实际版本、推荐精度、参考编码器位置和安全加速模式
+   - 只报告能力，不安装任何附加依赖；“可用”与模型启动后的“实际生效”分开说明
 14. `IndexTTS 2.5 时间轴编辑 · T8star-Aix`
    - 接收批量/SRT 脚本和可编辑 JSON，按毫秒修改逐句开始、结束、角色、语言与时长系数
    - 输出严格校验后的脚本、结构化 JSON 和标准 `IMAGE` 彩色轨道预览

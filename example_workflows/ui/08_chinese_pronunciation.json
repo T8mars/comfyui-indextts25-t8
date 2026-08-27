@@ -124,7 +124,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_ModelLoader",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.12.2"
+        "ver": "0.13.0"
       },
       "widgets_values": [
         "IndexTTS-2.5",
@@ -247,7 +247,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_Pronunciation",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.12.2"
+        "ver": "0.13.0"
       },
       "widgets_values": [
         "小明<要求|YAO4 QIU2>这个题的答案是多少；他在银行里工作，行长正在开会。",
@@ -415,7 +415,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_Generate",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.12.2"
+        "ver": "0.13.0"
       },
       "widgets_values": [
         "小明<要求|YAO4 QIU2>这个题的答案是多少；他在银行里工作，行长正在开会。",

@@ -1,4 +1,10 @@
-from runtime.acceleration import recommend_runtime_config, resolve_acceleration
+import torch
+
+from runtime.acceleration import (
+    probe_acceleration,
+    recommend_runtime_config,
+    resolve_acceleration,
+)
 
 
 def caps(cuda=True, *, nvcc=False, cxx=False, **modules):
@@ -48,3 +54,17 @@ def test_preflight_only_recommends_auto_safe_when_toolchain_is_ready():
     )
     assert recommendation["precision"] == "bfloat16"
     assert recommendation["acceleration_mode"] == "auto_safe"
+
+
+def test_preflight_includes_dependency_versions_without_importing_models():
+    report = probe_acceleration("cpu")
+    assert report["cuda"] is False
+    assert report["versions"]["torch"] == str(torch.__version__)
+    assert set(report["versions"]) == {
+        "torch",
+        "cuda_runtime",
+        "deepspeed",
+        "flash_attn",
+        "triton",
+        "ninja",
+    }

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+from importlib import metadata
 import os
 import shutil
 from dataclasses import dataclass
@@ -30,6 +31,17 @@ def _module(name: str) -> bool:
         return importlib.util.find_spec(name) is not None
     except (ImportError, ModuleNotFoundError, ValueError):
         return False
+
+
+def _distribution_version(*names: str) -> str | None:
+    """Return a package version without importing optional acceleration modules."""
+
+    for name in names:
+        try:
+            return metadata.version(name)
+        except metadata.PackageNotFoundError:
+            continue
+    return None
 
 
 def probe_acceleration(device: str) -> dict:
@@ -63,6 +75,14 @@ def probe_acceleration(device: str) -> dict:
         "bf16": bf16,
         "fp16": cuda,
         "gpu": gpu,
+        "versions": {
+            "torch": str(torch.__version__),
+            "cuda_runtime": str(torch.version.cuda or ""),
+            "deepspeed": _distribution_version("deepspeed"),
+            "flash_attn": _distribution_version("flash-attn", "flash_attn"),
+            "triton": _distribution_version("triton-windows", "triton"),
+            "ninja": _distribution_version("ninja"),
+        },
         "modules": {"deepspeed": _module("deepspeed"), "flash_attn": _module("flash_attn"), "triton": _module("triton"), "ninja": _module("ninja") or shutil.which("ninja") is not None},
         "tools": {
             "nvcc": shutil.which("nvcc") is not None,
