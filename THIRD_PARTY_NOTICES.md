@@ -4,12 +4,17 @@
 
 - 上游代码仓库：`index-tts/index-tts`
 - 固定代码提交：`ee40fa7d6c6b8a2c7f06105f9f1e65775b74868c`
-- 正式模型仓库：`IndexTeam/IndexTTS-2.5`
-- 固定模型版本：`c39ce5ba981572cb187443877ff559dfb246ce63`
+- 本节点完整模型仓库：`t8star/IndexTTS-2.5-T8`
+- 固定完整模型版本：`45ddbcc709e1219ff044cc51d5873079333d5726`
+- 上游正式模型仓库：`IndexTeam/IndexTTS-2.5`
+- 固定上游模型版本：`c39ce5ba981572cb187443877ff559dfb246ce63`
+- 必需分词器 `bpe.model`：`IndexTeam/IndexTTS-2`，固定版本 `740dcaff396282ffb241903d150ac011cd4b1ede`
+- 辅助模型：`facebook/w2v-bert-2.0`、`funasr/campplus`、`nvidia/bigvgan_v2_22khz_80band_256x`；来源、固定版本和哈希见模型清单及完整模型仓库的模型卡
 - 上游许可证及限制：见本目录 `LICENSE`、`LICENSE_ZH.txt` 和 `DISCLAIMER`
 
-模型权重不包含在本节点包内。下载脚本会要求用户显式传入 `--accept-license`，并在下载后依据
-`manifests/model_2_5.json` 对正式模型文件执行 SHA-256 校验。
+模型权重不包含在本节点包内。下载脚本和模型加载器的按需下载均要求用户显式接受许可证，并在下载后依据
+`manifests/model_2_5.json` 对完整模型文件执行 SHA-256 校验。完整模型仓库只重新组织推理必需的原始文件，
+不修改上游模型权重。
 
 ## 可选 audio.cpp 实验连接器
 

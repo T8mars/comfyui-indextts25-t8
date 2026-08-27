@@ -71,7 +71,9 @@ def check_updates(
             errors.append("node_project: 未找到版本号")
 
     pinned_code = str(manifest.get("codeRevision", ""))
-    pinned_model = str(manifest.get("modelRevision", ""))
+    pinned_model = str(
+        manifest.get("upstreamModelRevision") or manifest.get("modelRevision", "")
+    )
     report = {
         "checked_at": datetime.now(timezone.utc).isoformat(),
         "node": {

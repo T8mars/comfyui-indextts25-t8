@@ -31,7 +31,13 @@ def main() -> int:
     print("Dependencies:", "OK" if not missing else "missing " + ", ".join(missing))
     manifest = load_manifest()
     print(f"Code revision: {manifest['codeRevision']}")
-    print(f"Model revision: {manifest['modelRevision']}")
+    print(
+        f"Complete model bundle: {manifest['modelRepository']}@{manifest['modelRevision']}"
+    )
+    print(
+        "Upstream model: "
+        f"{manifest['upstreamModelRepository']}@{manifest['upstreamModelRevision']}"
+    )
     if len(sys.argv) > 1:
         report = validate_model_dir(Path(sys.argv[1]), verify_hashes="--hash" in sys.argv[2:])
         print(f"Model directory: {report.model_dir}")

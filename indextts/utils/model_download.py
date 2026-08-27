@@ -11,9 +11,9 @@ import os
 import shutil
 import tempfile
 
-logger = logging.getLogger(__name__)
-
 from indextts.utils.network_detection import need_proxy
+
+logger = logging.getLogger(__name__)
 
 _USING_MODELSCOPE: bool | None = None
 
@@ -42,9 +42,20 @@ HF_TO_MODELSCOPE_REPO_MAP = {
 
 # Default BigVGAN repo (also in config.yaml, but needed for pre-download)
 _BIGVGAN_REPO = "nvidia/bigvgan_v2_22khz_80band_256x"
+_AUXILIARY_REVISIONS = {
+    "facebook/w2v-bert-2.0": "da985ba0987f70aaeb84a80f2851cfac8c697a7b",
+    "funasr/campplus": "e4b6ede7ce16997aff4ae69fbca1f0175e2afede",
+    _BIGVGAN_REPO: "633ff708ed5b74903e86ff1298cf4a98e921c513",
+}
 
 
-def _download_single_file(repo_id: str, filename: str, local_path: str) -> str:
+def _download_single_file(
+    repo_id: str,
+    filename: str,
+    local_path: str,
+    *,
+    revision: str | None = None,
+) -> str:
     """Download a single file from a HF/ModelScope repo to a specific local path."""
     from indextts.utils.examples_downloader import _download_file
 
@@ -62,9 +73,11 @@ def _download_single_file(repo_id: str, filename: str, local_path: str) -> str:
             except Exception:
                 pass
         # Fallback to hf-mirror.com
-        url = f"https://hf-mirror.com/{repo_id}/resolve/main/{filename}"
+        resolved_revision = revision or "main"
+        url = f"https://hf-mirror.com/{repo_id}/resolve/{resolved_revision}/{filename}"
     else:
-        url = f"https://huggingface.co/{repo_id}/resolve/main/{filename}"
+        resolved_revision = revision or "main"
+        url = f"https://huggingface.co/{repo_id}/resolve/{resolved_revision}/{filename}"
 
     print(f">> Downloading {repo_id}/{filename} from {url} ...")
     _download_file(url, local_path, timeout=300)
@@ -100,7 +113,6 @@ def ensure_models_available(model_dir: str, bigvgan_repo: str = _BIGVGAN_REPO) -
 
     Returns a dict of local paths:
         - ``w2v_bert``: directory containing w2v-bert-2.0 model
-        - ``semantic_codec``: path to semantic_codec/model.safetensors
         - ``campplus``: path to campplus_cn_common.bin
         - ``bigvgan``: directory containing config.json + bigvgan_generator.pt
     """
@@ -110,32 +122,49 @@ def ensure_models_available(model_dir: str, bigvgan_repo: str = _BIGVGAN_REPO) -
 
     # 1. w2v-bert-2.0 (full repo — needed by SeamlessM4T and Wav2Vec2BertModel)
     w2v_dir = os.path.join(cache_dir, "w2v-bert-2.0")
-    if not os.path.isdir(w2v_dir) or not os.listdir(w2v_dir):
+    w2v_required = ("config.json", "model.safetensors", "preprocessor_config.json")
+    if not all(os.path.isfile(os.path.join(w2v_dir, name)) for name in w2v_required):
         print(f">> Downloading w2v-bert-2.0 to {w2v_dir}...")
-        snapshot_download("facebook/w2v-bert-2.0", local_dir=w2v_dir)
+        snapshot_download(
+            "facebook/w2v-bert-2.0",
+            local_dir=w2v_dir,
+            revision=_AUXILIARY_REVISIONS["facebook/w2v-bert-2.0"],
+            allow_patterns=list(w2v_required),
+        )
     paths["w2v_bert"] = w2v_dir
 
-    # 2. MaskGCT semantic codec
-    maskgct_path = os.path.join(cache_dir, "semantic_codec_model.safetensors")
-    if not os.path.isfile(maskgct_path):
-        print(f">> Downloading MaskGCT semantic codec to {maskgct_path}...")
-        _download_single_file("amphion/MaskGCT", "semantic_codec/model.safetensors", maskgct_path)
-    paths["semantic_codec"] = maskgct_path
-
-    # 3. CAMPPlus speaker embedding model
+    # 2. CAMPPlus speaker embedding model
     campplus_path = os.path.join(cache_dir, "campplus_cn_common.bin")
     if not os.path.isfile(campplus_path):
         print(f">> Downloading CAMPPlus to {campplus_path}...")
-        _download_single_file("funasr/campplus", "campplus_cn_common.bin", campplus_path)
+        _download_single_file(
+            "funasr/campplus",
+            "campplus_cn_common.bin",
+            campplus_path,
+            revision=_AUXILIARY_REVISIONS["funasr/campplus"],
+        )
     paths["campplus"] = campplus_path
 
-    # 4. BigVGAN vocoder (config + weights)
+    # 3. BigVGAN vocoder (config + weights)
     bigvgan_dir = os.path.join(cache_dir, "bigvgan")
-    if not os.path.isdir(bigvgan_dir) or not os.path.isfile(os.path.join(bigvgan_dir, "config.json")):
+    if not all(
+        os.path.isfile(os.path.join(bigvgan_dir, name))
+        for name in ("config.json", "bigvgan_generator.pt")
+    ):
         print(f">> Downloading BigVGAN to {bigvgan_dir}...")
         os.makedirs(bigvgan_dir, exist_ok=True)
-        _download_single_file(bigvgan_repo, "config.json", os.path.join(bigvgan_dir, "config.json"))
-        _download_single_file(bigvgan_repo, "bigvgan_generator.pt", os.path.join(bigvgan_dir, "bigvgan_generator.pt"))
+        _download_single_file(
+            bigvgan_repo,
+            "config.json",
+            os.path.join(bigvgan_dir, "config.json"),
+            revision=_AUXILIARY_REVISIONS.get(bigvgan_repo),
+        )
+        _download_single_file(
+            bigvgan_repo,
+            "bigvgan_generator.pt",
+            os.path.join(bigvgan_dir, "bigvgan_generator.pt"),
+            revision=_AUXILIARY_REVISIONS.get(bigvgan_repo),
+        )
     paths["bigvgan"] = bigvgan_dir
 
     print(">> All auxiliary models ready.")
@@ -158,8 +187,12 @@ def snapshot_download(repo_id: str, local_dir: str, revision=None, force_downloa
 def _snapshot_from_modelscope(model_id: str, local_dir: str, revision=None) -> str:
     """Download an entire model repository from ModelScope."""
     ms_model_id = HF_TO_MODELSCOPE_REPO_MAP.get(model_id, model_id)
+    ms_revision = revision
     if ms_model_id != model_id:
         logger.info(f"ModelScope: mapped '{model_id}' -> '{ms_model_id}'")
+        # Hugging Face and ModelScope use different revision identifiers.
+        # The complete manifest still verifies the downloaded bytes afterward.
+        ms_revision = None
 
     from modelscope.hub.snapshot_download import snapshot_download as _ms_snapshot
     logger.info(f"Downloading repo from ModelScope: {ms_model_id}")
@@ -176,7 +209,7 @@ def _snapshot_from_modelscope(model_id: str, local_dir: str, revision=None) -> s
         return local_dir
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        _ms_snapshot(model_id=ms_model_id, cache_dir=tmpdir, revision=revision)
+        _ms_snapshot(model_id=ms_model_id, cache_dir=tmpdir, revision=ms_revision)
         downloaded = os.path.join(tmpdir, ms_model_id)
         if not os.path.isdir(downloaded):
             for root, dirs, files in os.walk(tmpdir):

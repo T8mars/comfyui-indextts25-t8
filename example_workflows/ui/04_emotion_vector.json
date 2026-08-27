@@ -106,6 +106,22 @@
           "link": null
         },
         {
+          "name": "download_missing",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "download_missing"
+          },
+          "link": null
+        },
+        {
+          "name": "accept_model_license",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "accept_model_license"
+          },
+          "link": null
+        },
+        {
           "name": "custom_model_path",
           "type": "STRING",
           "widget": {
@@ -132,7 +148,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_ModelLoader",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.15.0"
+        "ver": "0.16.0"
       },
       "widgets_values": [
         "IndexTTS-2.5",
@@ -146,6 +162,8 @@
         "auto",
         false,
         true,
+        false,
+        false,
         ""
       ]
     },
@@ -312,7 +330,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_EmotionControl",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.15.0"
+        "ver": "0.16.0"
       },
       "widgets_values": [
         "vector",
@@ -492,7 +510,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_Generate",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.15.0"
+        "ver": "0.16.0"
       },
       "widgets_values": [
         "太好了，这个版本终于加入了真正可控的语速适配功能！",

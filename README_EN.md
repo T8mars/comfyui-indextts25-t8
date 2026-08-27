@@ -13,6 +13,7 @@ Creator: **Bilibili: T8star-Aix**.
 - Bilibili: [T8star-Aix](https://space.bilibili.com/385085361)
 - YouTube: [T8star-Aix](https://www.youtube.com/@T8star-Aix/)
 - Hugging Face: [t8star](https://huggingface.co/t8star)
+- Complete IndexTTS 2.5 bundle: [t8star/IndexTTS-2.5-T8](https://huggingface.co/t8star/IndexTTS-2.5-T8)
 - API sign-up (affiliate link): [api.seedance.nz](https://api.seedance.nz/sign-up?aff=5f4w)
 - Online AI apps (RunningHub): [T8star-Aix profile](https://www.runninghub.ai/zh-cn/user-center/1907375370302308353/userPost?inviteCode=rh-v1121)
 - ComfyUI portable package: [Quark Drive](https://pan.quark.cn/s/264edb7e36bd)
@@ -20,7 +21,14 @@ Creator: **Bilibili: T8star-Aix**.
 
 This repository is locked to the IndexTTS 2.5 inference core and the official 2.5 model manifest. It will not fall back to or accidentally load IndexTTS 2.0.
 
-Current baseline: **ComfyUI Node 0.15.0 · Desktop 0.16.0 · Core `ee40fa7d` · Model `c39ce5ba`**.
+Current baseline: **ComfyUI Node 0.16.0 · Desktop 0.16.0 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**.
+
+### v0.16.0 complete model bundle and opt-in repair
+
+- Added `t8star/IndexTTS-2.5-T8`, a single complete repository containing the unmodified official 2.5 main model, the required `bpe.model` from the official 2.0 model repository, and the Wav2Vec2-BERT, CAMPPlus, and BigVGAN runtime assets.
+- Model Loader now offers “download/repair the complete model when missing.” It is off by default and requires explicit license acceptance before downloading approximately 7.7 GiB.
+- The downloader pins revisions, verifies the SHA-256 manifest, and repairs only missing or damaged files. A manually downloaded complete repository works directly as well.
+- The official `IndexTeam/IndexTTS-2.5` repository currently has no `bpe.model`, so that snapshot alone is correctly reported as incomplete; the user's destination directory is not the problem.
 
 ### v0.15.0 per-line emotion and tail-safe subtitle slots
 
@@ -32,8 +40,8 @@ Current baseline: **ComfyUI Node 0.15.0 · Desktop 0.16.0 · Core `ee40fa7d` · 
 
 Version 0.14.0 adds an active-mode runtime benchmark, a manual upstream update check, safe conditioning reuse
 across model reloads, and retained multi-candidate quality selection. Desktop 0.16.0 can benchmark acceleration
-modes sequentially and recommend one; every expensive or network operation remains explicitly user-triggered. The formal model manifest keeps
-the shared `bpe.model` tokenizer pinned to `IndexTeam/IndexTTS-2`; both download paths fetch and verify it.
+modes sequentially and recommend one; every expensive or network operation remains explicitly user-triggered.
+The complete model repository preserves upstream source and revision attribution for every component. Main weights remain the official 2.5 files; `bpe.model` is the unmodified file from the official 2.0 model repository.
 Desktop and Node are separate deliverables with independent versions; Core/Model identify the pinned official code and weight revisions.
 
 ### v0.14.0 runtime benchmark, candidates, and cache update
@@ -242,11 +250,37 @@ Model weights do not belong in the custom node directory. The standard location 
 ComfyUI/models/TTS/IndexTTS-2.5/
 ```
 
-This is the only exception to shipping the whole repository: node code, manifests, scripts, licenses, examples, and tests are included here, while the approximately 5 GB model follows ComfyUI's shared model-directory convention.
+This is the only exception to shipping the whole repository: node code, manifests, scripts, licenses, examples, and tests are included here, while the approximately 7.7 GiB complete model follows ComfyUI's shared model-directory convention.
 
 When sharing the node with another user, send the complete `comfyui-indextts25-T8` directory. The recipient must still download the model as described here, or receive the complete `IndexTTS-2.5` directory separately under `ComfyUI/models/TTS/`. Do not send only one `.py` file.
 
-After installing the node in `custom_nodes`, install the optional ModelScope downloader first:
+### Option 1: opt-in download in Model Loader (recommended)
+
+1. Add the IndexTTS 2.5 Model Loader.
+2. Enable “download/repair the complete model when missing.”
+3. Read the license and disclaimer, then enable the license-acceptance checkbox.
+4. Queue the workflow once. The node downloads or repairs the standard directory and continues loading when complete; it never downloads by default.
+
+The complete bundle is approximately 7.7 GiB. Ensure adequate disk space and a stable connection. You can disable both download options afterward.
+
+### Option 2: command-line download
+
+After installing the node in `custom_nodes`, Hugging Face is the default and recommended source:
+
+```powershell
+python ComfyUI/custom_nodes/comfyui-indextts25-T8/scripts/download_models.py `
+  --source huggingface `
+  --accept-license
+```
+
+You can also download the complete directory with the Hugging Face CLI:
+
+```powershell
+hf download t8star/IndexTTS-2.5-T8 `
+  --local-dir "ComfyUI/models/TTS/IndexTTS-2.5"
+```
+
+ModelScope remains a compatible download path. Install its optional dependency first:
 
 ```powershell
 python -m pip install -r ComfyUI/custom_nodes/comfyui-indextts25-T8/requirements-modelscope.txt
@@ -260,21 +294,13 @@ python ComfyUI/custom_nodes/comfyui-indextts25-T8/scripts/download_models.py `
   --accept-license
 ```
 
-Or from Hugging Face:
-
-```powershell
-python ComfyUI/custom_nodes/comfyui-indextts25-T8/scripts/download_models.py `
-  --source huggingface `
-  --accept-license
-```
-
 When the node is not installed in `custom_nodes`, specify the ComfyUI root explicitly:
 
 ```powershell
-python scripts/download_models.py --comfy-root "D:\ComfyUI" --source modelscope --accept-license
+python scripts/download_models.py --comfy-root "D:\ComfyUI" --source huggingface --accept-license
 ```
 
-The downloader is pinned to the official model manifest, performs full SHA-256 verification, and prepares the Wav2Vec2-BERT, MaskGCT, CAMPPlus, and BigVGAN helper models. Restart ComfyUI after download so the model selector refreshes.
+The downloader is pinned to the complete model manifest, performs full SHA-256 verification, and prepares the Wav2Vec2-BERT, CAMPPlus, and BigVGAN helper models. A direct download of `IndexTeam/IndexTTS-2.5` lacks the required `bpe.model`; use the complete repository or this downloader. Restart or refresh ComfyUI after manual installation so the model selector refreshes.
 
 ## Quick start
 
@@ -489,7 +515,7 @@ Bilibili|B IY1 . L IY1 . B IY1 . L IY1|EN
 
 The dictionary is embedded in workflow JSON and travels with the workflow. Existing manual annotations always win; dictionary replacements use longest match first and never rewrite inside `<text|pronunciation>`. Strict validation is enabled by default and fails before queueing. When disabled, invalid entries remain unchanged and are recorded in the report. This node requires no additional G2P model and never mutates the cached model's global glossary.
 
-See `example_workflows/README.md` for 30 ready-to-open UI workflows and 30 API prompts covering basic cloning, speed comparison, emotion reference audio, eight-dimensional emotion, text emotion, random-sampling long text, five-language generation, Chinese polyphonic characters, English CMU phonemes, Japanese Kana, multi-role dialogue, JSON batch lines, SRT, acceleration diagnostics, segmentation preview, explicit pauses, native target duration, advanced CFM parameters, audio post-processing, ASR proofreading, timeline editing, subtitle rewriting, independent per-role emotions, reference-audio quality, retained candidate selection, model recycling, the experimental audio.cpp backend, low-VRAM FP16, runtime benchmarking, and manual update checks. Upload `voice_reference.wav` and, for emotion-audio examples, `emotion_reference.wav` to ComfyUI input first.
+See `example_workflows/README.md` for 31 ready-to-open UI workflows and 31 API prompts covering basic cloning, speed comparison, emotion reference audio, eight-dimensional emotion, text emotion, random-sampling long text, five-language generation, Chinese polyphonic characters, English CMU phonemes, Japanese Kana, multi-role dialogue, JSON batch lines, SRT, acceleration diagnostics, segmentation preview, explicit pauses, native target duration, advanced CFM parameters, audio post-processing, ASR proofreading, timeline editing, subtitle rewriting, independent per-role emotions, reference-audio quality, retained candidate selection, model recycling, the experimental audio.cpp backend, low-VRAM FP16, runtime benchmarking, manual update checks, and per-line emotion overrides. Upload `voice_reference.wav` and, for emotion-audio examples, `emotion_reference.wav` to ComfyUI input first.
 
 ### Optional audio.cpp experimental backend
 
@@ -503,21 +529,25 @@ python scripts/check_environment.py "D:\ComfyUI\models\TTS\IndexTTS-2.5"
 python scripts/download_models.py --target "D:\ComfyUI\models\TTS\IndexTTS-2.5" --verify-only
 ```
 
-The final command reads approximately 5 GB and performs full hash verification.
+The final command reads approximately 7.7 GiB and performs full hash verification.
 
 See [`SECURITY_REVIEW.md`](SECURITY_REVIEW.md) for Registry scan notes and the boundaries of remaining sensitive operations. The release workflow no longer treats archive upload as Manager availability; only `NodeVersionStatusActive` passes.
 
 ## Pinned revisions
 
 - IndexTTS code: `ee40fa7d6c6b8a2c7f06105f9f1e65775b74868c`
-- IndexTTS 2.5 model: `c39ce5ba981572cb187443877ff559dfb246ce63`
+- Upstream IndexTTS 2.5 model: `c39ce5ba981572cb187443877ff559dfb246ce63`
+- Complete model bundle: `45ddbcc709e1219ff044cc51d5873079333d5726`
 - Model manifest: `manifests/model_2_5.json`
 
 ## Official project, model downloads, and acknowledgements
 
 - Official IndexTTS repository: [index-tts/index-tts](https://github.com/index-tts/index-tts)
+- Complete model for this node (recommended): [t8star/IndexTTS-2.5-T8](https://huggingface.co/t8star/IndexTTS-2.5-T8)
 - IndexTTS 2.5 model on ModelScope: [IndexTeam/IndexTTS-2.5](https://modelscope.cn/models/IndexTeam/IndexTTS-2.5)
 - IndexTTS 2.5 model on Hugging Face: [IndexTeam/IndexTTS-2.5](https://huggingface.co/IndexTeam/IndexTTS-2.5)
+
+The complete model repository only reorganizes required runtime files without modifying upstream weights, and its model card records every source, pinned revision, and license. Special thanks to the IndexTTS, Wav2Vec2-BERT, CAMPPlus, and BigVGAN authors for their open-source work.
 
 Thanks to the IndexTTS team for open-sourcing IndexTTS and the IndexTTS 2.5 model. This project is a third-party ComfyUI integration built on their open-source work; please support and follow the official project.
 

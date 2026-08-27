@@ -22,9 +22,14 @@ def test_check_updates_reports_each_source() -> None:
 
     report = check_updates(
         "0.13.0",
-        {"codeRevision": "old-code", "modelRevision": "same-model"},
+        {
+            "codeRevision": "old-code",
+            "modelRevision": "bundle-model",
+            "upstreamModelRevision": "same-model",
+        },
         fetcher=fetcher,
     )
     assert report["node"]["update_available"] is True
     assert report["official_code"]["update_available"] is True
     assert report["official_model"]["update_available"] is False
+    assert report["official_model"]["pinned"] == "same-model"

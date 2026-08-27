@@ -12,6 +12,7 @@ PLUGIN_ROOT = Path(__file__).resolve().parents[1]
 MANIFEST_PATH = PLUGIN_ROOT / "manifests" / "model_2_5.json"
 MODEL_FOLDER_NAME = "IndexTTS-2.5"
 MISSING_MODEL_OPTION = "[未找到] 请将模型放入 models/TTS/IndexTTS-2.5"
+MODEL_REPOSITORY_URL = "https://huggingface.co/t8star/IndexTTS-2.5-T8"
 _HASH_CACHE: dict[tuple[str, int, int], str] = {}
 
 
@@ -34,7 +35,12 @@ class ValidationReport:
             details.append("缺少：" + ", ".join(self.missing))
         if self.mismatched:
             details.append("大小或哈希不匹配：" + ", ".join(self.mismatched))
-        raise FileNotFoundError(f"IndexTTS 2.5 模型目录不完整：{self.model_dir}；" + "；".join(details))
+        raise FileNotFoundError(
+            f"IndexTTS 2.5 模型目录不完整：{self.model_dir}；"
+            + "；".join(details)
+            + "。可在模型加载器中勾选“缺失时自动下载”并接受模型许可证，"
+            + f"或从 {MODEL_REPOSITORY_URL} 下载完整目录。"
+        )
 
 
 def load_manifest() -> dict:
@@ -113,8 +119,9 @@ def resolve_model(model_name: str, custom_model_path: str = "") -> Path:
     if model_name == MISSING_MODEL_OPTION or model_name not in models:
         expected = configured_model_roots()[0] / MODEL_FOLDER_NAME
         raise FileNotFoundError(
-            "未找到完整的 IndexTTS 2.5 模型。请运行节点目录中的 scripts/download_models.py，"
-            f"或把模型放到：{expected}"
+            "未找到完整的 IndexTTS 2.5 模型。可在模型加载器中勾选“缺失时自动下载”"
+            "并接受模型许可证，或运行节点目录中的 scripts/download_models.py。"
+            f"完整模型：{MODEL_REPOSITORY_URL}；标准位置：{expected}"
         )
     return models[model_name]
 
@@ -134,12 +141,19 @@ def _sha256(path: Path) -> str:
     return value
 
 
-def validate_model_dir(model_dir: Path | str, *, verify_hashes: bool = False) -> ValidationReport:
+def validate_model_dir(
+    model_dir: Path | str,
+    *,
+    verify_hashes: bool = False,
+    include_auxiliary: bool = True,
+) -> ValidationReport:
     model_dir = Path(model_dir).expanduser().resolve()
     manifest = load_manifest()
     missing: list[str] = []
     mismatched: list[str] = []
     for relative, metadata in manifest["files"].items():
+        if not include_auxiliary and metadata.get("group") == "auxiliary":
+            continue
         path = model_dir.joinpath(*relative.split("/"))
         if not path.is_file():
             missing.append(relative)

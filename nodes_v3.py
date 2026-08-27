@@ -81,6 +81,9 @@ from .runtime.types import (
 )
 from .services.model_store import (
     MISSING_MODEL_OPTION,
+    MODEL_FOLDER_NAME,
+    MODEL_REPOSITORY_URL,
+    configured_model_roots,
     load_manifest,
     model_fingerprint,
     model_options,
@@ -88,6 +91,7 @@ from .services.model_store import (
     resolve_model,
     validate_model_dir,
 )
+from .services.downloader import ensure_model_bundle
 
 
 LOGGER = logging.getLogger("comfyui-indextts25-T8")
@@ -257,7 +261,10 @@ class T8IndexTTS25ModelLoader(io.ComfyNode):
             display_name="IndexTTS 2.5 模型加载器 · T8star-Aix",
             category=CATEGORY,
             search_aliases=["IndexTTS 2.5", "T8star-Aix", "TTS model loader"],
-            description="发现并校验 ComfyUI/models/TTS 下的正式 IndexTTS 2.5 模型；权重在首次生成时按需载入。",
+            description=(
+                "发现并校验 ComfyUI/models/TTS 下的正式 IndexTTS 2.5 模型；"
+                "可由用户明确授权后下载或修复完整模型，权重在首次生成时按需载入。"
+            ),
             inputs=[
                 io.Combo.Input(
                     "model_name",
@@ -318,7 +325,7 @@ class T8IndexTTS25ModelLoader(io.ComfyNode):
                     display_name="完整 SHA-256 校验",
                     default=False,
                     advanced=True,
-                    tooltip="首次校验约需读取 5GB 文件；平时仅做文件大小校验即可。",
+                    tooltip="首次校验约需读取 7.7 GiB 文件；平时仅做文件大小校验即可。",
                 ),
                 io.String.Input(
                     "custom_model_path",
@@ -350,6 +357,24 @@ class T8IndexTTS25ModelLoader(io.ComfyNode):
                     advanced=True,
                     tooltip="按音频内容和模型版本缓存已提取的音色/情感张量；使用 safetensors，模型重载后仍可复用。",
                 ),
+                io.Boolean.Input(
+                    "download_missing",
+                    display_name="缺失时自动下载/修复完整模型",
+                    default=False,
+                    tooltip=(
+                        "默认关闭。启用后会从 t8star/IndexTTS-2.5-T8 下载主模型、"
+                        "bpe.model 与运行所需辅助模型，完整目录约 7.7 GiB。"
+                    ),
+                ),
+                io.Boolean.Input(
+                    "accept_model_license",
+                    display_name="我已阅读并接受模型许可证",
+                    default=False,
+                    tooltip=(
+                        "仅自动下载时需要勾选。许可证、免责声明与完整模型说明："
+                        f"{MODEL_REPOSITORY_URL}"
+                    ),
+                ),
             ],
             outputs=[
                 ModelType.Output("model", display_name="IndexTTS 2.5 模型"),
@@ -372,6 +397,8 @@ class T8IndexTTS25ModelLoader(io.ComfyNode):
         reference_device: str = "auto",
         reuse_spk_cond_for_emo: bool = False,
         persistent_reference_cache: bool = True,
+        download_missing: bool = False,
+        accept_model_license: bool = False,
     ) -> str:
         recycle_after_runs, verify_hashes, custom_model_path, _ = (
             _normalize_model_loader_values(
@@ -384,7 +411,10 @@ class T8IndexTTS25ModelLoader(io.ComfyNode):
             path = resolve_model(model_name, custom_model_path)
             return model_fingerprint(path)
         except Exception as exc:
-            return f"missing:{model_name}:{custom_model_path}:{exc}"
+            return (
+                f"missing:{model_name}:{custom_model_path}:"
+                f"download={bool(download_missing)}:license={bool(accept_model_license)}:{exc}"
+            )
 
     @classmethod
     def validate_inputs(
@@ -393,6 +423,8 @@ class T8IndexTTS25ModelLoader(io.ComfyNode):
         custom_model_path: str = "",
         recycle_after_runs: int = 0,
         verify_hashes: bool = False,
+        download_missing: bool = False,
+        accept_model_license: bool = False,
         **kwargs,
     ) -> bool | str:
         _, _, custom_model_path, _ = _normalize_model_loader_values(
@@ -400,8 +432,17 @@ class T8IndexTTS25ModelLoader(io.ComfyNode):
             verify_hashes,
             custom_model_path,
         )
-        if model_name == MISSING_MODEL_OPTION and not custom_model_path.strip():
-            return "未找到 IndexTTS 2.5 模型；请先运行 scripts/download_models.py。"
+        if download_missing and not accept_model_license:
+            return "启用自动下载前，请勾选“我已阅读并接受模型许可证”。"
+        if (
+            model_name == MISSING_MODEL_OPTION
+            and not custom_model_path.strip()
+            and not download_missing
+        ):
+            return (
+                "未找到 IndexTTS 2.5 模型；可启用“缺失时自动下载/修复完整模型”"
+                "并接受许可证，或先运行 scripts/download_models.py。"
+            )
         return True
 
     @classmethod
@@ -419,6 +460,8 @@ class T8IndexTTS25ModelLoader(io.ComfyNode):
         reference_device: str = "auto",
         reuse_spk_cond_for_emo: bool = False,
         persistent_reference_cache: bool = True,
+        download_missing: bool = False,
+        accept_model_license: bool = False,
     ) -> io.NodeOutput:
         recycle_after_runs, verify_hashes, custom_model_path, compatibility_note = (
             _normalize_model_loader_values(
@@ -427,9 +470,34 @@ class T8IndexTTS25ModelLoader(io.ComfyNode):
                 custom_model_path,
             )
         )
-        model_dir = resolve_model(model_name, custom_model_path)
-        report = validate_model_dir(model_dir, verify_hashes=verify_hashes)
-        report.require_valid()
+        try:
+            model_dir = resolve_model(model_name, custom_model_path)
+        except FileNotFoundError:
+            if not download_missing:
+                raise
+            model_dir = (
+                Path(custom_model_path.strip().strip('"')).expanduser().resolve()
+                if custom_model_path.strip()
+                else configured_model_roots()[0] / MODEL_FOLDER_NAME
+            )
+
+        downloaded_or_repaired = False
+        if download_missing:
+            if not accept_model_license:
+                raise ValueError(
+                    "启用自动下载前，请勾选“我已阅读并接受模型许可证”。"
+                )
+            initial_report = validate_model_dir(model_dir, verify_hashes=False)
+            downloaded_or_repaired = not initial_report.valid
+            report = ensure_model_bundle(
+                model_dir,
+                "huggingface",
+                accept_license=True,
+                verify_hashes=True,
+            )
+        else:
+            report = validate_model_dir(model_dir, verify_hashes=verify_hashes)
+            report.require_valid()
         fingerprint = model_fingerprint(model_dir)
         resolved_device = _resolve_device(device)
         low_vram = _is_low_vram(resolved_device)
@@ -481,6 +549,7 @@ class T8IndexTTS25ModelLoader(io.ComfyNode):
             + (" | 低显存自动适配" if low_vram else "")
             + (" | 快速默认情感" if reuse_spk_cond_for_emo else "")
             + (" | 持久参考缓存" if persistent_reference_cache else "")
+            + (" | 完整模型已自动下载/修复" if downloaded_or_repaired else "")
         )
         return io.NodeOutput(handle, info)
 

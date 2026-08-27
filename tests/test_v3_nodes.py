@@ -71,6 +71,8 @@ def test_registers_all_pure_v3_nodes():
     assert "float16" in loader_inputs["precision"].as_dict()["options"]
     assert loader_inputs["reference_device"].as_dict()["default"] == "auto"
     assert loader_inputs["reuse_spk_cond_for_emo"].as_dict()["default"] is False
+    assert loader_inputs["download_missing"].as_dict()["default"] is False
+    assert loader_inputs["accept_model_license"].as_dict()["default"] is False
     assert not hasattr(plugin, "NODE_CLASS_MAPPINGS")
 
 
@@ -139,6 +141,101 @@ def test_model_loader_reports_node_core_and_model_versions(tmp_path, monkeypatch
     assert "core=ee40fa7d" in result[1]
     assert "model=c39ce5ba" in result[1]
     assert "reference=cpu" in result[1]
+
+
+def test_model_loader_auto_download_is_explicit_and_license_gated(
+    tmp_path, monkeypatch
+):
+    _load_plugin()
+    from types import SimpleNamespace
+
+    from comfyui_indextts25_t8_test import nodes_v3
+
+    missing = nodes_v3.MISSING_MODEL_OPTION
+    assert "自动下载" in nodes_v3.T8IndexTTS25ModelLoader.validate_inputs(
+        missing,
+        download_missing=False,
+    )
+    assert "许可证" in nodes_v3.T8IndexTTS25ModelLoader.validate_inputs(
+        missing,
+        download_missing=True,
+        accept_model_license=False,
+    )
+    assert (
+        nodes_v3.T8IndexTTS25ModelLoader.validate_inputs(
+            missing,
+            download_missing=True,
+            accept_model_license=True,
+        )
+        is True
+    )
+
+    target = tmp_path / "IndexTTS-2.5"
+
+    class MissingReport:
+        valid = False
+        hashes_verified = False
+
+    class CompleteReport:
+        valid = True
+        hashes_verified = True
+
+    monkeypatch.setattr(nodes_v3, "configured_model_roots", lambda: [tmp_path])
+    monkeypatch.setattr(
+        nodes_v3,
+        "resolve_model",
+        lambda *args: (_ for _ in ()).throw(FileNotFoundError("missing")),
+    )
+    monkeypatch.setattr(
+        nodes_v3, "validate_model_dir", lambda *args, **kwargs: MissingReport()
+    )
+    calls = []
+
+    def fake_ensure(path, source, **kwargs):
+        calls.append((path, source, kwargs))
+        return CompleteReport()
+
+    monkeypatch.setattr(nodes_v3, "ensure_model_bundle", fake_ensure)
+    monkeypatch.setattr(nodes_v3, "model_fingerprint", lambda _path: "fingerprint")
+    monkeypatch.setattr(nodes_v3, "_resolve_device", lambda _device: "cpu")
+    monkeypatch.setattr(nodes_v3, "_is_low_vram", lambda _device: False)
+    monkeypatch.setattr(
+        nodes_v3,
+        "resolve_acceleration",
+        lambda *args: SimpleNamespace(
+            use_cuda_kernel=False,
+            use_torch_compile=False,
+            use_accel=False,
+            use_deepspeed=False,
+            requested="off",
+            effective="off",
+            reason="普通模式",
+        ),
+    )
+    monkeypatch.setattr(
+        nodes_v3,
+        "load_manifest",
+        lambda: {"codeRevision": "ee40fa7d6c", "modelRevision": "a" * 40},
+    )
+
+    result = nodes_v3.T8IndexTTS25ModelLoader.execute(
+        model_name=missing,
+        device="auto",
+        precision="auto",
+        acceleration_mode="off",
+        use_cuda_kernel=False,
+        release_after_run=False,
+        download_missing=True,
+        accept_model_license=True,
+    )
+    assert calls == [
+        (
+            target,
+            "huggingface",
+            {"accept_license": True, "verify_hashes": True},
+        )
+    ]
+    assert "完整模型已自动下载/修复" in result[1]
 
 
 def test_timeline_asr_and_subtitle_nodes_form_a_complete_editing_chain(monkeypatch):

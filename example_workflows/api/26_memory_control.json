@@ -13,7 +13,9 @@
       "custom_model_path": "",
       "reference_device": "auto",
       "reuse_spk_cond_for_emo": false,
-      "persistent_reference_cache": true
+      "persistent_reference_cache": true,
+      "download_missing": false,
+      "accept_model_license": false
     }
   },
   "2": {

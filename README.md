@@ -13,6 +13,7 @@ IndexTTS 2.5 的 ComfyUI V3 原生节点集成。节点菜单位于：
 - B 站：[T8star-Aix](https://space.bilibili.com/385085361)
 - YouTube：[T8star-Aix](https://www.youtube.com/@T8star-Aix/)
 - Hugging Face：[t8star](https://huggingface.co/t8star)
+- IndexTTS 2.5 完整模型：[t8star/IndexTTS-2.5-T8](https://huggingface.co/t8star/IndexTTS-2.5-T8)
 - API 注册（推广链接）：[api.seedance.nz](https://api.seedance.nz/sign-up?aff=5f4w)
 - 在线 AI 应用（RunningHub）：[T8star-Aix 用户主页](https://www.runninghub.ai/zh-cn/user-center/1907375370302308353/userPost?inviteCode=rh-v1121)
 - ComfyUI 整合包：[夸克网盘下载](https://pan.quark.cn/s/264edb7e36bd)
@@ -20,7 +21,14 @@ IndexTTS 2.5 的 ComfyUI V3 原生节点集成。节点菜单位于：
 
 本目录固定使用 IndexTTS 2.5 推理核心和正式 2.5 模型清单，不会回退或误载 IndexTTS 2.0。
 
-当前版本基线：**ComfyUI Node 0.15.0 · Desktop 0.16.0 · Core `ee40fa7d` · Model `c39ce5ba`**。
+当前版本基线：**ComfyUI Node 0.16.0 · Desktop 0.16.0 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**。
+
+### v0.16.0 完整模型单仓库与按需修复
+
+- 新增完整模型仓库 `t8star/IndexTTS-2.5-T8`：在未修改原始权重的前提下，把官方 2.5 主模型、来自官方 2.0 仓库的必需 `bpe.model`，以及推理必需的 Wav2Vec2-BERT、CAMPPlus、BigVGAN 放在同一目录结构中。
+- 模型加载器新增“缺失时自动下载/修复完整模型”；默认关闭，只有用户同时勾选许可证确认后才联网下载，约需 7.7 GiB。
+- 下载器按固定 revision 与 SHA-256 清单检查并只修复缺失或损坏的文件，手动下载完整仓库也可直接使用。
+- 官方 `IndexTeam/IndexTTS-2.5` 仓库目前没有 `bpe.model`，所以只下载该仓库会被本节点正确判定为目录不完整；这不是用户目录放错。
 
 ### v0.15.0 逐句情感与安全字幕槽位
 
@@ -32,7 +40,7 @@ IndexTTS 2.5 的 ComfyUI V3 原生节点集成。节点菜单位于：
 
 0.14.0 新增当前模式真实性能基准、手动上游更新检查、跨模型重载的安全参考条件缓存，以及保留全部音频的多候选质量筛选；
 Desktop 0.16.0 可依次实测加速模式并给出推荐，所有耗时或联网操作仍必须由用户主动触发。
-正式模型清单继续固定复用 `IndexTeam/IndexTTS-2` 的 `bpe.model` 分词器，Hugging Face 与 ModelScope 下载器会自动补齐并校验该文件。
+完整模型仓库保留每个文件的上游来源与固定 revision；主权重仍是官方 2.5 文件，`bpe.model` 来自官方 2.0 模型仓库，未对权重内容做修改。
 Desktop 与 Node 是两个独立发行物，因此各自使用独立版本号；Core/Model 是固定的官方代码和权重 revision。
 
 ### v0.14.0 真实性能、多候选与缓存更新
@@ -257,15 +265,39 @@ Windows 便携版：
 ComfyUI/models/TTS/IndexTTS-2.5/
 ```
 
-这是唯一例外：节点所需的代码、清单、脚本、许可证、示例和测试都在本目录；约 5GB 的模型权重遵循
+这是唯一例外：节点所需的代码、清单、脚本、许可证、示例和测试都在本目录；约 7.7 GiB 的完整模型遵循
 ComfyUI 模型目录规范，可由多个工作流共享，避免复制。
 
 如果把节点发给其他用户，发送整个 `comfyui-indextts25-T8` 目录即可；对方仍需按本节下载模型，或由你
 另行把完整的 `IndexTTS-2.5` 模型目录放到其 `ComfyUI/models/TTS/`。不要只发送单个 `.py` 文件。
 
-在节点已放到 ComfyUI 后执行：
+### 方法一：在模型加载器中按需下载（推荐）
 
-使用 ModelScope 前先安装可选下载依赖：
+1. 添加“IndexTTS 2.5 模型加载器”。
+2. 开启“缺失时自动下载/修复完整模型”。
+3. 阅读许可证与免责声明后，勾选“我已阅读并接受模型许可证”。
+4. 运行一次工作流。节点会下载或修复到上面的标准目录，并在完成后继续加载；默认不会自动联网。
+
+完整仓库约 7.7 GiB，请保证磁盘空间和网络稳定。首次下载完成后可关闭这两个选项。
+
+### 方法二：命令行下载
+
+节点已放到 ComfyUI 后，Hugging Face 是默认和推荐下载源：
+
+```powershell
+python ComfyUI/custom_nodes/comfyui-indextts25-T8/scripts/download_models.py `
+  --source huggingface `
+  --accept-license
+```
+
+也可使用 Hugging Face CLI 直接下载完整目录：
+
+```powershell
+hf download t8star/IndexTTS-2.5-T8 `
+  --local-dir "ComfyUI/models/TTS/IndexTTS-2.5"
+```
+
+ModelScope 是兼容下载路径。使用前先安装可选依赖：
 
 ```powershell
 python -m pip install -r ComfyUI/custom_nodes/comfyui-indextts25-T8/requirements-modelscope.txt
@@ -277,22 +309,15 @@ python ComfyUI/custom_nodes/comfyui-indextts25-T8/scripts/download_models.py `
   --accept-license
 ```
 
-Hugging Face：
-
-```powershell
-python ComfyUI/custom_nodes/comfyui-indextts25-T8/scripts/download_models.py `
-  --source huggingface `
-  --accept-license
-```
-
 节点未安装到 `custom_nodes` 时，显式指定 ComfyUI 根目录：
 
 ```powershell
-python scripts/download_models.py --comfy-root "D:\ComfyUI" --source modelscope --accept-license
+python scripts/download_models.py --comfy-root "D:\ComfyUI" --source huggingface --accept-license
 ```
 
-下载器固定到清单中的正式模型版本，完成后执行全量 SHA-256 校验，并准备 Wav2Vec2-BERT、
-MaskGCT、CAMPPlus 和 BigVGAN 辅助模型。下载结束后重启 ComfyUI，模型下拉框才会刷新。
+下载器固定到清单中的完整模型版本，完成后执行全量 SHA-256 校验，并准备 Wav2Vec2-BERT、
+CAMPPlus 和 BigVGAN 辅助模型。直接下载官方 `IndexTeam/IndexTTS-2.5` 仓库不会包含必需的
+`bpe.model`；请使用上面的完整仓库或本项目下载器。手动安装后重启/刷新 ComfyUI，模型下拉框才会刷新。
 
 ## 快速使用
 
@@ -529,7 +554,7 @@ Bilibili|B IY1 . L IY1 . B IY1 . L IY1|EN
 不会改写 `<文字|读音>` 内部。严格校验默认开启，错误会在排队前给出；关闭后无效词条保持原文并
 写入报告。该节点不依赖额外 G2P 模型，也不会修改已缓存模型的全局 glossary。
 
-完整示例见 `example_workflows/README.md`，包含 30 组可直接打开的 UI 工作流和 30 组 API prompt：
+完整示例见 `example_workflows/README.md`，包含 31 组可直接打开的 UI 工作流和 31 组 API prompt：
 基础克隆、语速对比、情感参考音频、八维情感、文本情感、随机采样长文本、五语种生成，以及中文
 多音字、英文 CMU 音素、日语假名发音控制、多角色、JSON 批量台词、SRT、可选加速诊断、自动分段
 预览、显式停顿、原生目标秒数、CFM 高级参数、独立音频后处理、ASR 自动校对、时间轴编辑、字幕
@@ -553,7 +578,7 @@ python scripts/check_environment.py "D:\ComfyUI\models\TTS\IndexTTS-2.5"
 python scripts/download_models.py --target "D:\ComfyUI\models\TTS\IndexTTS-2.5" --verify-only
 ```
 
-最后一条命令会读取约 5GB 文件执行完整哈希校验。
+最后一条命令会读取约 7.7 GiB 文件执行完整哈希校验。
 
 Registry 安全扫描说明与剩余敏感操作的边界见 [`SECURITY_REVIEW.md`](SECURITY_REVIEW.md)。发布工作流
 不会再把“上传完成”误报成“Manager 可安装”；只有版本状态成为 `NodeVersionStatusActive` 才通过。
@@ -561,14 +586,18 @@ Registry 安全扫描说明与剩余敏感操作的边界见 [`SECURITY_REVIEW.m
 ## 固定版本
 
 - IndexTTS 代码：`ee40fa7d6c6b8a2c7f06105f9f1e65775b74868c`
-- IndexTTS 2.5 模型：`c39ce5ba981572cb187443877ff559dfb246ce63`
+- IndexTTS 2.5 上游模型：`c39ce5ba981572cb187443877ff559dfb246ce63`
+- 完整模型仓库：`45ddbcc709e1219ff044cc51d5873079333d5726`
 - 模型清单：`manifests/model_2_5.json`
 
 ## 官方项目、模型下载与致谢
 
 - IndexTTS 官方仓库：[index-tts/index-tts](https://github.com/index-tts/index-tts)
+- 本节点完整模型（推荐）：[t8star/IndexTTS-2.5-T8](https://huggingface.co/t8star/IndexTTS-2.5-T8)
 - IndexTTS 2.5 模型（ModelScope）：[IndexTeam/IndexTTS-2.5](https://modelscope.cn/models/IndexTeam/IndexTTS-2.5)
 - IndexTTS 2.5 模型（Hugging Face）：[IndexTeam/IndexTTS-2.5](https://huggingface.co/IndexTeam/IndexTTS-2.5)
+
+完整模型仓库仅重新组织运行所需的原始文件，不修改上游权重，并在模型卡中列出每个来源、固定版本和许可证。特别感谢 IndexTTS、Wav2Vec2-BERT、CAMPPlus 与 BigVGAN 的作者开源相关成果。
 
 感谢 IndexTTS 团队开源 IndexTTS 及 IndexTTS 2.5 模型。本项目是在其开源成果基础上开发的第三方
 ComfyUI 集成；请支持并关注官方项目。

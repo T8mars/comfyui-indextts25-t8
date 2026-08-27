@@ -201,6 +201,8 @@ def add_model(
             widget_input("reference_device", "COMBO"),
             widget_input("reuse_spk_cond_for_emo", "BOOLEAN"),
             widget_input("persistent_reference_cache", "BOOLEAN"),
+            widget_input("download_missing", "BOOLEAN"),
+            widget_input("accept_model_license", "BOOLEAN"),
             # ComfyUI V3 finalizes required inputs before optional inputs even
             # when the optional field is declared earlier by the node class.
             widget_input("custom_model_path", "STRING", optional=True),
@@ -218,6 +220,8 @@ def add_model(
             reference_device,
             reuse_spk_cond_for_emo,
             True,
+            False,
+            False,
             "",
         ],
     )
@@ -864,6 +868,8 @@ def api_model(
             "reference_device": reference_device,
             "reuse_spk_cond_for_emo": reuse_spk_cond_for_emo,
             "persistent_reference_cache": True,
+            "download_missing": False,
+            "accept_model_license": False,
         },
     }
 
