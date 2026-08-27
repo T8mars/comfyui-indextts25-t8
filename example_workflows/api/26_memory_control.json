@@ -10,7 +10,9 @@
       "release_after_run": false,
       "recycle_after_runs": 20,
       "verify_hashes": false,
-      "custom_model_path": ""
+      "custom_model_path": "",
+      "reference_device": "auto",
+      "reuse_spk_cond_for_emo": false
     }
   },
   "2": {

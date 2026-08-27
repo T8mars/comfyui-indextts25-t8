@@ -11,7 +11,7 @@
       ],
       "size": [
         390,
-        290
+        365
       ],
       "flags": {},
       "order": 0,
@@ -89,6 +89,22 @@
           },
           "link": null,
           "shape": 7
+        },
+        {
+          "name": "reference_device",
+          "type": "COMBO",
+          "widget": {
+            "name": "reference_device"
+          },
+          "link": null
+        },
+        {
+          "name": "reuse_spk_cond_for_emo",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "reuse_spk_cond_for_emo"
+          },
+          "link": null
         }
       ],
       "outputs": [
@@ -108,7 +124,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_ModelLoader",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.11.5"
+        "ver": "0.12.0"
       },
       "widgets_values": [
         "IndexTTS-2.5",
@@ -119,7 +135,9 @@
         false,
         0,
         false,
-        ""
+        "",
+        "auto",
+        false
       ]
     },
     {
@@ -158,7 +176,7 @@
       "properties": {
         "Node name for S&R": "LoadAudio",
         "cnr_id": "comfy-core",
-        "ver": "0.11.5"
+        "ver": "0.12.0"
       },
       "widgets_values": [
         "role_a.wav"
@@ -201,7 +219,7 @@
       "properties": {
         "Node name for S&R": "LoadAudio",
         "cnr_id": "comfy-core",
-        "ver": "0.11.5"
+        "ver": "0.12.0"
       },
       "widgets_values": [
         "role_b.wav"
@@ -329,7 +347,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_EmotionControl",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.11.5"
+        "ver": "0.12.0"
       },
       "widgets_values": [
         "vector",
@@ -466,7 +484,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_EmotionControl",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.11.5"
+        "ver": "0.12.0"
       },
       "widgets_values": [
         "vector",
@@ -542,7 +560,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_VoiceProfile",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.11.5"
+        "ver": "0.12.0"
       },
       "widgets_values": [
         "角色A",
@@ -610,7 +628,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_VoiceProfile",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.11.5"
+        "ver": "0.12.0"
       },
       "widgets_values": [
         "角色B",
@@ -662,7 +680,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_MergeVoiceEmotions",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.11.5"
+        "ver": "0.12.0"
       },
       "title": "合并各角色的音色与独立情感"
     },
@@ -731,7 +749,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_DialogueScript",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.11.5"
+        "ver": "0.12.0"
       },
       "widgets_values": [
         "batch",
@@ -945,7 +963,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_DialogueGenerate",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.11.5"
+        "ver": "0.12.0"
       },
       "widgets_values": [
         20260818,
@@ -1007,7 +1025,7 @@
       "properties": {
         "Node name for S&R": "SaveAudio",
         "cnr_id": "comfy-core",
-        "ver": "0.11.5"
+        "ver": "0.12.0"
       },
       "widgets_values": [
         "IndexTTS25_T8/multi_role_emotions"

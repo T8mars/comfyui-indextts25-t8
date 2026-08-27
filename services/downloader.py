@@ -53,12 +53,13 @@ def download_main_model(target: Path, source: str) -> None:
         raise ValueError(f"未知下载源：{source}")
 
 
-def download_auxiliary_models(target: Path) -> None:
+def download_auxiliary_models(target: Path, source: str) -> None:
     root_string = str(PLUGIN_ROOT)
     if root_string not in sys.path:
         sys.path.insert(0, root_string)
-    from indextts.utils.model_download import ensure_models_available
+    from indextts.utils.model_download import ensure_models_available, set_download_source
 
+    set_download_source(source)
     ensure_models_available(str(target))
 
 
@@ -122,7 +123,7 @@ def main(argv: list[str] | None = None) -> int:
         print(">> 正式模型 SHA-256 校验通过。")
         if not args.skip_aux:
             print(">> 准备 IndexTTS 2.5 辅助模型……")
-            download_auxiliary_models(target)
+            download_auxiliary_models(target, args.source)
 
     manifest = load_manifest()
     print(f">> 模型已就绪：{target}")

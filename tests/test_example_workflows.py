@@ -40,6 +40,7 @@ EXAMPLES = (
     "25_quality_retry",
     "26_memory_control",
     "27_audiocpp_experimental",
+    "28_low_vram_fp16",
 )
 
 
@@ -329,6 +330,14 @@ def test_examples_cover_multi_role_batch_srt_and_optional_acceleration():
         node["class_type"] == "T8_IndexTTS25_AudioCppGenerate"
         for node in prompts["27_audiocpp_experimental"].values()
     )
+    low_vram_loader = next(
+        node["inputs"]
+        for node in prompts["28_low_vram_fp16"].values()
+        if node["class_type"] == "T8_IndexTTS25_ModelLoader"
+    )
+    assert low_vram_loader["precision"] == "float16"
+    assert low_vram_loader["reference_device"] == "cpu"
+    assert low_vram_loader["reuse_spk_cond_for_emo"] is True
     role_emotions = prompts["23_multi_role_emotions"]
     assert (
         sum(

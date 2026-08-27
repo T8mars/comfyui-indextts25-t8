@@ -11,7 +11,7 @@
       ],
       "size": [
         390,
-        290
+        365
       ],
       "flags": {},
       "order": 0,
@@ -89,6 +89,22 @@
           },
           "link": null,
           "shape": 7
+        },
+        {
+          "name": "reference_device",
+          "type": "COMBO",
+          "widget": {
+            "name": "reference_device"
+          },
+          "link": null
+        },
+        {
+          "name": "reuse_spk_cond_for_emo",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "reuse_spk_cond_for_emo"
+          },
+          "link": null
         }
       ],
       "outputs": [
@@ -108,7 +124,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_ModelLoader",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.11.5"
+        "ver": "0.12.0"
       },
       "widgets_values": [
         "IndexTTS-2.5",
@@ -119,7 +135,9 @@
         false,
         0,
         false,
-        ""
+        "",
+        "auto",
+        false
       ]
     },
     {
@@ -158,7 +176,7 @@
       "properties": {
         "Node name for S&R": "LoadAudio",
         "cnr_id": "comfy-core",
-        "ver": "0.11.5"
+        "ver": "0.12.0"
       },
       "widgets_values": [
         "voice_reference.wav"
@@ -230,7 +248,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_Pronunciation",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.11.5"
+        "ver": "0.12.0"
       },
       "widgets_values": [
         "彼は料理が<上手|じょうず>だが、囲碁では<上手|うわて>に負けた。",
@@ -398,7 +416,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_Generate",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.11.5"
+        "ver": "0.12.0"
       },
       "widgets_values": [
         "彼は料理が<上手|じょうず>だが、囲碁では<上手|うわて>に負けた。",
@@ -456,7 +474,7 @@
       "properties": {
         "Node name for S&R": "SaveAudio",
         "cnr_id": "comfy-core",
-        "ver": "0.11.5"
+        "ver": "0.12.0"
       },
       "widgets_values": [
         "IndexTTS25_T8/pronunciation_ja"

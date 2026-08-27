@@ -20,8 +20,16 @@ IndexTTS 2.5 的 ComfyUI V3 原生节点集成。节点菜单位于：
 
 本目录固定使用 IndexTTS 2.5 推理核心和正式 2.5 模型清单，不会回退或误载 IndexTTS 2.0。
 
-当前版本基线：**ComfyUI Node 0.11.5 · Desktop 0.11.5 · Core `ee40fa7d` · Model `c39ce5ba`**。
+当前版本基线：**ComfyUI Node 0.12.0 · Desktop 0.12.0 · Core `ee40fa7d` · Model `c39ce5ba`**。
 Desktop 与 Node 是两个独立发行物，因此各自使用独立版本号；Core/Model 是固定的官方代码和权重 revision。
+
+### v0.12.0 低显存与精度更新
+
+- `auto` 精度只在显卡原生支持时选择 BF16；旧显卡自动回退 FP16，也可手工选择 `float16`。
+- 参考编码器新增 `auto / same / cpu`：低于 10GB 显存时，`auto` 会把 Wav2Vec/CAMPPlus 放到 CPU。
+- 可选“快速默认情感”在没有独立情感输入时复用音色条件，减少一次参考编码；默认关闭以保持原行为。
+- 环境节点新增显卡名称、显存、推荐精度、参考编码器位置和安全加速模式，不加载模型即可先检查。
+- 新增第 28 组低显存工作流；Registry 发布后继续等待安全扫描，只有 Active 才算正式发布成功。
 
 ### v0.11.5 发布保护
 
@@ -50,7 +58,8 @@ Desktop 与 Node 是两个独立发行物，因此各自使用独立版本号；
 1. `IndexTTS 2.5 模型加载器 · T8star-Aix`
    - 扫描标准模型目录和 `extra_model_paths.yaml` 中的 `TTS` 路径
    - 正式模型文件大小校验；可选完整 SHA-256 校验
-   - `auto / CUDA / CPU` 设备和 `auto / bfloat16 / float32` 精度
+   - `auto / CUDA / CPU` 设备和 `auto / bfloat16 / float16 / float32` 精度
+   - `auto / same / cpu` 参考编码器位置，以及可选默认情感条件复用
    - 全局惰性缓存、同模型线程锁、可选生成后释放或连续 N 次生成后安全重载
 2. `IndexTTS 2.5 情感控制 · T8star-Aix`
    - 跟随音色参考
@@ -96,8 +105,8 @@ Desktop 与 Node 是两个独立发行物，因此各自使用独立版本号；
 12. `IndexTTS 2.5 人声后处理 · T8star-Aix`
    - 独立处理任意 ComfyUI AUDIO，支持强度混合和目标峰值，不依赖 FFmpeg
 13. `IndexTTS 2.5 环境与可选加速 · T8star-Aix`
-   - 不加载模型即可检查 BF16、CUDA 工具链、Triton、FlashAttention、DeepSpeed
-   - 只报告能力，不安装任何附加依赖
+   - 不加载模型即可检查原生 BF16、FP16、显存、CUDA 工具链、Triton、FlashAttention、DeepSpeed
+   - 输出推荐精度、参考编码器位置和安全加速模式；只报告能力，不安装任何附加依赖
 14. `IndexTTS 2.5 时间轴编辑 · T8star-Aix`
    - 接收批量/SRT 脚本和可编辑 JSON，按毫秒修改逐句开始、结束、角色、语言与时长系数
    - 输出严格校验后的脚本、结构化 JSON 和标准 `IMAGE` 彩色轨道预览
@@ -357,6 +366,10 @@ v0.8.1 已回移 GPT 合成提示 KV Cache 根修复；多个停顿语音块和�
 
 模型加载器默认 `off`，这是零附加依赖、兼容性最高的模式：
 
+- `precision=auto`：原生 BF16 可用时选择 `bfloat16`，否则 CUDA 自动使用 `float16`；CPU 使用 `float32`。
+- `reference_device=auto`：显存低于 10GB 时把参考编码器放 CPU；`same` 强制同设备，`cpu` 始终节省显存。
+- `reuse_spk_cond_for_emo`：只有未连接独立情感时才复用音色条件，默认关闭；开启后更快但可能轻微改变听感。
+
 - `auto_safe`：仅当本机已有 Ninja 和 CUDA/C++ 编译工具链时启用 BigVGAN CUDA 融合核。
 - `bigvgan_cuda`：显式请求 BigVGAN 融合核；首次可能编译，失败自动回退。
 - `torch_compile`：需要与当前 PyTorch 匹配的 Triton；首次推理有编译开销。
@@ -458,11 +471,12 @@ Bilibili|B IY1 . L IY1 . B IY1 . L IY1|EN
 不会改写 `<文字|读音>` 内部。严格校验默认开启，错误会在排队前给出；关闭后无效词条保持原文并
 写入报告。该节点不依赖额外 G2P 模型，也不会修改已缓存模型的全局 glossary。
 
-完整示例见 `example_workflows/README.md`，包含 27 组可直接打开的 UI 工作流和 27 组 API prompt：
+完整示例见 `example_workflows/README.md`，包含 28 组可直接打开的 UI 工作流和 28 组 API prompt：
 基础克隆、语速对比、情感参考音频、八维情感、文本情感、随机采样长文本、五语种生成，以及中文
 多音字、英文 CMU 音素、日语假名发音控制、多角色、JSON 批量台词、SRT、可选加速诊断、自动分段
 预览、显式停顿、原生目标秒数、CFM 高级参数、独立音频后处理、ASR 自动校对、时间轴编辑、字幕
-回写、多角色独立情感、参考音频检测、ASR 失败重试、模型回收和 audio.cpp 实验后端。使用前把
+回写、多角色独立情感、参考音频检测、ASR 失败重试、模型回收、audio.cpp 实验后端和低显存 FP16。
+使用前把
 `voice_reference.wav`（情感音频示例还需 `emotion_reference.wav`）上传到 ComfyUI input。
 
 ### 可选 audio.cpp 实验后端
@@ -482,6 +496,9 @@ python scripts/download_models.py --target "D:\ComfyUI\models\TTS\IndexTTS-2.5" 
 ```
 
 最后一条命令会读取约 5GB 文件执行完整哈希校验。
+
+Registry 安全扫描说明与剩余敏感操作的边界见 [`SECURITY_REVIEW.md`](SECURITY_REVIEW.md)。发布工作流
+不会再把“上传完成”误报成“Manager 可安装”；只有版本状态成为 `NodeVersionStatusActive` 才通过。
 
 ## 固定版本
 

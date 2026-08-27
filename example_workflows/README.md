@@ -36,6 +36,7 @@
 | `25_quality_retry.json` | ASR 质检失败后更换 seed，保留相似度最高的生成结果 | `voice_reference.wav` |
 | `26_memory_control.json` | 连续生成自动重载、显存和模型缓存状态 | `voice_reference.wav` |
 | `27_audiocpp_experimental.json` | 隔离的 audio.cpp IndexTTS2.5 GGUF 实验后端 | `voice_reference.wav` |
+| `28_low_vram_fp16.json` | 低显存 FP16、CPU 参考编码器与快速默认情感 | `voice_reference.wav` |
 
 ## 使用方法
 
@@ -57,6 +58,10 @@
 
 示例 25 同样需要可选 Whisper。示例 27 不使用默认 Python 模型加载器，需要先从 audio.cpp 官方发布页
 下载 `audiocpp_cli`，并另行下载 `IndexTTS2.5-GGUF`；打开工作流后把两个示例绝对路径改成自己的位置。
+
+示例 28 面向旧显卡和 10GB 以下显存：`float16` 可替代不受原生支持的 `bfloat16`，参考编码器放到
+CPU 可减少常驻显存；“快速默认情感”只在未提供独立情感时复用音色条件，速度更快但可能轻微改变听感。
+若显卡原生支持 BF16，应优先把精度改回 `auto`。
 
 普通批量格式中的正文可以直接包含 `<文字|读音>`，例如
 `旁白|小明<要求|YAO4 QIU2>这个题。|ZH|1.0`；解析器不会把标注中的竖线当成字段分隔符。

@@ -96,7 +96,6 @@ from transformers.utils import (
     is_torch_xla_available,
     logging,
     replace_return_docstrings,
-    strtobool,
 )
 from transformers.utils.hub import convert_file_size_to_int, create_and_tag_model_card, get_checkpoint_shard_files
 from transformers.utils.import_utils import (
@@ -108,8 +107,10 @@ from transformers.utils.import_utils import (
 from transformers.utils.quantization_config import BitsAndBytesConfig, QuantizationMethod
 
 
-XLA_USE_BF16 = os.environ.get("XLA_USE_BF16", "0").upper()
-XLA_DOWNCAST_BF16 = os.environ.get("XLA_DOWNCAST_BF16", "0").upper()
+# This vendored inference-only copy does not support XLA/FSDP training modes.
+# Fixed values avoid process-environment coupling inside a ComfyUI custom node.
+XLA_USE_BF16 = "0"
+XLA_DOWNCAST_BF16 = "0"
 
 
 if is_accelerate_available():
@@ -143,20 +144,11 @@ _init_weights = True
 
 
 def is_fsdp_enabled():
-    return (
-        torch.distributed.is_available()
-        and torch.distributed.is_initialized()
-        and strtobool(os.environ.get("ACCELERATE_USE_FSDP", "False")) == 1
-        and strtobool(os.environ.get("FSDP_CPU_RAM_EFFICIENT_LOADING", "False")) == 1
-    )
+    return False
 
 
 def is_local_dist_rank_0():
-    return (
-        torch.distributed.is_available()
-        and torch.distributed.is_initialized()
-        and int(os.environ.get("LOCAL_RANK", -1)) == 0
-    )
+    return True
 
 
 if is_sagemaker_mp_enabled():

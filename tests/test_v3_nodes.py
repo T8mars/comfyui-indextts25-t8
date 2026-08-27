@@ -65,6 +65,10 @@ def test_registers_all_pure_v3_nodes():
     assert dialogue_script_input.as_dict()["dynamicPrompts"] is False
     audiocpp_backend = next(item for item in schemas[16].inputs if item.id == "backend")
     assert "metal" in audiocpp_backend.as_dict()["options"]
+    loader_inputs = {item.id: item for item in schemas[0].inputs}
+    assert "float16" in loader_inputs["precision"].as_dict()["options"]
+    assert loader_inputs["reference_device"].as_dict()["default"] == "auto"
+    assert loader_inputs["reuse_spk_cond_for_emo"].as_dict()["default"] is False
     assert not hasattr(plugin, "NODE_CLASS_MAPPINGS")
 
 
@@ -132,6 +136,7 @@ def test_model_loader_reports_node_core_and_model_versions(tmp_path, monkeypatch
     assert f"node={nodes_v3.PROJECT_VERSION}" in result[1]
     assert "core=ee40fa7d" in result[1]
     assert "model=c39ce5ba" in result[1]
+    assert "reference=cpu" in result[1]
 
 
 def test_timeline_asr_and_subtitle_nodes_form_a_complete_editing_chain(monkeypatch):

@@ -28,7 +28,12 @@ from .runtime.audiocpp_backend import probe as probe_audiocpp
 from .runtime.audiocpp_backend import run as run_audiocpp
 from .runtime.model_cache import MODEL_CACHE
 from .runtime.reference_cache import comfy_audio_to_reference_wav
-from .runtime.acceleration import MODES, probe_acceleration, resolve_acceleration
+from .runtime.acceleration import (
+    MODES,
+    probe_acceleration,
+    recommend_runtime_config,
+    resolve_acceleration,
+)
 from .runtime.dialogue import (
     compose_timeline,
     fit_duration_factor,
@@ -127,25 +132,63 @@ def _resolve_device(requested: str) -> str:
     return selected
 
 
-def _use_bf16(precision: str, device: str) -> bool:
-    if precision == "float32":
-        return False
-    if precision == "bfloat16":
-        if device == "cpu" or device.startswith("mps"):
-            raise RuntimeError("bfloat16 仅建议在支持该格式的 CUDA/XPU 设备上使用。")
+def _native_bf16(device: str) -> bool:
+    if device.startswith("xpu"):
         return True
-    if device.startswith("cuda"):
-        index = (
-            int(device.split(":", 1)[1])
-            if ":" in device
-            else torch.cuda.current_device()
-        )
+    if not device.startswith("cuda") or not torch.cuda.is_available():
+        return False
+    index = (
+        int(device.split(":", 1)[1])
+        if ":" in device
+        else torch.cuda.current_device()
+    )
+    try:
+        if hasattr(torch.cuda, "device"):
+            with torch.cuda.device(index):
+                return bool(
+                    torch.cuda.is_bf16_supported(including_emulation=False)
+                )
+        return bool(torch.cuda.is_bf16_supported(including_emulation=False))
+    except TypeError:
         try:
             return bool(torch.cuda.is_bf16_supported(index))
         except TypeError:
-            with torch.cuda.device(index):
-                return bool(torch.cuda.is_bf16_supported())
-    return device.startswith("xpu")
+            return bool(torch.cuda.is_bf16_supported())
+
+
+def _precision_flags(precision: str, device: str) -> tuple[bool, bool, str]:
+    requested = str(precision or "auto").strip().lower()
+    if requested not in {"auto", "bfloat16", "float16", "float32"}:
+        raise RuntimeError(f"未知精度：{precision}")
+    accelerator = device.startswith("cuda") or device.startswith("xpu")
+    if requested in {"bfloat16", "float16"} and not accelerator:
+        raise RuntimeError(f"{requested} 仅建议在 CUDA/XPU 设备上使用。")
+    if requested == "float32" or not accelerator:
+        return False, False, "float32"
+    if requested == "bfloat16":
+        return True, False, "bfloat16"
+    if requested == "float16":
+        return False, True, "float16"
+    if _native_bf16(device):
+        return True, False, "bfloat16"
+    return False, True, "float16"
+
+
+def _use_bf16(precision: str, device: str) -> bool:
+    """Compatibility helper retained for existing integrations and tests."""
+
+    return _precision_flags(precision, device)[0]
+
+
+def _resolve_reference_device(mode: str, device: str, low_vram: bool) -> str:
+    normalized = str(mode or "auto").strip().lower()
+    if normalized not in {"auto", "same", "cpu"}:
+        raise RuntimeError(f"未知参考编码器设备：{mode}")
+    if normalized == "cpu" or (
+        normalized == "auto" and low_vram and device.startswith("cuda")
+    ):
+        return "cpu"
+    return device
 
 
 def _is_low_vram(device: str, threshold_gb: float = 10.0) -> bool:
@@ -212,9 +255,9 @@ class T8IndexTTS25ModelLoader(io.ComfyNode):
                 io.Combo.Input(
                     "precision",
                     display_name="精度",
-                    options=["auto", "bfloat16", "float32"],
+                    options=["auto", "bfloat16", "float16", "float32"],
                     default="auto",
-                    tooltip="auto 会在支持的 GPU 上使用 bfloat16，否则使用 float32。",
+                    tooltip="auto 优先原生 bfloat16；旧显卡自动使用 float16，CPU 使用 float32。",
                 ),
                 io.Combo.Input(
                     "acceleration_mode",
@@ -265,6 +308,21 @@ class T8IndexTTS25ModelLoader(io.ComfyNode):
                     advanced=True,
                     tooltip="留空时使用上方模型列表；仅用于已有的完整 IndexTTS 2.5 目录。",
                 ),
+                io.Combo.Input(
+                    "reference_device",
+                    display_name="参考编码器设备",
+                    options=["auto", "same", "cpu"],
+                    default="auto",
+                    advanced=True,
+                    tooltip="auto：低于 10GB 显存时把 Wav2Vec/CAMPPlus 放到 CPU；same：与主模型相同；cpu：始终节省显存。",
+                ),
+                io.Boolean.Input(
+                    "reuse_spk_cond_for_emo",
+                    display_name="快速默认情感",
+                    default=False,
+                    advanced=True,
+                    tooltip="未连接独立情感时复用音色条件，减少一次参考编码；可能轻微改变音色或情感。",
+                ),
             ],
             outputs=[
                 ModelType.Output("model", display_name="IndexTTS 2.5 模型"),
@@ -284,6 +342,8 @@ class T8IndexTTS25ModelLoader(io.ComfyNode):
         recycle_after_runs: int = 0,
         verify_hashes: bool = False,
         custom_model_path: str = "",
+        reference_device: str = "auto",
+        reuse_spk_cond_for_emo: bool = False,
     ) -> str:
         recycle_after_runs, verify_hashes, custom_model_path, _ = (
             _normalize_model_loader_values(
@@ -328,6 +388,8 @@ class T8IndexTTS25ModelLoader(io.ComfyNode):
         recycle_after_runs: int = 0,
         verify_hashes: bool = False,
         custom_model_path: str = "",
+        reference_device: str = "auto",
+        reuse_spk_cond_for_emo: bool = False,
     ) -> io.NodeOutput:
         recycle_after_runs, verify_hashes, custom_model_path, compatibility_note = (
             _normalize_model_loader_values(
@@ -342,6 +404,12 @@ class T8IndexTTS25ModelLoader(io.ComfyNode):
         fingerprint = model_fingerprint(model_dir)
         resolved_device = _resolve_device(device)
         low_vram = _is_low_vram(resolved_device)
+        use_bf16, use_fp16, precision_name = _precision_flags(
+            precision, resolved_device
+        )
+        resolved_reference_device = _resolve_reference_device(
+            reference_device, resolved_device, low_vram
+        )
         requested_acceleration = (
             "bigvgan_cuda"
             if use_cuda_kernel and acceleration_mode in {"off", "auto_safe"}
@@ -352,7 +420,10 @@ class T8IndexTTS25ModelLoader(io.ComfyNode):
         handle = ModelHandle(
             model_dir=model_dir,
             device=resolved_device,
-            use_bf16=_use_bf16(precision, resolved_device),
+            use_bf16=use_bf16,
+            use_fp16=use_fp16,
+            reference_device=resolved_reference_device,
+            reuse_spk_cond_for_emo=bool(reuse_spk_cond_for_emo),
             use_cuda_kernel=acceleration.use_cuda_kernel,
             use_torch_compile=acceleration.use_torch_compile,
             use_accel=acceleration.use_accel,
@@ -370,10 +441,11 @@ class T8IndexTTS25ModelLoader(io.ComfyNode):
         info = (
             f"IndexTTS 2.5 | node={PROJECT_VERSION} | core={str(manifest['codeRevision'])[:8]} | "
             f"model={str(manifest['modelRevision'])[:8]} | {model_dir} | device={resolved_device} | "
-            f"precision={'bfloat16' if handle.use_bf16 else 'float32'} | {verification} | "
+            f"precision={precision_name} | reference={resolved_reference_device} | {verification} | "
             f"accel={acceleration.effective}（{acceleration.reason}）"
             + (f" | {compatibility_note}" if compatibility_note else "")
             + (" | 低显存自动适配" if low_vram else "")
+            + (" | 快速默认情感" if reuse_spk_cond_for_emo else "")
         )
         return io.NodeOutput(handle, info)
 
@@ -2237,7 +2309,12 @@ class T8IndexTTS25Environment(io.ComfyNode):
         }
         return io.NodeOutput(
             json.dumps(
-                {"device": resolved, "capabilities": capabilities, "modes": modes},
+                {
+                    "device": resolved,
+                    "recommended": recommend_runtime_config(capabilities),
+                    "capabilities": capabilities,
+                    "modes": modes,
+                },
                 ensure_ascii=False,
                 indent=2,
             )

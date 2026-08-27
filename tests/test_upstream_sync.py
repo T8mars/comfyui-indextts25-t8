@@ -70,6 +70,13 @@ def test_config_download_targets_index_tts_25(monkeypatch, tmp_path):
     assert calls[0][:2] == ("IndexTeam/IndexTTS-2.5", "config.yaml")
 
 
+def test_download_source_is_explicit_and_never_probes_the_network():
+    model_download.set_download_source("modelscope")
+    assert model_download._get_using_modelscope() is True
+    model_download.set_download_source("huggingface")
+    assert model_download._get_using_modelscope() is False
+
+
 def test_deepspeed_bfloat16_dtype_fix_is_synced(monkeypatch):
     class FakeInference:
         def eval(self):

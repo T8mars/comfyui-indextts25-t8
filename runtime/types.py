@@ -12,6 +12,9 @@ class ModelHandle:
     model_dir: Path
     device: str
     use_bf16: bool
+    use_fp16: bool = False
+    reference_device: str | None = None
+    reuse_spk_cond_for_emo: bool = False
     use_cuda_kernel: bool = False
     use_torch_compile: bool = False
     use_accel: bool = False
@@ -31,6 +34,9 @@ class ModelHandle:
             str(self.model_dir.resolve()),
             self.device,
             self.use_bf16,
+            self.use_fp16,
+            self.reference_device or self.device,
+            self.reuse_spk_cond_for_emo,
             self.use_cuda_kernel,
             self.use_torch_compile,
             self.use_accel,

@@ -1,6 +1,7 @@
 __pycache__/
 *.py[cod]
 .pytest_cache/
+.pytest-*/
 .ipynb_checkpoints/
 .coverage
 htmlcov/
@@ -21,6 +22,7 @@ venv/
 *.mp3
 *.opus
 .download.lock
+/node.zip
 
 # Small upstream inference constant bundled with the pinned 2.5 core.
 !indextts/utils/maskgct/models/tts/maskgct/ckpt/wav2vec2bert_stats.pt

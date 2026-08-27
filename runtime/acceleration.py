@@ -35,18 +35,75 @@ def _module(name: str) -> bool:
 def probe_acceleration(device: str) -> dict:
     cuda = bool(torch.cuda.is_available() and str(device).startswith("cuda"))
     try:
+        bf16 = bool(
+            cuda and torch.cuda.is_bf16_supported(including_emulation=False)
+        )
+    except TypeError:
         bf16 = bool(cuda and torch.cuda.is_bf16_supported())
     except Exception:
         bf16 = False
+    gpu: dict[str, object] = {}
+    if cuda:
+        try:
+            index = (
+                int(str(device).split(":", 1)[1])
+                if ":" in str(device)
+                else torch.cuda.current_device()
+            )
+            properties = torch.cuda.get_device_properties(index)
+            gpu = {
+                "index": index,
+                "name": str(properties.name),
+                "total_vram_gb": round(float(properties.total_memory) / (1024**3), 2),
+            }
+        except Exception:
+            gpu = {}
     return {
         "cuda": cuda,
         "bf16": bf16,
+        "fp16": cuda,
+        "gpu": gpu,
         "modules": {"deepspeed": _module("deepspeed"), "flash_attn": _module("flash_attn"), "triton": _module("triton"), "ninja": _module("ninja") or shutil.which("ninja") is not None},
         "tools": {
             "nvcc": shutil.which("nvcc") is not None,
             "cl": shutil.which("cl") is not None,
             "cxx": any(shutil.which(name) is not None for name in ("c++", "g++", "clang++")),
         },
+    }
+
+
+def recommend_runtime_config(capabilities: dict) -> dict[str, str]:
+    """Return conservative settings without importing or loading the model."""
+
+    if not capabilities.get("cuda", False):
+        return {
+            "precision": "float32",
+            "reference_device": "cpu",
+            "acceleration_mode": "off",
+            "reason": "未检测到 CUDA；使用 CPU float32 普通模式。",
+        }
+    total_vram = capabilities.get("gpu", {}).get("total_vram_gb")
+    low_vram = isinstance(total_vram, (int, float)) and float(total_vram) < 10.0
+    modules = capabilities.get("modules", {})
+    tools = capabilities.get("tools", {})
+    kernel_ready = bool(
+        modules.get("ninja")
+        and tools.get("nvcc")
+        and (tools.get("cl") or tools.get("cxx"))
+    )
+    precision = "bfloat16" if capabilities.get("bf16", False) else "float16"
+    reference_device = "cpu" if low_vram else "same"
+    acceleration = "auto_safe" if kernel_ready else "off"
+    vram_reason = (
+        "显存低于 10GB，参考编码器建议放 CPU。"
+        if low_vram
+        else "参考编码器可与主模型使用同一设备。"
+    )
+    return {
+        "precision": precision,
+        "reference_device": reference_device,
+        "acceleration_mode": acceleration,
+        "reason": f"推荐 {precision}；{vram_reason}",
     }
 
 
@@ -82,4 +139,10 @@ def resolve_acceleration(mode: str, device: str, capabilities: dict | None = Non
     return AccelerationSelection(requested, requested if ready else "off", use_deepspeed=ready, available=ready, reason=(ready_reason if ready else "未安装可选 DeepSpeed，已回退；它不是必需依赖"))
 
 
-__all__ = ["AccelerationSelection", "MODES", "probe_acceleration", "resolve_acceleration"]
+__all__ = [
+    "AccelerationSelection",
+    "MODES",
+    "probe_acceleration",
+    "recommend_runtime_config",
+    "resolve_acceleration",
+]

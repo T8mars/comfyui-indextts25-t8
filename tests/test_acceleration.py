@@ -1,10 +1,12 @@
-from runtime.acceleration import resolve_acceleration
+from runtime.acceleration import recommend_runtime_config, resolve_acceleration
 
 
 def caps(cuda=True, *, nvcc=False, cxx=False, **modules):
     return {
         "cuda": cuda,
         "bf16": cuda,
+        "fp16": cuda,
+        "gpu": {"total_vram_gb": 8.0 if cuda else 0.0},
         "modules": {"deepspeed": False, "flash_attn": False, "triton": False, "ninja": False} | modules,
         "tools": {"nvcc": nvcc, "cl": False, "cxx": cxx},
     }
@@ -29,3 +31,20 @@ def test_bigvgan_needs_cuda_and_cpp_compilers():
     assert resolve_acceleration(
         "bigvgan_cuda", "cuda:0", caps(ninja=True, nvcc=True, cxx=True)
     ).use_cuda_kernel
+
+
+def test_preflight_recommends_fp16_and_cpu_reference_for_old_low_vram_gpu():
+    report = caps(cuda=True)
+    report["bf16"] = False
+    recommendation = recommend_runtime_config(report)
+    assert recommendation["precision"] == "float16"
+    assert recommendation["reference_device"] == "cpu"
+    assert recommendation["acceleration_mode"] == "off"
+
+
+def test_preflight_only_recommends_auto_safe_when_toolchain_is_ready():
+    recommendation = recommend_runtime_config(
+        caps(cuda=True, ninja=True, nvcc=True, cxx=True)
+    )
+    assert recommendation["precision"] == "bfloat16"
+    assert recommendation["acceleration_mode"] == "auto_safe"

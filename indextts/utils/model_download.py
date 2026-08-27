@@ -18,6 +18,16 @@ from indextts.utils.network_detection import need_proxy
 _USING_MODELSCOPE: bool | None = None
 
 
+def set_download_source(source: str) -> None:
+    """Select a source explicitly for the current download command."""
+
+    global _USING_MODELSCOPE
+    normalized = str(source).strip().lower()
+    if normalized not in {"huggingface", "modelscope"}:
+        raise ValueError(f"Unsupported download source: {source}")
+    _USING_MODELSCOPE = normalized == "modelscope"
+
+
 def _get_using_modelscope() -> bool:
     global _USING_MODELSCOPE
     if _USING_MODELSCOPE is None:

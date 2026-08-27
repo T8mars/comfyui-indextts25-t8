@@ -76,7 +76,10 @@ class ModelCache:
                 "cfg_path": str(handle.model_dir / "config.yaml"),
                 "model_dir": str(handle.model_dir),
                 "use_bf16": handle.use_bf16,
+                "use_fp16": handle.use_fp16,
                 "device": handle.device,
+                "reference_device": handle.reference_device,
+                "reuse_spk_cond_for_emo": handle.reuse_spk_cond_for_emo,
                 "use_cuda_kernel": handle.use_cuda_kernel,
                 "use_deepspeed": handle.use_deepspeed,
                 "use_accel": handle.use_accel,
@@ -187,7 +190,15 @@ class ModelCache:
             entries = [
                 {
                     "device": str(key[1]),
-                    "precision": "bfloat16" if bool(key[2]) else "float32",
+                    "precision": (
+                        "bfloat16"
+                        if bool(key[2])
+                        else "float16"
+                        if bool(key[3])
+                        else "float32"
+                    ),
+                    "reference_device": str(key[4]),
+                    "reuse_spk_cond_for_emo": bool(key[5]),
                     "users": entry.users,
                     "completed_runs": entry.completed_runs,
                     "idle_seconds": round(max(0.0, now - entry.last_used), 3),

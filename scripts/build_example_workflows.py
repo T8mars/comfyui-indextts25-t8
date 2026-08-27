@@ -173,12 +173,18 @@ class Workflow:
 
 
 def add_model(
-    workflow: Workflow, pos=(0, 0), *, release_after_run: bool = False
+    workflow: Workflow,
+    pos=(0, 0),
+    *,
+    release_after_run: bool = False,
+    precision: str = "auto",
+    reference_device: str = "auto",
+    reuse_spk_cond_for_emo: bool = False,
 ) -> int:
     return workflow.add(
         MODEL_NODE,
         pos,
-        (390, 290),
+        (390, 365),
         [
             widget_input("model_name", "COMBO"),
             widget_input("device", "COMBO"),
@@ -189,9 +195,23 @@ def add_model(
             widget_input("recycle_after_runs", "INT"),
             widget_input("verify_hashes", "BOOLEAN"),
             widget_input("custom_model_path", "STRING", optional=True),
+            widget_input("reference_device", "COMBO"),
+            widget_input("reuse_spk_cond_for_emo", "BOOLEAN"),
         ],
         [output("model", "T8_INDEXTTS25_MODEL"), output("model_info", "STRING")],
-        ["IndexTTS-2.5", "auto", "auto", "off", False, release_after_run, 0, False, ""],
+        [
+            "IndexTTS-2.5",
+            "auto",
+            precision,
+            "off",
+            False,
+            release_after_run,
+            0,
+            False,
+            "",
+            reference_device,
+            reuse_spk_cond_for_emo,
+        ],
     )
 
 
@@ -762,19 +782,27 @@ def wire_generation(
     workflow.connect(generate, "audio", save, "audio")
 
 
-def api_model(*, release_after_run: bool = False) -> dict[str, Any]:
+def api_model(
+    *,
+    release_after_run: bool = False,
+    precision: str = "auto",
+    reference_device: str = "auto",
+    reuse_spk_cond_for_emo: bool = False,
+) -> dict[str, Any]:
     return {
         "class_type": MODEL_NODE,
         "inputs": {
             "model_name": "IndexTTS-2.5",
             "device": "auto",
-            "precision": "auto",
+            "precision": precision,
             "acceleration_mode": "off",
             "use_cuda_kernel": False,
             "release_after_run": release_after_run,
             "recycle_after_runs": 0,
             "verify_hashes": False,
             "custom_model_path": "",
+            "reference_device": reference_device,
+            "reuse_spk_cond_for_emo": reuse_spk_cond_for_emo,
         },
     }
 
@@ -1914,6 +1942,57 @@ def audiocpp_pair() -> tuple[dict[str, Any], dict[str, Any]]:
     return workflow.as_dict(), api
 
 
+def low_vram_fp16_pair() -> tuple[dict[str, Any], dict[str, Any]]:
+    workflow = Workflow("28 低显存 FP16 与 CPU 参考编码器")
+    model = add_model(
+        workflow,
+        precision="float16",
+        reference_device="cpu",
+        reuse_spk_cond_for_emo=True,
+    )
+    speaker = add_load_audio(
+        workflow, "voice_reference.wav", pos=(0, 430), title="音色参考音频"
+    )
+    environment = workflow.add(
+        ENVIRONMENT_NODE,
+        (440, 0),
+        (410, 150),
+        [widget_input("device", "COMBO")],
+        [output("environment_report", "STRING")],
+        ["auto"],
+    )
+    generate = add_generate(
+        workflow,
+        "这是低显存模式示例：GPT 使用半精度，参考编码器放在 CPU，默认情感复用音色条件。",
+        "ZH",
+        1.0,
+        20260827,
+        pos=(900, 180),
+    )
+    save = add_save(workflow, "IndexTTS25_T8/low_vram_fp16", pos=(1460, 300))
+    wire_generation(workflow, model, speaker, generate, save)
+    api = {
+        "1": api_model(
+            precision="float16",
+            reference_device="cpu",
+            reuse_spk_cond_for_emo=True,
+        ),
+        "2": api_audio("voice_reference.wav"),
+        "3": {"class_type": ENVIRONMENT_NODE, "inputs": {"device": "auto"}},
+        "4": api_generate(
+            "1",
+            "2",
+            "这是低显存模式示例：GPT 使用半精度，参考编码器放在 CPU，默认情感复用音色条件。",
+            "ZH",
+            1.0,
+            20260827,
+        ),
+        "5": api_save("4", "IndexTTS25_T8/low_vram_fp16"),
+    }
+    assert environment
+    return workflow.as_dict(), api
+
+
 EXAMPLES = {
     "01_basic_voice_clone": basic_pair,
     "02_speed_comparison": speed_pair,
@@ -1942,6 +2021,7 @@ EXAMPLES = {
     "25_quality_retry": quality_retry_pair,
     "26_memory_control": memory_control_pair,
     "27_audiocpp_experimental": audiocpp_pair,
+    "28_low_vram_fp16": low_vram_fp16_pair,
 }
 
 
