@@ -194,9 +194,11 @@ def add_model(
             widget_input("release_after_run", "BOOLEAN"),
             widget_input("recycle_after_runs", "INT"),
             widget_input("verify_hashes", "BOOLEAN"),
-            widget_input("custom_model_path", "STRING", optional=True),
             widget_input("reference_device", "COMBO"),
             widget_input("reuse_spk_cond_for_emo", "BOOLEAN"),
+            # ComfyUI V3 finalizes required inputs before optional inputs even
+            # when the optional field is declared earlier by the node class.
+            widget_input("custom_model_path", "STRING", optional=True),
         ],
         [output("model", "T8_INDEXTTS25_MODEL"), output("model_info", "STRING")],
         [
@@ -208,9 +210,9 @@ def add_model(
             release_after_run,
             0,
             False,
-            "",
             reference_device,
             reuse_spk_cond_for_emo,
+            "",
         ],
     )
 
