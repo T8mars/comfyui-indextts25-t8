@@ -37,8 +37,7 @@
       ],
       "properties": {
         "Node name for S&R": "LoadAudio",
-        "cnr_id": "comfy-core",
-        "ver": "0.12.1"
+        "cnr_id": "comfy-core"
       },
       "widgets_values": [
         "voice_reference.wav"
@@ -145,7 +144,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_AudioCppGenerate",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.12.1"
+        "ver": "0.12.2"
       },
       "widgets_values": [
         "D:\\audio.cpp\\audiocpp_cli.exe",
@@ -195,8 +194,7 @@
       ],
       "properties": {
         "Node name for S&R": "SaveAudio",
-        "cnr_id": "comfy-core",
-        "ver": "0.12.1"
+        "cnr_id": "comfy-core"
       },
       "widgets_values": [
         "IndexTTS25_T8/audiocpp_experimental"

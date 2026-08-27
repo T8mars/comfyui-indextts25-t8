@@ -20,7 +20,11 @@ Creator: **Bilibili: T8star-Aix**.
 
 This repository is locked to the IndexTTS 2.5 inference core and the official 2.5 model manifest. It will not fall back to or accidentally load IndexTTS 2.0.
 
-Current baseline: **ComfyUI Node 0.12.1 · Desktop 0.12.0 · Core `ee40fa7d` · Model `c39ce5ba`**.
+Current baseline: **ComfyUI Node 0.12.2 · Desktop 0.13.1 · Core `ee40fa7d` · Model `c39ce5ba`**.
+
+Version 0.12.2 fixes an omission in the formal model manifest. IndexTTS 2.5 continues to reuse the
+`bpe.model` tokenizer from `IndexTeam/IndexTTS-2`; both Hugging Face and ModelScope download paths now
+fetch it from a pinned revision, verify it, and reject incomplete model directories before loading.
 Desktop and Node are separate deliverables with independent versions; Core/Model identify the pinned official code and weight revisions.
 
 ### v0.12.0 low-VRAM and precision update

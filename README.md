@@ -20,7 +20,10 @@ IndexTTS 2.5 的 ComfyUI V3 原生节点集成。节点菜单位于：
 
 本目录固定使用 IndexTTS 2.5 推理核心和正式 2.5 模型清单，不会回退或误载 IndexTTS 2.0。
 
-当前版本基线：**ComfyUI Node 0.12.1 · Desktop 0.12.0 · Core `ee40fa7d` · Model `c39ce5ba`**。
+当前版本基线：**ComfyUI Node 0.12.2 · Desktop 0.13.1 · Core `ee40fa7d` · Model `c39ce5ba`**。
+
+0.12.2 修复正式模型清单遗漏：IndexTTS 2.5 继续复用 `IndexTeam/IndexTTS-2` 的 `bpe.model` 分词器，
+Hugging Face 与 ModelScope 下载器现在会从固定 revision 自动补齐并校验该文件，模型加载前也会明确拦截不完整目录。
 Desktop 与 Node 是两个独立发行物，因此各自使用独立版本号；Core/Model 是固定的官方代码和权重 revision。
 
 ### v0.12.0 低显存与精度更新

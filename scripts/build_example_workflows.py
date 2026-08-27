@@ -64,11 +64,13 @@ def output(name: str, data_type: str) -> dict[str, Any]:
 
 
 def properties(node_type: str, *, core: bool = False) -> dict[str, str]:
-    return {
+    result = {
         "Node name for S&R": node_type,
         "cnr_id": "comfy-core" if core else "comfyui-indextts25-t8",
-        "ver": PROJECT_VERSION,
     }
+    if not core:
+        result["ver"] = PROJECT_VERSION
+    return result
 
 
 @dataclass

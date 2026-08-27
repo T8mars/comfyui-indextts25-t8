@@ -124,7 +124,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_ModelLoader",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.12.1"
+        "ver": "0.12.2"
       },
       "widgets_values": [
         "IndexTTS-2.5",
@@ -175,8 +175,7 @@
       ],
       "properties": {
         "Node name for S&R": "LoadAudio",
-        "cnr_id": "comfy-core",
-        "ver": "0.12.1"
+        "cnr_id": "comfy-core"
       },
       "widgets_values": [
         "voice_reference.wav"
@@ -217,7 +216,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_Environment",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.12.1"
+        "ver": "0.12.2"
       },
       "widgets_values": [
         "auto"
@@ -382,7 +381,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_Generate",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.12.1"
+        "ver": "0.12.2"
       },
       "widgets_values": [
         "这是低显存模式示例：GPT 使用半精度，参考编码器放在 CPU，默认情感复用音色条件。",
@@ -439,8 +438,7 @@
       ],
       "properties": {
         "Node name for S&R": "SaveAudio",
-        "cnr_id": "comfy-core",
-        "ver": "0.12.1"
+        "cnr_id": "comfy-core"
       },
       "widgets_values": [
         "IndexTTS25_T8/low_vram_fp16"

@@ -24,19 +24,44 @@ def _copy_snapshot(source: Path, target: Path) -> None:
     shutil.copytree(source, target, dirs_exist_ok=True)
 
 
-def download_main_model(target: Path, source: str) -> None:
+def _file_source(manifest: dict, relative_path: str) -> tuple[str, str]:
+    metadata = manifest["files"][relative_path]
+    return (
+        str(metadata.get("repository", manifest["modelRepository"])),
+        str(metadata.get("revision", manifest["modelRevision"])),
+    )
+
+
+def download_main_model(
+    target: Path,
+    source: str,
+    *,
+    missing: tuple[str, ...] = (),
+    mismatched: tuple[str, ...] = (),
+) -> None:
     manifest = load_manifest()
     repository = str(manifest["modelRepository"])
     revision = str(manifest["modelRevision"])
     target.mkdir(parents=True, exist_ok=True)
     if source == "huggingface":
-        from huggingface_hub import snapshot_download
+        from huggingface_hub import hf_hub_download, snapshot_download
 
         snapshot_download(
             repo_id=repository,
             revision=revision,
             local_dir=str(target),
         )
+        for relative_path in [*missing, *mismatched]:
+            file_repository, file_revision = _file_source(manifest, relative_path)
+            if file_repository == repository and relative_path in missing:
+                continue
+            hf_hub_download(
+                repo_id=file_repository,
+                revision=file_revision,
+                filename=relative_path,
+                local_dir=str(target),
+                force_download=relative_path in mismatched,
+            )
     elif source == "modelscope":
         try:
             from modelscope.hub.snapshot_download import snapshot_download
@@ -49,6 +74,24 @@ def download_main_model(target: Path, source: str) -> None:
 
         downloaded = Path(snapshot_download(model_id=repository, revision=revision)).resolve()
         _copy_snapshot(downloaded, target)
+        supplemental = {
+            relative_path
+            for relative_path in [*missing, *mismatched]
+            if _file_source(manifest, relative_path)[0] != repository
+        }
+        if supplemental:
+            from modelscope.hub.file_download import model_file_download
+
+            for relative_path in sorted(supplemental):
+                file_repository, _file_revision = _file_source(manifest, relative_path)
+                source_path = Path(
+                    model_file_download(
+                        model_id=file_repository, file_path=relative_path
+                    )
+                ).resolve()
+                destination = target / relative_path
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source_path, destination)
     else:
         raise ValueError(f"未知下载源：{source}")
 
@@ -117,7 +160,12 @@ def main(argv: list[str] | None = None) -> int:
         quick = validate_model_dir(target, verify_hashes=False)
         if not quick.valid:
             print(f">> 从 {args.source} 下载正式 IndexTTS 2.5 模型……")
-            download_main_model(target, args.source)
+            download_main_model(
+                target,
+                args.source,
+                missing=quick.missing,
+                mismatched=quick.mismatched,
+            )
         report = validate_model_dir(target, verify_hashes=True)
         report.require_valid()
         print(">> 正式模型 SHA-256 校验通过。")

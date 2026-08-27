@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 
-from services import model_store
+from services import downloader, model_store
 
 
 def _metadata(data: bytes) -> dict:
@@ -41,6 +41,16 @@ def test_manifest_is_pinned_to_formal_index_tts_25():
     assert manifest["modelRevision"] == "c39ce5ba981572cb187443877ff559dfb246ce63"
     assert manifest["files"]["config.yaml"]["sha256"] == "18adf417be3e8f5e2e48e30f7420c719170a6870619436250f360d626877870e"
     assert manifest["modelRepository"] == "IndexTeam/IndexTTS-2.5"
+    assert manifest["files"]["bpe.model"] == {
+        "size": 475997,
+        "sha256": "b2a5ce8090d32da3642cc4f81fdc996376bc6dd3f4cd5e3d165f71120d9f2bc8",
+        "repository": "IndexTeam/IndexTTS-2",
+        "revision": "740dcaff396282ffb241903d150ac011cd4b1ede",
+    }
+    assert downloader._file_source(manifest, "bpe.model") == (
+        "IndexTeam/IndexTTS-2",
+        "740dcaff396282ffb241903d150ac011cd4b1ede",
+    )
 
 
 def test_comfy_requirements_do_not_replace_torch_or_pull_training_stacks():

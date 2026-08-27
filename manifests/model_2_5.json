@@ -8,6 +8,12 @@
       "size": 2860,
       "sha256": "18adf417be3e8f5e2e48e30f7420c719170a6870619436250f360d626877870e"
     },
+    "bpe.model": {
+      "size": 475997,
+      "sha256": "b2a5ce8090d32da3642cc4f81fdc996376bc6dd3f4cd5e3d165f71120d9f2bc8",
+      "repository": "IndexTeam/IndexTTS-2",
+      "revision": "740dcaff396282ffb241903d150ac011cd4b1ede"
+    },
     "gpt.pth": {
       "size": 3259599833,
       "sha256": "43a8f4c30eccdf201958d3b9713511482c19d56dc20b0b1c4ee1e6b080b19d85"

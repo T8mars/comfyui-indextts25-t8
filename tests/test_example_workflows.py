@@ -80,6 +80,8 @@ def test_ui_widget_values_keep_declared_order_types_and_release_version():
                 assert (
                     node["properties"]["ver"] == build_example_workflows.PROJECT_VERSION
                 )
+            elif node["properties"].get("cnr_id") == "comfy-core":
+                assert "ver" not in node["properties"]
 
 
 def test_embedded_dialogue_scripts_are_parsed_not_just_outer_workflow_json():
