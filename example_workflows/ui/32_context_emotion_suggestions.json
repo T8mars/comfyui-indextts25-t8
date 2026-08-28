@@ -1,6 +1,6 @@
 {
-  "last_node_id": 4,
-  "last_link_id": 3,
+  "last_node_id": 5,
+  "last_link_id": 4,
   "nodes": [
     {
       "id": 1,
@@ -169,56 +169,88 @@
     },
     {
       "id": 2,
-      "type": "LoadAudio",
+      "type": "T8_IndexTTS25_DialogueScript",
       "pos": [
-        0,
-        430
+        430,
+        20
       ],
       "size": [
-        330,
-        130
+        520,
+        390
       ],
       "flags": {},
       "order": 1,
       "mode": 0,
       "inputs": [
         {
-          "name": "audio",
+          "name": "script_type",
           "type": "COMBO",
           "widget": {
-            "name": "audio"
+            "name": "script_type"
+          },
+          "link": null
+        },
+        {
+          "name": "script",
+          "type": "STRING",
+          "widget": {
+            "name": "script"
+          },
+          "link": null
+        },
+        {
+          "name": "default_role",
+          "type": "STRING",
+          "widget": {
+            "name": "default_role"
+          },
+          "link": null
+        },
+        {
+          "name": "default_language",
+          "type": "COMBO",
+          "widget": {
+            "name": "default_language"
           },
           "link": null
         }
       ],
       "outputs": [
         {
-          "name": "AUDIO",
-          "type": "AUDIO",
+          "name": "dialogue_script",
+          "type": "T8_INDEXTTS25_DIALOGUE_SCRIPT",
           "links": [
             2
           ]
+        },
+        {
+          "name": "script_preview",
+          "type": "STRING",
+          "links": []
         }
       ],
       "properties": {
-        "Node name for S&R": "LoadAudio",
-        "cnr_id": "comfy-core"
+        "Node name for S&R": "T8_IndexTTS25_DialogueScript",
+        "cnr_id": "comfyui-indextts25-t8",
+        "ver": "0.17.0"
       },
       "widgets_values": [
-        "voice_reference.wav"
-      ],
-      "title": "固定参考音频"
+        "batch",
+        "角色A|我以为你不会来了。|ZH|1.0\n角色B|路上出了点意外，但我一直在赶回来。|ZH|1.0\n角色A|你每次都这样说，我已经不相信了！|ZH|1.0\n角色B|对不起。这次我会留下来把事情说清楚。|ZH|1.0",
+        "角色A",
+        "ZH"
+      ]
     },
     {
       "id": 3,
-      "type": "T8_IndexTTS25_RuntimeBenchmark",
+      "type": "T8_IndexTTS25_DialogueEmotionSuggest",
       "pos": [
-        900,
-        40
+        1020,
+        20
       ],
       "size": [
         500,
-        470
+        280
       ],
       "flags": {},
       "order": 2,
@@ -230,81 +262,37 @@
           "link": 1
         },
         {
-          "name": "speaker_audio",
-          "type": "AUDIO",
+          "name": "dialogue_script",
+          "type": "T8_INDEXTTS25_DIALOGUE_SCRIPT",
           "link": 2
         },
         {
-          "name": "text",
-          "type": "STRING",
-          "widget": {
-            "name": "text"
-          },
-          "link": null
-        },
-        {
-          "name": "language",
-          "type": "COMBO",
-          "widget": {
-            "name": "language"
-          },
-          "link": null
-        },
-        {
-          "name": "duration_factor",
-          "type": "FLOAT",
-          "widget": {
-            "name": "duration_factor"
-          },
-          "link": null
-        },
-        {
-          "name": "repeat_count",
+          "name": "context_window",
           "type": "INT",
           "widget": {
-            "name": "repeat_count"
+            "name": "context_window"
           },
           "link": null
         },
         {
-          "name": "warmup",
+          "name": "overwrite_existing",
           "type": "BOOLEAN",
           "widget": {
-            "name": "warmup"
+            "name": "overwrite_existing"
           },
           "link": null
-        },
-        {
-          "name": "seed",
-          "type": "INT",
-          "widget": {
-            "name": "seed"
-          },
-          "link": null
-        },
-        {
-          "name": "emotion",
-          "type": "T8_INDEXTTS25_EMOTION",
-          "link": null,
-          "shape": 7
-        },
-        {
-          "name": "sampling",
-          "type": "T8_INDEXTTS25_SAMPLING",
-          "link": null,
-          "shape": 7
         }
       ],
       "outputs": [
         {
-          "name": "audio",
-          "type": "AUDIO",
+          "name": "dialogue_script",
+          "type": "T8_INDEXTTS25_DIALOGUE_SCRIPT",
           "links": [
             3
           ]
         },
         {
-          "name": "benchmark_report",
+          "name": "editable_suggestions_json",
           "type": "STRING",
           "links": []
         },
@@ -315,63 +303,101 @@
         }
       ],
       "properties": {
-        "Node name for S&R": "T8_IndexTTS25_RuntimeBenchmark",
+        "Node name for S&R": "T8_IndexTTS25_DialogueEmotionSuggest",
         "cnr_id": "comfyui-indextts25-t8",
         "ver": "0.17.0"
       },
       "widgets_values": [
-        "这是 IndexTTS 2.5 真实性能基准。所有运行使用相同文本、参考音频和随机种子。",
-        "ZH",
-        1.0,
         2,
-        true,
-        20250827,
-        "fixed"
-      ]
+        false
+      ],
+      "title": "先分析上下文；不会生成音频"
     },
     {
       "id": 4,
-      "type": "SaveAudio",
+      "type": "T8_IndexTTS25_TimelineEditor",
       "pos": [
-        1480,
-        180
+        1580,
+        20
       ],
       "size": [
-        320,
-        130
+        520,
+        330
       ],
       "flags": {},
       "order": 3,
       "mode": 0,
       "inputs": [
         {
-          "name": "audio",
-          "type": "AUDIO",
+          "name": "dialogue_script",
+          "type": "T8_INDEXTTS25_DIALOGUE_SCRIPT",
           "link": 3
         },
         {
-          "name": "filename_prefix",
+          "name": "timeline_edits_json",
           "type": "STRING",
           "widget": {
-            "name": "filename_prefix"
+            "name": "timeline_edits_json"
           },
           "link": null
         }
       ],
       "outputs": [
         {
-          "name": "audio",
-          "type": "AUDIO",
+          "name": "dialogue_script",
+          "type": "T8_INDEXTTS25_DIALOGUE_SCRIPT",
           "links": []
+        },
+        {
+          "name": "timeline_preview",
+          "type": "STRING",
+          "links": []
+        },
+        {
+          "name": "timeline_image",
+          "type": "IMAGE",
+          "links": [
+            4
+          ]
         }
       ],
       "properties": {
-        "Node name for S&R": "SaveAudio",
-        "cnr_id": "comfy-core"
+        "Node name for S&R": "T8_IndexTTS25_TimelineEditor",
+        "cnr_id": "comfyui-indextts25-t8",
+        "ver": "0.17.0"
       },
       "widgets_values": [
-        "IndexTTS25_T8/runtime_benchmark"
+        ""
       ]
+    },
+    {
+      "id": 5,
+      "type": "PreviewImage",
+      "pos": [
+        2160,
+        20
+      ],
+      "size": [
+        420,
+        360
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 4
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "PreviewImage",
+        "cnr_id": "comfy-core"
+      },
+      "widgets_values": [],
+      "title": "检查建议后再连接生成节点"
     }
   ],
   "links": [
@@ -389,7 +415,7 @@
       0,
       3,
       1,
-      "AUDIO"
+      "T8_INDEXTTS25_DIALOGUE_SCRIPT"
     ],
     [
       3,
@@ -397,17 +423,25 @@
       0,
       4,
       0,
-      "AUDIO"
+      "T8_INDEXTTS25_DIALOGUE_SCRIPT"
+    ],
+    [
+      4,
+      4,
+      2,
+      5,
+      0,
+      "IMAGE"
     ]
   ],
   "groups": [
     {
-      "title": "29 当前加速模式真实性能基准 · B站：T8star-Aix",
+      "title": "32 上下文逐句情感建议（确认后再生成） · B站：T8star-Aix",
       "bounding": [
         -40,
         -60,
-        1880,
-        640
+        2660,
+        490
       ],
       "color": "#3f789e",
       "font_size": 24,

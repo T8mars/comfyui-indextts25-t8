@@ -42,6 +42,7 @@ def test_registers_all_pure_v3_nodes():
         "T8_IndexTTS25_RoleLibrary",
         "T8_IndexTTS25_MergeVoiceEmotions",
         "T8_IndexTTS25_DialogueScript",
+        "T8_IndexTTS25_DialogueEmotionSuggest",
         "T8_IndexTTS25_TimelineEditor",
         "T8_IndexTTS25_DialogueGenerate",
         "T8_IndexTTS25_ASRProofread",
@@ -56,16 +57,20 @@ def test_registers_all_pure_v3_nodes():
     ]
     assert all(schema.category == "T8star-Aix/Audio/IndexTTS 2.5" for schema in schemas)
     assert schemas[5].outputs[0].io_type == "AUDIO"
-    assert schemas[11].outputs[0].io_type == "AUDIO"
-    assert schemas[14].outputs[0].io_type == "AUDIO"
-    assert schemas[15].outputs[0].io_type == "STRING"
-    assert schemas[16].outputs[0].io_type == "AUDIO"
+    assert schemas[12].outputs[0].io_type == "AUDIO"
+    assert schemas[15].outputs[0].io_type == "AUDIO"
+    assert schemas[16].outputs[0].io_type == "STRING"
+    assert schemas[17].outputs[0].io_type == "AUDIO"
     dialogue_script_input = next(
         item for item in schemas[9].inputs if item.id == "script"
     )
     assert dialogue_script_input.dynamic_prompts is False
     assert dialogue_script_input.as_dict()["dynamicPrompts"] is False
-    audiocpp_backend = next(item for item in schemas[16].inputs if item.id == "backend")
+    suggestion_inputs = {item.id: item for item in schemas[10].inputs}
+    assert suggestion_inputs["context_window"].as_dict()["default"] == 2
+    assert suggestion_inputs["overwrite_existing"].as_dict()["default"] is False
+    assert "不会生成音频" in schemas[10].description
+    audiocpp_backend = next(item for item in schemas[17].inputs if item.id == "backend")
     assert "metal" in audiocpp_backend.as_dict()["options"]
     loader_inputs = {item.id: item for item in schemas[0].inputs}
     assert "float16" in loader_inputs["precision"].as_dict()["options"]
@@ -74,6 +79,123 @@ def test_registers_all_pure_v3_nodes():
     assert loader_inputs["download_missing"].as_dict()["default"] is False
     assert loader_inputs["accept_model_license"].as_dict()["default"] is False
     assert not hasattr(plugin, "NODE_CLASS_MAPPINGS")
+
+
+def test_context_emotion_node_returns_editable_script_without_generating_audio(
+    tmp_path, monkeypatch
+):
+    _load_plugin()
+    import threading
+    from types import SimpleNamespace
+
+    from comfyui_indextts25_t8_test import nodes_v3
+    from comfyui_indextts25_t8_test.runtime.dialogue import DialogueLine
+    from comfyui_indextts25_t8_test.runtime.types import DialogueScript, ModelHandle
+
+    class FakeQwenEmotion:
+        @staticmethod
+        def inference(prompt):
+            assert str(prompt).strip()
+            return {
+                "angry": 0.9,
+                "surprised": 0.3,
+                "calm": 0.0,
+            }
+
+    class FakeCore:
+        def __init__(self):
+            self.qwen_emo = None
+
+        def ensure_qwen_emotion(self):
+            self.qwen_emo = FakeQwenEmotion()
+
+    core = FakeCore()
+    entry = SimpleNamespace(model=core, lock=threading.RLock())
+    done_calls = []
+    monkeypatch.setattr(nodes_v3.MODEL_CACHE, "acquire", lambda _handle: entry)
+    monkeypatch.setattr(
+        nodes_v3.MODEL_CACHE,
+        "done",
+        lambda handle, cache_entry, release=False: done_calls.append(
+            (handle, cache_entry, release)
+        ),
+    )
+    handle = ModelHandle(tmp_path, "cpu", False, low_vram=True)
+    script = DialogueScript(
+        [
+            DialogueLine(1, "角色A", "你为什么骗我？", "ZH"),
+            DialogueLine(
+                2,
+                "角色B",
+                "我只是想保护你。",
+                "ZH",
+                emotion_mode="text",
+                emotion_text="克制而难过",
+            ),
+        ],
+        "batch",
+    )
+
+    result = nodes_v3.T8IndexTTS25DialogueEmotionSuggest.execute(
+        handle, script, 1, False
+    )
+
+    suggested_script = result[0]
+    report = json.loads(result[1])
+    assert suggested_script.lines[0].emotion_mode == "vector"
+    assert suggested_script.lines[0].emotion_vector[1] == pytest.approx(0.6)
+    assert suggested_script.lines[1].emotion_mode == "text"
+    assert report["classified_count"] == 1
+    assert report["preserved_count"] == 1
+    assert report["started_synthesis"] is False
+    assert report["requires_user_confirmation"] is True
+    assert report["temporary_qwen_released"] is True
+    assert "尚未合成音频" in result[2]
+    assert core.qwen_emo is None
+    assert done_calls == [(handle, entry, False)]
+
+
+def test_context_emotion_node_releases_temporary_qwen_after_analysis_error(
+    tmp_path, monkeypatch
+):
+    _load_plugin()
+    import threading
+    from types import SimpleNamespace
+
+    from comfyui_indextts25_t8_test import nodes_v3
+    from comfyui_indextts25_t8_test.runtime.dialogue import DialogueLine
+    from comfyui_indextts25_t8_test.runtime.types import DialogueScript, ModelHandle
+
+    class FailingQwenEmotion:
+        @staticmethod
+        def inference(_prompt):
+            raise RuntimeError("fake classifier failure")
+
+    class FakeCore:
+        qwen_emo = None
+
+        def ensure_qwen_emotion(self):
+            self.qwen_emo = FailingQwenEmotion()
+
+    core = FakeCore()
+    entry = SimpleNamespace(model=core, lock=threading.RLock())
+    done_calls = []
+    monkeypatch.setattr(nodes_v3.MODEL_CACHE, "acquire", lambda _handle: entry)
+    monkeypatch.setattr(
+        nodes_v3.MODEL_CACHE,
+        "done",
+        lambda *_args, **_kwargs: done_calls.append(True),
+    )
+    handle = ModelHandle(tmp_path, "cpu", False, low_vram=True)
+    script = DialogueScript([DialogueLine(1, "角色A", "测试。", "ZH")])
+
+    with pytest.raises(RuntimeError, match="fake classifier failure"):
+        nodes_v3.T8IndexTTS25DialogueEmotionSuggest.execute(
+            handle, script, 1, False
+        )
+
+    assert core.qwen_emo is None
+    assert done_calls == [True]
 
 
 def test_v010_model_loader_widget_values_are_restored():

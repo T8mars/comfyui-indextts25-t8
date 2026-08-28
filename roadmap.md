@@ -1,6 +1,18 @@
 # T8star-Aix IndexTTS 2.5 路线图
 
-本路线图同时记录 ComfyUI 节点和桌面整合包的共同方向。项目只支持 **IndexTTS 2.5**。ComfyUI 基础依赖不强装 DeepSpeed、FlashAttention、Triton；桌面 v0.11.0 则内置与固定 Python/torch/CUDA ABI 匹配的可选轮子，仍不默认启用。
+本路线图同时记录 ComfyUI 节点和桌面整合包的共同方向。项目只支持 **IndexTTS 2.5**。当前公开基线为
+**ComfyUI Node 0.17.0 / Desktop 0.17.0**。
+ComfyUI 基础依赖不强装 DeepSpeed、FlashAttention、Triton；桌面整合包内置与固定 Python/torch/CUDA
+ABI 匹配的可选轮子，仍不默认启用。
+
+## v0.17.0
+
+- [x] 上下文逐句情感建议：区分前文、目标句、后文与不同角色。
+- [x] 建议八维情感向量和强度，默认保留已有人工逐句情感。
+- [x] 节点只输出可编辑台词脚本/JSON，不生成音频。
+- [x] 第 32 组 UI/API 工作流先分析与预览，确认前不连接生成节点。
+- [x] 完整测试、Comfy V3 schema 与 Registry 包校验。
+- [x] 版本提升到 0.17.0，并在推送前刷新全部 32 组 UI/API 示例。
 
 ## v0.11.0（本地实现）
 
@@ -71,7 +83,7 @@
 - [x] 当前环境与 Transformers 4.57.6 均为 53 项通过、2 项按环境跳过；V3 节点和 22 组工作流审计通过。
 - [x] 真实 IndexTTS 音频完成 Whisper tiny/base CUDA 校对，失败阈值与字幕保留原文策略符合预期。
 
-## v0.8.1（实现完成，待发布验收）
+## v0.8.1（历史版本，已发布验收）
 
 - [x] GPT 合成提示 KV Cache 根修复，长文本/多停顿块不再保护性关闭加速。
 - [x] ASR 支持 OpenAI Whisper 与可选 faster-whisper 后端。
@@ -80,7 +92,7 @@
 - [x] `asr` / `asr-fast` 两组可选依赖，普通 TTS 安装仍不需要 ASR。
 - [x] 当前环境 57 项通过、1 项按环境跳过；Transformers 4.57.6 结果相同。
 - [x] V3 schema 12 项及 22 组 UI/API 工作流复核通过。
-- [ ] Comfy Registry v0.8.1 发布复核（推送 main 后执行）。
+- [x] Comfy Registry v0.8.1 发布复核。（历史记录）
 
 ## 依赖政策
 
@@ -93,7 +105,7 @@
 ## 验收记录
 
 - [x] 公共解析、时间轴、混音和加速探测测试通过。
-- [x] V3 节点 schema 与 27 组 UI/API 工作流测试通过。
+- [x] V3 节点 schema 与 31 组已发布 UI/API 工作流测试通过；下一版第 32 组已完成本地结构校验。
 - [x] 当前基础环境：73 项测试通过。
 - [x] Transformers 4.57.6：50 项测试通过，2 项按环境条件跳过。
 - [x] IndexTTS 2.5 真实模型联合冒烟：两段生成、前导/段间停顿、目标时长和人声后处理通过。

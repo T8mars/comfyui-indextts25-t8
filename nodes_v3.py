@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import gc
 import json
 import logging
 import tempfile
@@ -13,7 +14,11 @@ from comfy_api.latest import ComfyExtension, io
 from typing_extensions import override
 
 from .project_meta import PROJECT_VERSION
-from .runtime.inference_adapter import NativeTargetDurationUnsupported, run_inference
+from .runtime.inference_adapter import (
+    NativeTargetDurationUnsupported,
+    _progress_callback,
+    run_inference,
+)
 from .runtime.audio_processing import (
     POSTPROCESS_PRESETS,
     apply_duration_policy,
@@ -30,6 +35,7 @@ from .runtime.candidates import (
     select_best_candidate,
     technical_audio_review,
 )
+from .runtime.context_emotion import suggest_context_emotions
 from .runtime.benchmark import summarize_measurements
 from .runtime.audiocpp_backend import probe as probe_audiocpp
 from .runtime.audiocpp_backend import run as run_audiocpp
@@ -1364,6 +1370,130 @@ class T8IndexTTS25DialogueScript(io.ComfyNode):
         return io.NodeOutput(
             DialogueScript(lines, script_type),
             json.dumps(payload, ensure_ascii=False, indent=2),
+        )
+
+
+class T8IndexTTS25DialogueEmotionSuggest(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="T8_IndexTTS25_DialogueEmotionSuggest",
+            display_name="IndexTTS 2.5 上下文逐句情感建议 · T8star-Aix",
+            category=CATEGORY,
+            search_aliases=[
+                "context emotion",
+                "上下文情感",
+                "逐句情感分析",
+                "SRT 情感建议",
+            ],
+            description=(
+                "使用本地 QwenEmotion 结合目标台词的前后文，为每句建议八维情感向量和强度。"
+                "节点只输出可编辑建议，不会生成音频；请先查看/修改 JSON，再连接时间轴编辑或生成节点。"
+            ),
+            inputs=[
+                ModelType.Input("model", display_name="IndexTTS 2.5 模型"),
+                DialogueScriptType.Input("dialogue_script", display_name="台词脚本"),
+                io.Int.Input(
+                    "context_window",
+                    display_name="每侧上下文台词数",
+                    default=2,
+                    min=0,
+                    max=5,
+                    step=1,
+                    tooltip="2 表示参考目标台词前 2 句和后 2 句；分析时会区分角色。",
+                ),
+                io.Boolean.Input(
+                    "overwrite_existing",
+                    display_name="覆盖已有逐句情感",
+                    default=False,
+                    tooltip="关闭时保留脚本里已有的 text:/vector: 人工设置。",
+                ),
+            ],
+            outputs=[
+                DialogueScriptType.Output(
+                    "dialogue_script", display_name="带建议的台词脚本"
+                ),
+                io.String.Output(
+                    "editable_suggestions_json", display_name="可编辑建议 JSON"
+                ),
+                io.String.Output("summary", display_name="分析摘要"),
+            ],
+        )
+
+    @classmethod
+    def execute(
+        cls,
+        model: ModelHandle,
+        dialogue_script: DialogueScript,
+        context_window: int,
+        overwrite_existing: bool,
+    ) -> io.NodeOutput:
+        if not isinstance(model, ModelHandle):
+            raise TypeError("model 输入无效，请连接本项目的 IndexTTS 2.5 模型加载节点。")
+        if not isinstance(dialogue_script, DialogueScript) or not dialogue_script.lines:
+            raise ValueError("台词脚本为空，请先连接批量台词 / SRT 节点。")
+        entry = MODEL_CACHE.acquire(model)
+        released_temporary_qwen = False
+        error: Exception | None = None
+        try:
+            with entry.lock:
+                had_qwen = getattr(entry.model, "qwen_emo", None) is not None
+                try:
+                    entry.model.ensure_qwen_emotion()
+                    if getattr(entry.model, "qwen_emo", None) is None:
+                        raise RuntimeError("QwenEmotion 加载后仍不可用。")
+                    progress = _progress_callback()
+
+                    def update_progress(position, total, line):
+                        if line is None:
+                            progress(1.0, "上下文情感分析完成，等待用户确认")
+                        else:
+                            progress(
+                                0.05 + 0.9 * position / max(1, total),
+                                f"分析第 {getattr(line, 'index', position + 1)} 条上下文情感",
+                            )
+
+                    lines, report = suggest_context_emotions(
+                        dialogue_script.lines,
+                        entry.model.qwen_emo.inference,
+                        context_window=int(context_window),
+                        overwrite_existing=bool(overwrite_existing),
+                        progress=update_progress,
+                    )
+                finally:
+                    if (
+                        model.low_vram
+                        and not had_qwen
+                        and getattr(entry.model, "qwen_emo", None) is not None
+                    ):
+                        entry.model.qwen_emo = None
+                        gc.collect()
+                        if model.device.startswith("cuda") and torch.cuda.is_available():
+                            torch.cuda.empty_cache()
+                        released_temporary_qwen = True
+        except Exception as exc:
+            error = exc
+        finally:
+            MODEL_CACHE.done(model, entry, release=model.release_after_run)
+        if error is not None:
+            raise RuntimeError(
+                "上下文情感分析失败："
+                f"{type(error).__name__}: {error}。可减少上下文句数或切换低显存/参考编码设备设置后重试。"
+            ) from error
+        report["temporary_qwen_released"] = released_temporary_qwen
+        report["instruction"] = (
+            "本节点没有生成音频。请检查 suggestions 与 lines，必要时复制 lines 到时间轴编辑节点修改；"
+            "确认后再连接多角色 / SRT 生成节点。"
+        )
+        payload = {**report, "lines": [line.to_dict() for line in lines]}
+        summary = (
+            f"已分析 {report['classified_count']} 条，保留 {report['preserved_count']} 条人工设置；"
+            "尚未合成音频，请先确认可编辑建议 JSON。"
+        )
+        return io.NodeOutput(
+            DialogueScript(lines, dialogue_script.script_type),
+            json.dumps(payload, ensure_ascii=False, indent=2),
+            summary,
         )
 
 
@@ -3131,6 +3261,7 @@ class T8IndexTTS25Extension(ComfyExtension):
             T8IndexTTS25RoleLibrary,
             T8IndexTTS25MergeVoiceEmotions,
             T8IndexTTS25DialogueScript,
+            T8IndexTTS25DialogueEmotionSuggest,
             T8IndexTTS25TimelineEditor,
             T8IndexTTS25DialogueGenerate,
             T8IndexTTS25ASRProofread,
@@ -3160,6 +3291,7 @@ __all__ = [
     "T8IndexTTS25RoleLibrary",
     "T8IndexTTS25MergeVoiceEmotions",
     "T8IndexTTS25DialogueScript",
+    "T8IndexTTS25DialogueEmotionSuggest",
     "T8IndexTTS25TimelineEditor",
     "T8IndexTTS25DialogueGenerate",
     "T8IndexTTS25ASRProofread",

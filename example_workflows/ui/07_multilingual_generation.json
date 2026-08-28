@@ -152,7 +152,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_ModelLoader",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.16.3"
+        "ver": "0.17.0"
       },
       "widgets_values": [
         "IndexTTS-2.5",
@@ -381,7 +381,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_Generate",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.16.3"
+        "ver": "0.17.0"
       },
       "widgets_values": [
         "这是中文语音生成示例。",
@@ -609,7 +609,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_Generate",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.16.3"
+        "ver": "0.17.0"
       },
       "widgets_values": [
         "This is an English speech generation example.",
@@ -837,7 +837,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_Generate",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.16.3"
+        "ver": "0.17.0"
       },
       "widgets_values": [
         "これは日本語の音声生成サンプルです。",
@@ -1065,7 +1065,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_Generate",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.16.3"
+        "ver": "0.17.0"
       },
       "widgets_values": [
         "Este es un ejemplo de generación de voz en español.",
@@ -1293,7 +1293,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_Generate",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.16.3"
+        "ver": "0.17.0"
       },
       "widgets_values": [
         "هذا مثال على توليد الكلام باللغة العربية.",

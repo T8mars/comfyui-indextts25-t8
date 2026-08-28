@@ -144,7 +144,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_AudioCppGenerate",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.16.3"
+        "ver": "0.17.0"
       },
       "widgets_values": [
         "D:\\audio.cpp\\audiocpp_cli.exe",

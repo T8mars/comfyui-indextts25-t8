@@ -21,7 +21,14 @@ Creator: **Bilibili: T8star-Aix**.
 
 This repository is locked to the IndexTTS 2.5 inference core and the official 2.5 model manifest. It will not fall back to or accidentally load IndexTTS 2.0.
 
-Current baseline: **ComfyUI Node 0.16.3 · Desktop 0.16.0 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**.
+Current baseline: **ComfyUI Node 0.17.0 · Desktop 0.17.0 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**.
+
+### v0.17.0 context-aware per-line emotion suggestions
+
+- A new Context Emotion Suggestion node uses local QwenEmotion while separating previous lines, the target line, following lines, and speaker roles.
+- Existing manual `text:` / `vector:` overrides are preserved unless `overwrite existing` is explicitly enabled.
+- The node returns a suggested dialogue script, editable JSON, and a summary. It **does not generate audio**; review it before connecting Timeline Editor or Multi-role Generation.
+- New `32_context_emotion_suggestions.json` is intentionally a two-stage example with no generation node connected.
 
 ### v0.16.3 Registry security-scan compatibility
 
@@ -153,38 +160,41 @@ Desktop and Node are separate deliverables with independent versions; Core/Model
     - `<text|pronunciation>` inside a plain batch line is preserved as text; JSON remains available for complex content
     - SRT supports `[Role] text`, `Role: text`, and `[Role|emotion=text:angry] text`, with a structured preview
     - Dynamic prompt parsing is disabled for the script input, so JSON braces are preserved when queueing
-11. `IndexTTS 2.5 Multi-role / SRT Generation · T8star-Aix`
+11. `IndexTTS 2.5 Context-aware Per-line Emotion Suggestions · T8star-Aix`
+    - Uses local QwenEmotion with surrounding dialogue while keeping speaker roles separate
+    - Preserves manual per-line emotion by default and returns editable script/JSON without generating audio
+12. `IndexTTS 2.5 Multi-role / SRT Generation · T8star-Aix`
     - Per-line inference, per-line AUDIO list, merged AUDIO, and a JSON report
     - `shift` conflict resolution or `overlay` timeline mixing; subtitle slots default to tail-safe `pad`, while `native/exact` are reserved for hard slots where trimming is acceptable
     - Optional per-line ASR retry, with every seed, score, and final selection recorded in the task report
-12. `IndexTTS 2.5 Voice Post-processing · T8star-Aix`
+13. `IndexTTS 2.5 Voice Post-processing · T8star-Aix`
     - Processes any ComfyUI AUDIO independently, with wet/dry strength and target peak, without FFmpeg
-13. `IndexTTS 2.5 Environment and Optional Acceleration · T8star-Aix`
+14. `IndexTTS 2.5 Environment and Optional Acceleration · T8star-Aix`
     - Checks native BF16, FP16, VRAM, the CUDA toolchain, Triton, FlashAttention, and DeepSpeed without loading the model
     - Reports installed torch/CUDA Runtime/FlashAttention/Triton/DeepSpeed/Ninja versions, then recommends precision, reference placement, and a safe mode
     - Never installs optional dependencies and keeps preflight availability distinct from the mode that actually initializes after startup
-14. `IndexTTS 2.5 Timeline Editor · T8star-Aix`
+15. `IndexTTS 2.5 Timeline Editor · T8star-Aix`
     - Accepts a batch/SRT script and editable JSON to change per-line start, end, role, language, duration factor, and emotion override
     - Outputs a strictly validated script, structured JSON, and a standard `IMAGE` timeline preview
-15. `IndexTTS 2.5 ASR Proofreading · T8star-Aix`
+16. `IndexTTS 2.5 ASR Proofreading · T8star-Aix`
     - Uses optional local OpenAI Whisper or faster-whisper to transcribe AUDIO and compare it with target text
     - Reports normalized CER/WER, differences, word timestamps, threshold result, waveform alignment image, and complete JSON
-16. `IndexTTS 2.5 Subtitle Rewrite · T8star-Aix`
+17. `IndexTTS 2.5 Subtitle Rewrite · T8star-Aix`
     - Preserves original SRT timing or uses the generated audio timeline
     - Writes original text, all ASR results, or only results that pass proofreading
-17. `IndexTTS 2.5 Reference Audio Quality · T8star-Aix`
+18. `IndexTTS 2.5 Reference Audio Quality · T8star-Aix`
     - Measures duration, leading/trailing silence, silence ratio, loudness, clipping, estimated SNR, and DC offset
     - Can trim silence and select the highest-energy section of an overlong reference without overwriting the source
-18. `IndexTTS 2.5 Memory Control · T8star-Aix`
+19. `IndexTTS 2.5 Memory Control · T8star-Aix`
     - Reports IndexTTS/ASR caches and CUDA memory; Release All also clears this extension's Whisper cache
     - Never invokes ComfyUI-wide cleanup or unloads another node's models
-19. `IndexTTS 2.5 audio.cpp Experimental Generation · T8star-Aix`
+20. `IndexTTS 2.5 audio.cpp Experimental Generation · T8star-Aix`
     - Isolated optional `audiocpp_cli` + IndexTTS2.5 GGUF route with CUDA/CPU/Vulkan/HIP/Metal, five languages, speed, and emotion controls
     - Does not replace Python inference; the CLI and roughly 3.5 GB Q8 GGUF are separate downloads
-20. `IndexTTS 2.5 Runtime Benchmark · T8star-Aix`
+21. `IndexTTS 2.5 Runtime Benchmark · T8star-Aix`
     - Warms up and measures the Model Loader mode that actually initialized, returning median/best RTF and CUDA peak VRAM
     - Keeps text, reference audio, and seed fixed; change the loader acceleration mode and rerun for a fair comparison
-21. `IndexTTS 2.5 Update Check · T8star-Aix`
+22. `IndexTTS 2.5 Update Check · T8star-Aix`
     - Manually checks the official main branch, official Hugging Face model, and node version
     - Returns JSON and a summary only; never downloads models, modifies the node, or runs automatically
 
@@ -384,6 +394,11 @@ Each line inherits the emotion stored for its assigned role unless that line sup
 from line to line. Here, “merge” means collecting role configurations. To mix “60% sadness + 40% anger”
 into one eight-dimensional emotion, set both dimensions in one vector.
 
+For contextual suggestions, connect Model Loader and Batch Dialogue / SRT to Context Emotion Suggestions. The default
+window reads two lines on each side while the prompt keeps roles separate. The first run only returns a suggested
+script and JSON; review the vector and `strength`, then connect the script through Timeline Editor to Multi-role
+Generation. See `32_context_emotion_suggestions.json` for the intentionally non-generating first stage.
+
 Batch text uses one line per utterance. Language, duration factor, and per-line emotion are optional:
 
 ```text
@@ -567,7 +582,7 @@ Bilibili|B IY1 . L IY1 . B IY1 . L IY1|EN
 
 The dictionary is embedded in workflow JSON and travels with the workflow. Existing manual annotations always win; dictionary replacements use longest match first and never rewrite inside `<text|pronunciation>`. Strict validation is enabled by default and fails before queueing. When disabled, invalid entries remain unchanged and are recorded in the report. This node requires no additional G2P model and never mutates the cached model's global glossary.
 
-See `example_workflows/README.md` for 31 ready-to-open UI workflows and 31 API prompts covering basic cloning, speed comparison, emotion reference audio, eight-dimensional emotion, text emotion, random-sampling long text, five-language generation, Chinese polyphonic characters, English CMU phonemes, Japanese Kana, multi-role dialogue, JSON batch lines, SRT, acceleration diagnostics, segmentation preview, explicit pauses, native target duration, advanced CFM parameters, audio post-processing, ASR proofreading, timeline editing, subtitle rewriting, independent per-role emotions, reference-audio quality, retained candidate selection, model recycling, the experimental audio.cpp backend, low-VRAM FP16, runtime benchmarking, manual update checks, and per-line emotion overrides. Upload `voice_reference.wav` and, for emotion-audio examples, `emotion_reference.wav` to ComfyUI input first.
+See `example_workflows/README.md` for 32 ready-to-open UI workflows and 32 API prompts, including the non-generating context-emotion review flow. Upload `voice_reference.wav` and, for emotion-audio examples, `emotion_reference.wav` to ComfyUI input first.
 
 ### Optional audio.cpp experimental backend
 

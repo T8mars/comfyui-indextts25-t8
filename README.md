@@ -21,7 +21,14 @@ IndexTTS 2.5 的 ComfyUI V3 原生节点集成。节点菜单位于：
 
 本目录固定使用 IndexTTS 2.5 推理核心和正式 2.5 模型清单，不会回退或误载 IndexTTS 2.0。
 
-当前版本基线：**ComfyUI Node 0.16.3 · Desktop 0.16.0 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**。
+当前版本基线：**ComfyUI Node 0.17.0 · Desktop 0.17.0 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**。
+
+### v0.17.0 上下文逐句情感建议
+
+- 新增“上下文逐句情感建议”节点：本地 QwenEmotion 会区分前文、目标台词、后文和角色，为每句建议八维情感向量与强度。
+- 默认保留脚本已有的 `text:` / `vector:` 人工设置；只有主动开启“覆盖已有逐句情感”才会替换。
+- 节点只输出带建议的台词脚本、可编辑 JSON 和摘要，**不会生成音频**。用户检查后再接时间轴或多角色生成节点。
+- 新增 `32_context_emotion_suggestions.json` 两阶段示例，工作流故意不连接生成节点，避免未经确认直接合成。
 
 ### v0.16.3 Registry 安全扫描兼容
 
@@ -152,38 +159,41 @@ Desktop 与 Node 是两个独立发行物，因此各自使用独立版本号；
    - 普通批量台词中的 `<文字|读音>` 会作为正文保留；复杂正文也可使用 JSON 格式
    - SRT 支持 `[角色] 台词`、`角色：台词` 和 `[角色|emotion=text:生气] 台词`，输出结构化预览
    - 台词输入关闭 ComfyUI 动态提示词解析，JSON 大括号不会在排队时被改写
-11. `IndexTTS 2.5 多角色 / SRT 生成 · T8star-Aix`
+11. `IndexTTS 2.5 上下文逐句情感建议 · T8star-Aix`
+   - 使用本地 QwenEmotion 结合每句前后文建议八维情感向量和强度，并明确区分不同角色
+   - 默认保留人工逐句情感，只输出可编辑脚本/JSON；不会生成音频
+12. `IndexTTS 2.5 多角色 / SRT 生成 · T8star-Aix`
    - 逐句推理、逐句 AUDIO 列表、合并 AUDIO 和 JSON 报告
    - `shift` 顺延或 `overlay` 时间轴混音；字幕槽位默认使用不丢字的 `pad`，`native/exact` 仅用于允许裁剪的硬槽位
    - 可逐句 ASR 校对并在低于阈值时自动重试，任务报告记录每次 seed、相似度和最终选择
-12. `IndexTTS 2.5 人声后处理 · T8star-Aix`
+13. `IndexTTS 2.5 人声后处理 · T8star-Aix`
    - 独立处理任意 ComfyUI AUDIO，支持强度混合和目标峰值，不依赖 FFmpeg
-13. `IndexTTS 2.5 环境与可选加速 · T8star-Aix`
+14. `IndexTTS 2.5 环境与可选加速 · T8star-Aix`
    - 不加载模型即可检查原生 BF16、FP16、显存、CUDA 工具链、Triton、FlashAttention、DeepSpeed
    - 输出 torch/CUDA Runtime/FlashAttention/Triton/DeepSpeed/Ninja 实际版本、推荐精度、参考编码器位置和安全加速模式
    - 只报告能力，不安装任何附加依赖；“可用”与模型启动后的“实际生效”分开说明
-14. `IndexTTS 2.5 时间轴编辑 · T8star-Aix`
+15. `IndexTTS 2.5 时间轴编辑 · T8star-Aix`
    - 接收批量/SRT 脚本和可编辑 JSON，按毫秒修改逐句开始、结束、角色、语言、时长系数与情感覆盖
    - 输出严格校验后的脚本、结构化 JSON 和标准 `IMAGE` 彩色轨道预览
-15. `IndexTTS 2.5 ASR 自动校对 · T8star-Aix`
+16. `IndexTTS 2.5 ASR 自动校对 · T8star-Aix`
    - 使用可选的本地 OpenAI Whisper 或 faster-whisper 对 AUDIO 识别并与目标文本比较
    - 输出简繁/数字归一化后的 CER/WER、差异明细、词级时间戳、阈值判定、波形对齐图和完整 JSON 报告
-16. `IndexTTS 2.5 字幕自动回写 · T8star-Aix`
+17. `IndexTTS 2.5 字幕自动回写 · T8star-Aix`
    - 可保留原 SRT 时间或使用生成音频真实时间轴
    - 可写回原文、全部 ASR 识别结果或仅校对通过的识别结果
-17. `IndexTTS 2.5 参考音频质量检测 · T8star-Aix`
+18. `IndexTTS 2.5 参考音频质量检测 · T8star-Aix`
    - 检测时长、首尾静音、静音占比、响度、削波、估算信噪比和直流偏移
    - 可在不覆盖原音频的前提下自动裁剪静音，并从超长音频中选取能量最集中的片段
-18. `IndexTTS 2.5 显存管理 · T8star-Aix`
+19. `IndexTTS 2.5 显存管理 · T8star-Aix`
    - 查看本扩展 IndexTTS/ASR 模型缓存与 CUDA 显存状态；“全部释放”同时清理 Whisper 缓存
    - 不调用 ComfyUI 全局清理，不会卸载其他节点正在使用的模型
-19. `IndexTTS 2.5 audio.cpp 实验生成 · T8star-Aix`
+20. `IndexTTS 2.5 audio.cpp 实验生成 · T8star-Aix`
    - 隔离调用可选 `audiocpp_cli` 与 IndexTTS2.5 GGUF，支持 CUDA/CPU/Vulkan/HIP/Metal、五语种、语速与情感控制
    - 不替换默认 Python 推理；CLI 和约 3.5GB 的 Q8 GGUF 均需用户另行下载
-20. `IndexTTS 2.5 真实性能基准 · T8star-Aix`
+21. `IndexTTS 2.5 真实性能基准 · T8star-Aix`
    - 对模型加载器实际生效的模式做预热和 1–5 次正式测量，报告中位/最佳 RTF 与 CUDA 峰值显存
    - 使用相同文本、参考音频和 seed；切换加载器加速模式后重跑即可公平对比
-21. `IndexTTS 2.5 检查更新 · T8star-Aix`
+22. `IndexTTS 2.5 检查更新 · T8star-Aix`
    - 手动联网检查官方主分支、官方 Hugging Face 模型和节点版本
    - 只返回 JSON 与摘要，不下载模型、不修改节点、不自动执行
 
@@ -438,6 +448,11 @@ CAMPPlus 和 BigVGAN 辅助模型。直接下载官方 `IndexTeam/IndexTTS-2.5` 
 强制跟随音色参考；`text` 使用情感描述；`vector` 使用八维向量。完整工作流见
 `31_per_line_emotion.json`。
 
+需要根据剧情前后文自动得到逐句建议时，使用“上下文逐句情感建议”节点：模型与“批量台词 / SRT”
+都连接到该节点，默认上下文窗口为前后各 2 句。第一次运行只得到带建议的台词脚本和 JSON，不会生成
+音频；检查八维向量和 `strength` 后，再将脚本连接到时间轴编辑与多角色生成。完整的安全两阶段连接见
+`32_context_emotion_suggestions.json`。
+
 JSON 可直接粘贴或随示例工作流载入。v0.5.1 起该输入明确关闭 ComfyUI 的动态提示词解析；
 旧版把 JSON 大括号误当作动态提示词，可能在排队时出现 `Expecting ',' delimiter`。
 
@@ -606,7 +621,7 @@ Bilibili|B IY1 . L IY1 . B IY1 . L IY1|EN
 不会改写 `<文字|读音>` 内部。严格校验默认开启，错误会在排队前给出；关闭后无效词条保持原文并
 写入报告。该节点不依赖额外 G2P 模型，也不会修改已缓存模型的全局 glossary。
 
-完整示例见 `example_workflows/README.md`，包含 31 组可直接打开的 UI 工作流和 31 组 API prompt：
+完整示例见 `example_workflows/README.md`，包含 32 组可直接打开的 UI 工作流和 32 组 API prompt：
 基础克隆、语速对比、情感参考音频、八维情感、文本情感、随机采样长文本、五语种生成，以及中文
 多音字、英文 CMU 音素、日语假名发音控制、多角色、JSON 批量台词、SRT、可选加速诊断、自动分段
 预览、显式停顿、原生目标秒数、CFM 高级参数、独立音频后处理、ASR 自动校对、时间轴编辑、字幕

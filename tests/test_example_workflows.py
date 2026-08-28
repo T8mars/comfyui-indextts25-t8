@@ -44,6 +44,7 @@ EXAMPLES = (
     "29_runtime_benchmark",
     "30_update_check",
     "31_per_line_emotion",
+    "32_context_emotion_suggestions",
 )
 
 
@@ -70,6 +71,7 @@ def test_all_ui_and_api_examples_are_present_and_valid():
             "T8_IndexTTS25_AudioCppGenerate",
             "T8_IndexTTS25_RuntimeBenchmark",
             "T8_IndexTTS25_UpdateCheck",
+            "T8_IndexTTS25_DialogueEmotionSuggest",
         }
         assert any(node["type"] in generation_types for node in workflow["nodes"])
         assert any(node["class_type"] in generation_types for node in prompt.values())
@@ -222,6 +224,7 @@ def test_api_prompts_expand_with_the_current_comfyui_v3_schema():
         "T8_IndexTTS25_RoleLibrary": nodes_module.T8IndexTTS25RoleLibrary,
         "T8_IndexTTS25_MergeVoiceEmotions": nodes_module.T8IndexTTS25MergeVoiceEmotions,
         "T8_IndexTTS25_DialogueScript": nodes_module.T8IndexTTS25DialogueScript,
+        "T8_IndexTTS25_DialogueEmotionSuggest": nodes_module.T8IndexTTS25DialogueEmotionSuggest,
         "T8_IndexTTS25_TimelineEditor": nodes_module.T8IndexTTS25TimelineEditor,
         "T8_IndexTTS25_DialogueGenerate": nodes_module.T8IndexTTS25DialogueGenerate,
         "T8_IndexTTS25_ASRProofread": nodes_module.T8IndexTTS25ASRProofread,
@@ -366,3 +369,15 @@ def test_examples_cover_multi_role_batch_srt_and_optional_acceleration():
         if node["class_type"] == "T8_IndexTTS25_VoiceProfile"
     ]
     assert voice_emotion_links == [["4", 0], ["5", 0]]
+    context_suggestion = prompts["32_context_emotion_suggestions"]
+    suggestion_inputs = next(
+        node["inputs"]
+        for node in context_suggestion.values()
+        if node["class_type"] == "T8_IndexTTS25_DialogueEmotionSuggest"
+    )
+    assert suggestion_inputs["context_window"] == 2
+    assert suggestion_inputs["overwrite_existing"] is False
+    assert not any(
+        node["class_type"] == "T8_IndexTTS25_DialogueGenerate"
+        for node in context_suggestion.values()
+    )

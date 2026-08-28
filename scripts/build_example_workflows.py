@@ -27,6 +27,7 @@ VOICE_NODE = "T8_IndexTTS25_VoiceProfile"
 ROLE_LIBRARY_NODE = "T8_IndexTTS25_RoleLibrary"
 MERGE_EMOTIONS_NODE = "T8_IndexTTS25_MergeVoiceEmotions"
 DIALOGUE_SCRIPT_NODE = "T8_IndexTTS25_DialogueScript"
+DIALOGUE_EMOTION_SUGGEST_NODE = "T8_IndexTTS25_DialogueEmotionSuggest"
 TIMELINE_EDITOR_NODE = "T8_IndexTTS25_TimelineEditor"
 DIALOGUE_GENERATE_NODE = "T8_IndexTTS25_DialogueGenerate"
 ASR_PROOFREAD_NODE = "T8_IndexTTS25_ASRProofread"
@@ -687,6 +688,29 @@ def add_dialogue_script(
     )
 
 
+def add_dialogue_emotion_suggest(
+    workflow: Workflow, pos=(1200, 520), *, context_window=2, overwrite_existing=False
+) -> int:
+    return workflow.add(
+        DIALOGUE_EMOTION_SUGGEST_NODE,
+        pos,
+        (500, 280),
+        [
+            slot_input("model", "T8_INDEXTTS25_MODEL"),
+            slot_input("dialogue_script", "T8_INDEXTTS25_DIALOGUE_SCRIPT"),
+            widget_input("context_window", "INT"),
+            widget_input("overwrite_existing", "BOOLEAN"),
+        ],
+        [
+            output("dialogue_script", "T8_INDEXTTS25_DIALOGUE_SCRIPT"),
+            output("editable_suggestions_json", "STRING"),
+            output("summary", "STRING"),
+        ],
+        [context_window, overwrite_existing],
+        title="先分析上下文；不会生成音频",
+    )
+
+
 def add_dialogue_generate(
     workflow: Workflow, pos=(1220, 240), *, policy="shift", fit=False
 ) -> int:
@@ -1101,6 +1125,24 @@ def api_dialogue_script(
             "script": script,
             "default_role": default_role,
             "default_language": "ZH",
+        },
+    }
+
+
+def api_dialogue_emotion_suggest(
+    model_id: str,
+    script_id: str,
+    *,
+    context_window: int = 2,
+    overwrite_existing: bool = False,
+) -> dict[str, Any]:
+    return {
+        "class_type": DIALOGUE_EMOTION_SUGGEST_NODE,
+        "inputs": {
+            "model": [model_id, 0],
+            "dialogue_script": [script_id, 0],
+            "context_window": context_window,
+            "overwrite_existing": overwrite_existing,
         },
     }
 
@@ -1647,6 +1689,38 @@ def per_line_emotion_pair() -> tuple[dict[str, Any], dict[str, Any]]:
     return _dialogue_pair("31 同一角色逐句情感覆盖", "batch", script)
 
 
+def context_emotion_suggestion_pair() -> tuple[dict[str, Any], dict[str, Any]]:
+    script = (
+        "角色A|我以为你不会来了。|ZH|1.0\n"
+        "角色B|路上出了点意外，但我一直在赶回来。|ZH|1.0\n"
+        "角色A|你每次都这样说，我已经不相信了！|ZH|1.0\n"
+        "角色B|对不起。这次我会留下来把事情说清楚。|ZH|1.0"
+    )
+    workflow = Workflow("32 上下文逐句情感建议（确认后再生成）")
+    model = add_model(workflow, pos=(0, 0))
+    script_node = add_dialogue_script(
+        workflow, "batch", script, "角色A", pos=(430, 20)
+    )
+    suggest = add_dialogue_emotion_suggest(
+        workflow, pos=(1020, 20), context_window=2, overwrite_existing=False
+    )
+    editor = add_timeline_editor(workflow, "", pos=(1580, 20))
+    preview = add_preview_image(
+        workflow, pos=(2160, 20), title="检查建议后再连接生成节点"
+    )
+    workflow.connect(model, "model", suggest, "model")
+    workflow.connect(script_node, "dialogue_script", suggest, "dialogue_script")
+    workflow.connect(suggest, "dialogue_script", editor, "dialogue_script")
+    workflow.connect(editor, "timeline_image", preview, "images")
+    api = {
+        "1": api_model(),
+        "2": api_dialogue_script("batch", script, "角色A"),
+        "3": api_dialogue_emotion_suggest("1", "2"),
+        "4": api_timeline_editor("3"),
+    }
+    return workflow.as_dict(), api
+
+
 def acceleration_pair() -> tuple[dict[str, Any], dict[str, Any]]:
     workflow = Workflow("14 可选加速与环境诊断")
     model = add_model(workflow)
@@ -2176,6 +2250,7 @@ EXAMPLES = {
     "29_runtime_benchmark": runtime_benchmark_pair,
     "30_update_check": update_check_pair,
     "31_per_line_emotion": per_line_emotion_pair,
+    "32_context_emotion_suggestions": context_emotion_suggestion_pair,
 }
 
 
