@@ -4,6 +4,7 @@ from subprocess import CalledProcessError
 import json
 import math
 import re
+import sys
 import time
 import librosa
 import torch
@@ -41,6 +42,13 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from transformers import SeamlessM4TFeatureExtractor, Wav2Vec2BertModel
 import random
 import torch.nn.functional as F
+
+
+def _console_text(value) -> str:
+    """Make user text safe for legacy Windows GBK consoles without changing inference."""
+
+    encoding = getattr(sys.stdout, "encoding", None) or "utf-8"
+    return str(value).encode(encoding, errors="backslashreplace").decode(encoding)
 
 
 def _select_deepspeed_dtype(
@@ -839,7 +847,7 @@ class IndexTTS2:
         if self.low_vram and not stream_return and len(text) > 40:
             segments = self.split_text_by_punctuation(text, max_chars=40)
             if verbose:
-                print(f">> Low-VRAM: split into {len(segments)} segments: {segments}")
+                print(_console_text(f">> Low-VRAM: split into {len(segments)} segments: {segments}"))
             sampling_rate = 22050
             hop_length = int(self.cfg.s2mel.preprocess_params.spect_params.hop_length)
             target_segment_frames, target_samples = allocate_target_frames(
@@ -1014,12 +1022,12 @@ class IndexTTS2:
             if torch.cuda.is_available():
                 torch.cuda.manual_seed_all(seed)
         if verbose:
-            print(
+            print(_console_text(
                 f"origin text:{text}, spk_audio_prompt:{spk_audio_prompt}, "
                 f"emo_audio_prompt:{emo_audio_prompt}, emo_alpha:{emo_alpha}, "
                 f"emo_vector:{emo_vector}, use_emo_text:{use_emo_text}, "
                 f"emo_text:{emo_text}"
-            )
+            ))
         start_time = time.perf_counter()
 
         reuse_spk_cond = self._should_reuse_spk_cond_for_emo(
@@ -1043,7 +1051,7 @@ class IndexTTS2:
             if emo_text is None:
                 emo_text = text  # use main text prompt
             emo_dict = self.qwen_emo.inference(emo_text)
-            print(f"detected emotion vectors from text: {emo_dict}")
+            print(_console_text(f"detected emotion vectors from text: {emo_dict}"))
             # convert ordered dict to list of vectors; the order is VERY important!
             emo_vector = list(emo_dict.values())
 
@@ -1106,7 +1114,7 @@ class IndexTTS2:
                 text = self.text_process.normalize(text)
             elif lang.lower() in ["ja", "es"]:
                 text = nemo_text_normalize(text, lang.lower())
-            print(f"text after normalization: {text}")
+            print(_console_text(f"text after normalization: {text}"))
 
         if lang.lower() in ["ja", "zh", "zhen", "en"]:
             text = text.lower()
@@ -1136,7 +1144,7 @@ class IndexTTS2:
         if verbose:
             print("segments count:", segments_count)
             print("max_text_tokens_per_segment:", max_text_tokens_per_segment)
-            print(*segments, sep="\n")
+            print(*(_console_text(segment) for segment in segments), sep="\n")
         do_sample = generation_kwargs.pop("do_sample", True)
         top_p = generation_kwargs.pop("top_p", 0.8)
         top_k = generation_kwargs.pop("top_k", 30)

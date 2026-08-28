@@ -21,7 +21,14 @@ IndexTTS 2.5 的 ComfyUI V3 原生节点集成。节点菜单位于：
 
 本目录固定使用 IndexTTS 2.5 推理核心和正式 2.5 模型清单，不会回退或误载 IndexTTS 2.0。
 
-当前版本基线：**ComfyUI Node 0.17.0 · Desktop 0.17.0 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**。
+当前版本基线：**ComfyUI Node 0.18.0 · Desktop 0.18.0 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**。
+
+### v0.18.0 长文本/SRT 稳定性与参考缓存管理
+
+- 长英文、西班牙语和长 SRT 台词会检测 `max_mel_tokens` 警告与异常输出时长；可疑语音块只自动缩短分段并重试一次，生成报告会记录原因和结果。
+- 修复 Windows GBK 控制台输出西语字符时可能触发的 `UnicodeEncodeError`；真实 IndexTTS 2.5 长英文/西语 WAV 已回归通过。
+- “模型、显存与参考缓存管理”新增 `reference_cache_status` 与 `clear_reference_cache`。报告包含条目、字节数、命中/未命中和命中率；清理只删除本节点自己的 `safetensors`，不删除模型和参考音频。
+- 示例 06 改为真实长英文保护用法；示例 13 增加长西语 SRT；示例 26 展示参考缓存状态。
 
 ### v0.17.0 上下文逐句情感建议
 

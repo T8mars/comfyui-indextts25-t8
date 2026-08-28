@@ -13,6 +13,7 @@ import torchaudio
 from comfy_api.latest import ComfyExtension, io
 from typing_extensions import override
 
+from .indextts.utils.reference_condition_cache import ReferenceConditionCache
 from .project_meta import PROJECT_VERSION
 from .runtime.inference_adapter import (
     NativeTargetDurationUnsupported,
@@ -2360,19 +2361,37 @@ class T8IndexTTS25MemoryControl(io.ComfyNode):
     def define_schema(cls) -> io.Schema:
         return io.Schema(
             node_id="T8_IndexTTS25_MemoryControl",
-            display_name="IndexTTS 2.5 显存管理 · T8star-Aix",
+            display_name="IndexTTS 2.5 模型、显存与参考缓存管理 · T8star-Aix",
             category=CATEGORY,
-            search_aliases=["释放显存", "VRAM", "model cache", "memory watchdog"],
+            search_aliases=[
+                "释放显存",
+                "VRAM",
+                "model cache",
+                "memory watchdog",
+                "reference cache",
+                "参考条件缓存",
+            ],
             description=(
-                "只管理本扩展加载的 IndexTTS 2.5 与可选 ASR 模型；可查看状态、释放空闲模型或全部释放，"
-                "不会清空 ComfyUI 的其他模型。"
+                "只管理本扩展加载的 IndexTTS 2.5、可选 ASR 模型和音色/情感参考条件缓存；"
+                "可查看条目、容量和命中统计，或安全清理本节点自己的 safetensors 缓存，"
+                "不会清空 ComfyUI 的其他模型或用户参考音频。"
             ),
             inputs=[
                 io.Combo.Input(
                     "action",
                     display_name="操作",
-                    options=["status", "release_idle", "release_all"],
+                    options=[
+                        "status",
+                        "reference_cache_status",
+                        "clear_reference_cache",
+                        "release_idle",
+                        "release_all",
+                    ],
                     default="status",
+                    tooltip=(
+                        "reference_cache_status 查看音色/情感参考编码缓存；"
+                        "clear_reference_cache 只删除本节点自己的 safetensors 缓存。"
+                    ),
                 ),
                 io.Float.Input(
                     "idle_seconds",
@@ -2394,13 +2413,24 @@ class T8IndexTTS25MemoryControl(io.ComfyNode):
     def execute(cls, action: str, idle_seconds: float) -> io.NodeOutput:
         before = MODEL_CACHE.status()
         asr_before = asr_cache_status()
+        disk_cache = ReferenceConditionCache(_reference_condition_cache_root())
+        reference_before = {
+            "disk": disk_cache.status(),
+            "live": MODEL_CACHE.reference_cache_status(),
+        }
         released_asr = 0
+        cleared_reference_entries = 0
         if action == "release_all":
             released = MODEL_CACHE.clear()
             released_asr = clear_asr_cache()
         elif action == "release_idle":
             released = MODEL_CACHE.evict_idle(float(idle_seconds))
-        elif action == "status":
+        elif action == "clear_reference_cache":
+            cleared_reference_entries = MODEL_CACHE.clear_reference_caches()
+            if cleared_reference_entries == 0:
+                cleared_reference_entries = disk_cache.clear()
+            released = 0
+        elif action in {"status", "reference_cache_status"}:
             released = 0
         else:
             raise ValueError(f"未知显存管理操作：{action}")
@@ -2410,10 +2440,16 @@ class T8IndexTTS25MemoryControl(io.ComfyNode):
                     "action": action,
                     "released_models": released,
                     "released_asr_models": released_asr,
+                    "cleared_reference_entries": cleared_reference_entries,
                     "before": before,
                     "after": MODEL_CACHE.status(),
                     "asr_before": asr_before,
                     "asr_after": asr_cache_status(),
+                    "reference_cache_before": reference_before,
+                    "reference_cache_after": {
+                        "disk": disk_cache.status(),
+                        "live": MODEL_CACHE.reference_cache_status(),
+                    },
                 },
                 ensure_ascii=False,
                 indent=2,

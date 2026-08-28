@@ -303,6 +303,20 @@ def test_examples_cover_multi_role_batch_srt_and_optional_acceleration():
         and node["inputs"]["fit_srt_slots"]
         for node in prompts["13_srt_multi_role"].values()
     )
+    srt_script = next(
+        node["inputs"]
+        for node in prompts["13_srt_multi_role"].values()
+        if node["class_type"] == "T8_IndexTTS25_DialogueScript"
+    )
+    assert srt_script["default_language"] == "ES"
+    assert len(srt_script["script"].split()) >= 30
+    long_english = next(
+        node["inputs"]
+        for node in prompts["06_random_sampling_long_text"].values()
+        if node["class_type"] == "T8_IndexTTS25_Generate"
+    )
+    assert long_english["language"] == "EN"
+    assert len(long_english["text"].split()) >= 60
     assert any(
         node["class_type"] == "T8_IndexTTS25_ModelLoader"
         and node["inputs"]["acceleration_mode"] == "auto_safe"
@@ -336,6 +350,11 @@ def test_examples_cover_multi_role_batch_srt_and_optional_acceleration():
     assert any(
         node["class_type"] == "T8_IndexTTS25_ModelLoader"
         and node["inputs"]["recycle_after_runs"] == 20
+        for node in prompts["26_memory_control"].values()
+    )
+    assert any(
+        node["class_type"] == "T8_IndexTTS25_MemoryControl"
+        and node["inputs"]["action"] == "reference_cache_status"
         for node in prompts["26_memory_control"].values()
     )
     assert any(

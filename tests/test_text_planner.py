@@ -79,3 +79,50 @@ def test_decimal_punctuation_does_not_create_false_pause_boundaries():
     assert len(chunks) == 1
     assert chunks[0].text == "Version 3.14 costs 1,000.50 dollars."
     assert chunks[0].pause_after_ms == 300
+
+
+def test_long_latin_guard_retries_collapsed_decode_with_smaller_limit():
+    calls = []
+
+    def generate(limit):
+        import warnings
+
+        calls.append(limit)
+        if len(calls) == 1:
+            warnings.warn(
+                "generation stopped due to exceeding max_mel_tokens",
+                RuntimeWarning,
+            )
+            return {"seconds": 0.9}
+        return {"seconds": 16.0}
+
+    result, report = text_planner.run_with_long_text_guard(
+        generate,
+        lambda value: value["seconds"],
+        text=(
+            "This long English regression paragraph verifies that incomplete output "
+            "is automatically retried with a smaller token budget before the audio "
+            "is returned to a ComfyUI workflow or a subtitle generation pipeline."
+        ),
+        language="EN",
+        token_count=54,
+        max_tokens=60,
+    )
+    assert result["seconds"] == 16.0
+    assert calls == [60, 40]
+    assert report["retried"] is True
+    assert report["recovered"] is True
+
+
+def test_long_latin_duration_check_is_skipped_for_native_target_but_not_max_mel():
+    result, report = text_planner.run_with_long_text_guard(
+        lambda limit: {"seconds": 0.5},
+        lambda value: value["seconds"],
+        text=" ".join(["palabras largas para una prueba estable"] * 8),
+        language="ES",
+        token_count=48,
+        max_tokens=60,
+        check_duration=False,
+    )
+    assert result["seconds"] == 0.5
+    assert report["retried"] is False

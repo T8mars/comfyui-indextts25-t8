@@ -8,8 +8,10 @@ from __future__ import annotations
 
 import json
 import re
+import warnings
 from dataclasses import asdict, dataclass
 from functools import lru_cache
+from math import isfinite
 from pathlib import Path
 from typing import Any, Callable
 
@@ -21,6 +23,8 @@ LANGUAGE_AUTO_LIMITS = {
     "ES": 60,
     "AR": 80,
 }
+LATIN_LONG_TEXT_LANGUAGES = frozenset({"EN", "ES"})
+LONG_TEXT_RETRY_MIN_TOKENS = 24
 
 PAUSE_PRESETS = {
     "off": (0, 0, 0),
@@ -92,6 +96,112 @@ class GenerationPlan:
 
     def to_json(self) -> str:
         return json.dumps(self.to_dict(), ensure_ascii=False, indent=2)
+
+
+def latin_word_count(text: str) -> int:
+    return len(re.findall(r"[^\W_]+(?:['’\-][^\W_]+)*", str(text or ""), re.UNICODE))
+
+
+def long_text_retry_limit(language: str, current_limit: int) -> int:
+    current = max(1, int(current_limit))
+    if str(language).strip().upper() not in LATIN_LONG_TEXT_LANGUAGES:
+        return current
+    return max(
+        LONG_TEXT_RETRY_MIN_TOKENS,
+        min(current - 1, int(round(current * 2 / 3))),
+    )
+
+
+def assess_long_text_result(
+    text: str,
+    language: str,
+    token_count: int,
+    duration_seconds: float,
+    duration_factor: float = 1.0,
+    warning_messages: tuple[str, ...] | list[str] = (),
+) -> list[str]:
+    normalized = str(language).strip().upper()
+    if normalized not in LATIN_LONG_TEXT_LANGUAGES or int(token_count) < 32:
+        return []
+    reasons: list[str] = []
+    lowered_warnings = "\n".join(str(item).lower() for item in warning_messages)
+    if "max_mel_tokens" in lowered_warnings and (
+        "exceed" in lowered_warnings or "stopped" in lowered_warnings
+    ):
+        reasons.append("max_mel_tokens_reached")
+    seconds = float(duration_seconds)
+    if not isfinite(seconds) or seconds <= 0:
+        reasons.append("invalid_audio_duration")
+        return reasons
+    words = latin_word_count(text)
+    if words < 24:
+        return reasons
+    factor = max(0.5, min(2.0, float(duration_factor)))
+    minimum_seconds = max(1.5, words * factor / 7.5)
+    maximum_seconds = max(20.0, words * factor / 0.65 + 6.0)
+    if seconds < minimum_seconds:
+        reasons.append("suspiciously_short_for_latin_text")
+    elif seconds > maximum_seconds:
+        reasons.append("suspiciously_long_for_latin_text")
+    return reasons
+
+
+def run_with_long_text_guard(
+    generate,
+    duration_reader,
+    *,
+    text: str,
+    language: str,
+    token_count: int,
+    max_tokens: int,
+    duration_factor: float = 1.0,
+    check_duration: bool = True,
+):
+    def invoke(limit: int):
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always", RuntimeWarning)
+            result = generate(int(limit))
+        messages = tuple(str(item.message) for item in caught)
+        duration = float(duration_reader(result))
+        reasons = assess_long_text_result(
+            text,
+            language,
+            token_count,
+            duration if check_duration else max(duration, 10_000.0),
+            duration_factor,
+            messages,
+        )
+        if not check_duration:
+            reasons = [item for item in reasons if item == "max_mel_tokens_reached"]
+        return result, duration, messages, reasons
+
+    requested_limit = int(max_tokens)
+    first, first_duration, first_warnings, first_reasons = invoke(requested_limit)
+    retry_limit = long_text_retry_limit(language, requested_limit)
+    report = {
+        "enabled": (
+            str(language).strip().upper() in LATIN_LONG_TEXT_LANGUAGES
+            and int(token_count) >= 32
+        ),
+        "requested_limit": requested_limit,
+        "used_limit": requested_limit,
+        "retried": False,
+        "first_duration_seconds": round(first_duration, 4),
+        "first_reasons": first_reasons,
+        "first_warnings": list(first_warnings),
+    }
+    if not first_reasons or retry_limit >= requested_limit:
+        return first, report
+    second, second_duration, second_warnings, second_reasons = invoke(retry_limit)
+    report.update(
+        retried=True,
+        used_limit=retry_limit,
+        retry_duration_seconds=round(second_duration, 4),
+        retry_reasons=second_reasons,
+        retry_warnings=list(second_warnings),
+        recovered=not second_reasons,
+    )
+    return second, report
 
 
 def auto_segment_limit(language: str) -> int:
@@ -338,14 +448,20 @@ def gpt_accel_risk(plan: GenerationPlan) -> bool:
 __all__ = [
     "GenerationPlan",
     "LANGUAGE_AUTO_LIMITS",
+    "LATIN_LONG_TEXT_LANGUAGES",
+    "LONG_TEXT_RETRY_MIN_TOKENS",
     "PAUSE_PRESETS",
     "SegmentPreview",
     "SpeechChunk",
     "auto_segment_limit",
+    "assess_long_text_result",
     "build_generation_plan",
     "effective_segment_limit",
     "gpt_accel_risk",
+    "latin_word_count",
+    "long_text_retry_limit",
     "resolve_pause_values",
+    "run_with_long_text_guard",
     "split_speech_chunks",
     "split_text_by_tokens",
 ]

@@ -668,7 +668,13 @@ def add_merge_voice_emotions(workflow: Workflow, count: int, pos=(800, 40)) -> i
 
 
 def add_dialogue_script(
-    workflow: Workflow, script_type: str, script: str, default_role: str, pos=(400, 620)
+    workflow: Workflow,
+    script_type: str,
+    script: str,
+    default_role: str,
+    pos=(400, 620),
+    *,
+    default_language: str = "ZH",
 ) -> int:
     return workflow.add(
         DIALOGUE_SCRIPT_NODE,
@@ -684,7 +690,7 @@ def add_dialogue_script(
             output("dialogue_script", "T8_INDEXTTS25_DIALOGUE_SCRIPT"),
             output("script_preview", "STRING"),
         ],
-        [script_type, script, default_role, "ZH"],
+        [script_type, script, default_role, default_language],
     )
 
 
@@ -1116,7 +1122,10 @@ def api_merge_voice_emotions(voice_ids: list[str]) -> dict[str, Any]:
 
 
 def api_dialogue_script(
-    script_type: str, script: str, default_role: str
+    script_type: str,
+    script: str,
+    default_role: str,
+    default_language: str = "ZH",
 ) -> dict[str, Any]:
     return {
         "class_type": DIALOGUE_SCRIPT_NODE,
@@ -1124,7 +1133,7 @@ def api_dialogue_script(
             "script_type": script_type,
             "script": script,
             "default_role": default_role,
-            "default_language": "ZH",
+            "default_language": default_language,
         },
     }
 
@@ -1386,26 +1395,29 @@ def sampling_pair() -> tuple[dict[str, Any], dict[str, Any]]:
         "top_p": 0.9,
         "top_k": 40,
         "num_beams": 1,
-        "max_text_tokens_per_segment": 80,
+        "max_text_tokens_per_segment": 60,
         "segment_silence_ms": 350,
     }
     text = (
-        "第一段用于演示随机采样，并通过固定种子保持结果可复现。"
-        "第二段用于演示长文本自动分段，以及段落之间的静音控制。"
-        "你可以修改温度、顶部概率和顶部候选数量，观察语气细节的变化。"
+        "This long English example demonstrates language-aware segmentation and the automatic output guard. "
+        "IndexTTS first follows the sixty-token budget shown in the sampling node, while the extension checks "
+        "each completed speech block for mel-token exhaustion or an implausible duration. If a suspicious block "
+        "is detected, only that block is retried once with a smaller budget, so the rest of the result is preserved. "
+        "The fixed seed keeps the random-sampling comparison reproducible, and the final report records whether "
+        "the retry guard was used."
     )
-    workflow = Workflow("06 随机采样与长文本")
+    workflow = Workflow("06 长英文分段与防截断重试")
     model = add_model(workflow)
     speaker = add_load_audio(workflow, "voice_reference.wav", title="音色参考音频")
     sampling = add_sampling(workflow, **controls)
-    generate = add_generate(workflow, text, "ZH", 1.0, 998877, pos=(900, 180))
+    generate = add_generate(workflow, text, "EN", 1.0, 998877, pos=(900, 180))
     save = add_save(workflow, "IndexTTS25_T8/random_long_text", pos=(1460, 300))
     wire_generation(workflow, model, speaker, generate, save, sampling=sampling)
     api = {
         "1": api_model(),
         "2": api_audio("voice_reference.wav"),
         "3": api_sampling(**controls),
-        "4": api_generate("1", "2", text, "ZH", 1.0, 998877, sampling_id="3"),
+        "4": api_generate("1", "2", text, "EN", 1.0, 998877, sampling_id="3"),
         "5": api_save("4", "IndexTTS25_T8/random_long_text"),
     }
     return workflow.as_dict(), api
@@ -1503,7 +1515,13 @@ def japanese_pronunciation_pair() -> tuple[dict[str, Any], dict[str, Any]]:
 
 
 def _dialogue_pair(
-    title: str, script_type: str, script: str, *, policy="shift", fit=False
+    title: str,
+    script_type: str,
+    script: str,
+    *,
+    policy="shift",
+    fit=False,
+    language="ZH",
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     workflow = Workflow(title)
     model = add_model(workflow, pos=(0, 0))
@@ -1513,11 +1531,16 @@ def _dialogue_pair(
     audio_b = add_load_audio(
         workflow, "role_b.wav", pos=(0, 520), title="角色 B 参考音频"
     )
-    voice_a = add_voice_profile(workflow, "角色A", "ZH", pos=(400, 0))
-    voice_b = add_voice_profile(workflow, "角色B", "ZH", pos=(400, 300))
+    voice_a = add_voice_profile(workflow, "角色A", language, pos=(400, 0))
+    voice_b = add_voice_profile(workflow, "角色B", language, pos=(400, 300))
     library = add_role_library(workflow, 2, pos=(800, 60))
     script_node = add_dialogue_script(
-        workflow, script_type, script, "角色A", pos=(650, 520)
+        workflow,
+        script_type,
+        script,
+        "角色A",
+        pos=(650, 520),
+        default_language=language,
     )
     generate = add_dialogue_generate(workflow, pos=(1220, 220), policy=policy, fit=fit)
     save = add_save(workflow, f"IndexTTS25_T8/{script_type}_dialogue", pos=(1760, 360))
@@ -1533,10 +1556,10 @@ def _dialogue_pair(
         "1": api_model(),
         "2": api_audio("role_a.wav"),
         "3": api_audio("role_b.wav"),
-        "4": api_voice("角色A", "2"),
-        "5": api_voice("角色B", "3"),
+        "4": api_voice("角色A", "2", language),
+        "5": api_voice("角色B", "3", language),
         "6": api_role_library(["4", "5"]),
-        "7": api_dialogue_script(script_type, script, "角色A"),
+        "7": api_dialogue_script(script_type, script, "角色A", language),
         "8": api_dialogue_generate("1", "6", "7", policy=policy, fit=fit),
         "9": api_save("8", f"IndexTTS25_T8/{script_type}_dialogue"),
     }
@@ -1581,10 +1604,19 @@ def batch_dialogue_pair() -> tuple[dict[str, Any], dict[str, Any]]:
 
 def srt_dialogue_pair() -> tuple[dict[str, Any], dict[str, Any]]:
     script = (
-        "1\n00:00:00,500 --> 00:00:02,600\n[角色A] 这是第一条字幕。\n\n"
-        "2\n00:00:02,800 --> 00:00:05,000\n角色B：这是第二条字幕，会尝试贴合时间槽位。"
+        "1\n00:00:00,500 --> 00:00:03,500\n[角色A] Esta es la primera línea del subtítulo.\n\n"
+        "2\n00:00:03,800 --> 00:00:10,000\n"
+        "[角色B] Esta línea larga en español demuestra que cada subtítulo también usa "
+        "la protección contra cortes inesperados y vuelve a intentarlo con segmentos más pequeños cuando es necesario."
     )
-    return _dialogue_pair("13 SRT 多角色配音", "srt", script, policy="shift", fit=True)
+    return _dialogue_pair(
+        "13 长西语 SRT 多角色配音",
+        "srt",
+        script,
+        policy="shift",
+        fit=True,
+        language="ES",
+    )
 
 
 def multi_role_emotions_pair() -> tuple[dict[str, Any], dict[str, Any]]:
@@ -2119,18 +2151,18 @@ def update_check_pair() -> tuple[dict[str, Any], dict[str, Any]]:
 
 
 def memory_control_pair() -> tuple[dict[str, Any], dict[str, Any]]:
-    workflow = Workflow("26 长批量模型回收与显存状态")
+    workflow = Workflow("26 模型显存与参考条件缓存管理")
     model = add_model(workflow)
     workflow.set_widget(model, "recycle_after_runs", 20)
     speaker = add_load_audio(workflow, "voice_reference.wav", title="音色参考音频")
     generate = add_generate(
         workflow,
-        "模型每完成二十次推理后自动安全重载，状态节点只管理本扩展。",
+        "模型每完成二十次推理后自动安全重载；状态节点还会报告参考条件缓存命中率。",
         "ZH",
         1.0,
         20260826,
     )
-    add_memory_control(workflow, pos=(440, 0), action="status")
+    add_memory_control(workflow, pos=(440, 0), action="reference_cache_status")
     save = add_save(workflow, "IndexTTS25_T8/memory_control")
     wire_generation(workflow, model, speaker, generate, save)
     model_api = api_model()
@@ -2141,12 +2173,12 @@ def memory_control_pair() -> tuple[dict[str, Any], dict[str, Any]]:
         "3": api_generate(
             "1",
             "2",
-            "模型每完成二十次推理后自动安全重载，状态节点只管理本扩展。",
+            "模型每完成二十次推理后自动安全重载；状态节点还会报告参考条件缓存命中率。",
             "ZH",
             1.0,
             20260826,
         ),
-        "4": api_memory_control("status"),
+        "4": api_memory_control("reference_cache_status"),
         "5": api_save("3", "IndexTTS25_T8/memory_control"),
     }
     return workflow.as_dict(), api

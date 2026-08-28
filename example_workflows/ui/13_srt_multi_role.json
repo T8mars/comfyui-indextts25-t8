@@ -148,7 +148,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_ModelLoader",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.17.0"
+        "ver": "0.18.0"
       },
       "widgets_values": [
         "IndexTTS-2.5",
@@ -311,11 +311,11 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_VoiceProfile",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.17.0"
+        "ver": "0.18.0"
       },
       "widgets_values": [
         "角色A",
-        "ZH"
+        "ES"
       ],
       "title": "角色音色：角色A"
     },
@@ -379,11 +379,11 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_VoiceProfile",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.17.0"
+        "ver": "0.18.0"
       },
       "widgets_values": [
         "角色B",
-        "ZH"
+        "ES"
       ],
       "title": "角色音色：角色B"
     },
@@ -431,7 +431,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_RoleLibrary",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.17.0"
+        "ver": "0.18.0"
       }
     },
     {
@@ -499,13 +499,13 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_DialogueScript",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.17.0"
+        "ver": "0.18.0"
       },
       "widgets_values": [
         "srt",
-        "1\n00:00:00,500 --> 00:00:02,600\n[角色A] 这是第一条字幕。\n\n2\n00:00:02,800 --> 00:00:05,000\n角色B：这是第二条字幕，会尝试贴合时间槽位。",
+        "1\n00:00:00,500 --> 00:00:03,500\n[角色A] Esta es la primera línea del subtítulo.\n\n2\n00:00:03,800 --> 00:00:10,000\n[角色B] Esta línea larga en español demuestra que cada subtítulo también usa la protección contra cortes inesperados y vuelve a intentarlo con segmentos más pequeños cuando es necesario.",
         "角色A",
-        "ZH"
+        "ES"
       ]
     },
     {
@@ -713,7 +713,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_DialogueGenerate",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.17.0"
+        "ver": "0.18.0"
       },
       "widgets_values": [
         20260818,
@@ -849,7 +849,7 @@
   ],
   "groups": [
     {
-      "title": "13 SRT 多角色配音 · B站：T8star-Aix",
+      "title": "13 长西语 SRT 多角色配音 · B站：T8star-Aix",
       "bounding": [
         -40,
         -60,

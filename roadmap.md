@@ -1,9 +1,17 @@
 # T8star-Aix IndexTTS 2.5 路线图
 
 本路线图同时记录 ComfyUI 节点和桌面整合包的共同方向。项目只支持 **IndexTTS 2.5**。当前公开基线为
-**ComfyUI Node 0.17.0 / Desktop 0.17.0**。
+**ComfyUI Node 0.18.0 / Desktop 0.18.0**。
 ComfyUI 基础依赖不强装 DeepSpeed、FlashAttention、Triton；桌面整合包内置与固定 Python/torch/CUDA
 ABI 匹配的可选轮子，仍不默认启用。
+
+## v0.18.0
+
+- [x] 长英文、西语和长 SRT 逐句检测 `max_mel_tokens` 与异常音频时长，必要时缩短分段并重试一次。
+- [x] 真实 IndexTTS 2.5 长英文/西语 WAV 回归，并修复 Windows GBK 西语日志编码中断。
+- [x] 参考条件缓存状态包含条目、容量、命中、未命中和命中率；安全清理只删除本节点缓存。
+- [x] 示例 06、13、26 覆盖长拉丁语系、长 SRT 与参考缓存管理，推送前刷新全部 32 组 UI/API 工作流。
+- [x] 本版不扩展 GPU 压测矩阵，也不增加 Linux sidecar 服务。
 
 ## v0.17.0
 

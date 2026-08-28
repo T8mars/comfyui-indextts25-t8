@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import gc
 import inspect
+import json
 import time
 from typing import Any
 
@@ -12,7 +13,7 @@ from .audio_processing import concatenate_with_pauses
 from .model_cache import MODEL_CACHE
 from .reference_cache import comfy_audio_to_reference_wav
 from .seed_scope import scoped_seed
-from .text_planner import build_generation_plan
+from .text_planner import build_generation_plan, run_with_long_text_guard
 from .types import DEFAULT_EMOTION, DEFAULT_SAMPLING, EmotionConfig, ModelHandle, SamplingConfig
 
 
@@ -57,6 +58,11 @@ def _progress_callback():
         return update
     except Exception:
         return lambda value, desc="": None
+
+
+def _result_duration_seconds(result: Any) -> float:
+    audio = indextts_result_to_audio(result)
+    return float(audio["waveform"].shape[-1]) / float(audio["sample_rate"])
 
 
 def run_inference(
@@ -117,6 +123,7 @@ def run_inference(
 
     entry = MODEL_CACHE.acquire(handle)
     results: list[Any] = []
+    long_text_guard_reports: list[dict[str, Any]] = []
     inference_error: Exception | None = None
     started_at = time.perf_counter()
     peak_memory_mb = None
@@ -159,27 +166,47 @@ def run_inference(
                         notes.append("低显存模式已在生成前释放 QwenEmotion")
                 for block_index, chunk in enumerate(plan.chunks):
                     with scoped_seed(int(seed) + block_index, handle.device):
-                        infer_kwargs = dict(
-                            spk_audio_prompt=str(speaker_path),
-                            text=chunk.text,
-                            output_path=None,
-                            lang=language.upper(),
-                            emo_audio_prompt=emo_audio_prompt,
-                            emo_alpha=float(emotion.strength),
-                            emo_vector=emo_vector,
-                            use_emo_text=use_emo_text,
-                            emo_text=emo_text,
-                            use_random=bool(emotion.use_random),
-                            interval_silence=int(sampling.segment_silence_ms),
-                            verbose=False,
-                            max_text_tokens_per_segment=int(plan.max_tokens),
-                            duration_factor=float(duration_factor),
-                            text_normalization=bool(sampling.text_normalization),
-                            **sampling.generation_kwargs(),
+                        def generate_with_limit(limit: int):
+                            infer_kwargs = dict(
+                                spk_audio_prompt=str(speaker_path),
+                                text=chunk.text,
+                                output_path=None,
+                                lang=language.upper(),
+                                emo_audio_prompt=emo_audio_prompt,
+                                emo_alpha=float(emotion.strength),
+                                emo_vector=emo_vector,
+                                use_emo_text=use_emo_text,
+                                emo_text=emo_text,
+                                use_random=bool(emotion.use_random),
+                                interval_silence=int(sampling.segment_silence_ms),
+                                verbose=False,
+                                max_text_tokens_per_segment=int(limit),
+                                duration_factor=float(duration_factor),
+                                text_normalization=bool(sampling.text_normalization),
+                                **sampling.generation_kwargs(),
+                            )
+                            if native_chunk_durations[block_index] is not None:
+                                infer_kwargs["target_duration"] = native_chunk_durations[block_index]
+                            return entry.model.infer(**infer_kwargs)
+
+                        block_token_count = sum(
+                            int(getattr(segment, "token_count", 0))
+                            for segment in plan.segments
+                            if int(getattr(segment, "speech_block", 1)) == block_index + 1
                         )
-                        if native_chunk_durations[block_index] is not None:
-                            infer_kwargs["target_duration"] = native_chunk_durations[block_index]
-                        results.append(entry.model.infer(**infer_kwargs))
+                        result, guard_report = run_with_long_text_guard(
+                            generate_with_limit,
+                            _result_duration_seconds,
+                            text=chunk.text,
+                            language=language,
+                            token_count=block_token_count,
+                            max_tokens=plan.max_tokens,
+                            duration_factor=duration_factor,
+                            check_duration=native_chunk_durations[block_index] is None,
+                        )
+                        results.append(result)
+                        guard_report["speech_block"] = block_index + 1
+                        long_text_guard_reports.append(guard_report)
             finally:
                 if temporarily_disabled_accel:
                     entry.model.gpt.accel_engine = accel_engine
@@ -251,6 +278,11 @@ def run_inference(
         status += f" | native_target={float(target_duration_seconds):.3f}s"
     if peak_memory_mb is not None:
         status += f" | CUDA峰值={peak_memory_mb:.0f}MiB"
+    latin_guards = [item for item in long_text_guard_reports if item.get("enabled")]
+    if latin_guards:
+        status += " | long_text_guard=" + json.dumps(
+            latin_guards, ensure_ascii=False, separators=(",", ":")
+        )
     if handle.acceleration_note:
         notes.append(handle.acceleration_note)
     if notes:

@@ -38,7 +38,7 @@
         "2",
         0
       ],
-      "language": "ZH"
+      "language": "ES"
     }
   },
   "5": {
@@ -49,7 +49,7 @@
         "3",
         0
       ],
-      "language": "ZH"
+      "language": "ES"
     }
   },
   "6": {
@@ -69,9 +69,9 @@
     "class_type": "T8_IndexTTS25_DialogueScript",
     "inputs": {
       "script_type": "srt",
-      "script": "1\n00:00:00,500 --> 00:00:02,600\n[角色A] 这是第一条字幕。\n\n2\n00:00:02,800 --> 00:00:05,000\n角色B：这是第二条字幕，会尝试贴合时间槽位。",
+      "script": "1\n00:00:00,500 --> 00:00:03,500\n[角色A] Esta es la primera línea del subtítulo.\n\n2\n00:00:03,800 --> 00:00:10,000\n[角色B] Esta línea larga en español demuestra que cada subtítulo también usa la protección contra cortes inesperados y vuelve a intentarlo con segmentos más pequeños cuando es necesario.",
       "default_role": "角色A",
-      "default_language": "ZH"
+      "default_language": "ES"
     }
   },
   "8": {

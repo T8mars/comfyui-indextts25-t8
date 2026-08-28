@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import torch
 
 from indextts.gpt import model_v2
-from indextts.infer_v2_5 import QwenEmotion, _select_deepspeed_dtype
+from indextts.infer_v2_5 import QwenEmotion, _console_text, _select_deepspeed_dtype
 from indextts.utils import common, model_download
 
 
@@ -34,6 +34,11 @@ def test_qwen_label_output_normalization_is_synced():
     redirected = emotion.convert({"高兴": "自然"})
     assert redirected["happy"] == 0.0
     assert redirected["calm"] == 1.0
+
+
+def test_console_logging_is_safe_for_spanish_on_non_utf8_windows(monkeypatch):
+    monkeypatch.setattr("indextts.infer_v2_5.sys.stdout", SimpleNamespace(encoding="ascii"))
+    assert _console_text("pequeño") == r"peque\xf1o"
 
 
 def test_pcm_wav_save_is_normalized_for_torchcodec(monkeypatch, tmp_path):

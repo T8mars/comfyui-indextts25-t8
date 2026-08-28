@@ -223,6 +223,38 @@ class ModelCache:
             )
         return {"cached_models": len(entries), "entries": entries, "cuda": cuda}
 
+    def reference_cache_status(self) -> dict[str, Any]:
+        """Report live per-model counters without exposing model objects."""
+
+        with self._guard:
+            entries = list(self._entries.values())
+        caches = []
+        seen: set[int] = set()
+        for entry in entries:
+            cache = getattr(entry.model, "reference_condition_cache", None)
+            if cache is None or id(cache) in seen:
+                continue
+            seen.add(id(cache))
+            with entry.lock:
+                caches.append(cache.status())
+        return {"active_caches": len(caches), "caches": caches}
+
+    def clear_reference_caches(self) -> int:
+        """Clear only reference-condition caches owned by live IndexTTS entries."""
+
+        with self._guard:
+            entries = list(self._entries.values())
+        removed = 0
+        seen: set[int] = set()
+        for entry in entries:
+            cache = getattr(entry.model, "reference_condition_cache", None)
+            if cache is None or id(cache) in seen:
+                continue
+            seen.add(id(cache))
+            with entry.lock:
+                removed += int(cache.clear())
+        return removed
+
     def size(self) -> int:
         with self._guard:
             return len(self._entries)

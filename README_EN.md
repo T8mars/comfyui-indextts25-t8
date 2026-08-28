@@ -21,7 +21,14 @@ Creator: **Bilibili: T8star-Aix**.
 
 This repository is locked to the IndexTTS 2.5 inference core and the official 2.5 model manifest. It will not fall back to or accidentally load IndexTTS 2.0.
 
-Current baseline: **ComfyUI Node 0.17.0 · Desktop 0.17.0 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**.
+Current baseline: **ComfyUI Node 0.18.0 · Desktop 0.18.0 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**.
+
+### v0.18.0 long-text/SRT stability and reference-cache management
+
+- Long English, Spanish, and SRT lines are checked for `max_mel_tokens` warnings and implausible output duration. Only a suspicious speech block is retried once with a smaller segment budget, and the generation report records the decision.
+- Windows GBK consoles no longer abort generation when Spanish text contains non-ASCII characters. Real IndexTTS 2.5 long-English and long-Spanish WAV regressions pass.
+- The model/memory control node adds `reference_cache_status` and `clear_reference_cache`. Reports include entries, bytes, hits, misses, and hit rate; clearing removes only this node's `safetensors` cache, never model files or source audio.
+- Example 06 demonstrates the long-English guard, example 13 includes a long Spanish SRT line, and example 26 demonstrates cache status.
 
 ### v0.17.0 context-aware per-line emotion suggestions
 

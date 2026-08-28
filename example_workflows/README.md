@@ -14,14 +14,14 @@
 | `03_emotion_reference_audio.json` | 音色与情感分别使用独立参考音频 | `voice_reference.wav`、`emotion_reference.wav` |
 | `04_emotion_vector.json` | 八维情感向量控制 | `voice_reference.wav` |
 | `05_emotion_text.json` | Qwen 文本情感描述控制 | `voice_reference.wav` |
-| `06_random_sampling_long_text.json` | 固定 seed 的随机采样、长文本分段和段间静音 | `voice_reference.wav` |
+| `06_random_sampling_long_text.json` | 长英文分段、防截断自动重试与固定 seed 随机采样 | `voice_reference.wav` |
 | `07_multilingual_generation.json` | 中文、英语、日语、西班牙语、阿拉伯语 | `voice_reference.wav` |
 | `08_chinese_pronunciation.json` | 中文多音字词典、长词优先和手工标注优先 | `voice_reference.wav` |
 | `09_english_cmu_pronunciation.json` | 英文同形异音与 CMU 音素校验 | `voice_reference.wav` |
 | `10_japanese_kana_pronunciation.json` | 日语假名发音控制 | `voice_reference.wav` |
 | `11_multi_role_dialogue.json` | 两个角色音色与多轮对话 | `role_a.wav`、`role_b.wav` |
 | `12_batch_dialogue_json.json` | JSON 批量台词、逐句与合并 AUDIO | `role_a.wav`、`role_b.wav` |
-| `13_srt_multi_role.json` | SRT 角色标记、时间轴和槽位适配 | `role_a.wav`、`role_b.wav` |
+| `13_srt_multi_role.json` | SRT 角色标记、长西语台词保护、时间轴和槽位适配 | `role_a.wav`、`role_b.wav` |
 | `14_optional_acceleration.json` | `auto_safe` 加速回退与环境诊断 | `voice_reference.wav` |
 | `15_auto_segment_preview.json` | 英文 60 Token 自动分段、预览 JSON 与 GPT 加速风险报告 | `voice_reference.wav` |
 | `16_pause_control.json` | 旁白标点停顿和 `<pause=0.8>` 显式停顿 | `voice_reference.wav` |
@@ -34,7 +34,7 @@
 | `23_multi_role_emotions.json` | 两个角色分别使用独立八维情感，并通过 `Merge Voice Emotions` 汇总 | `role_a.wav`、`role_b.wav` |
 | `24_reference_quality.json` | 参考音频质量评分、自动裁剪和波形预览 | `voice_reference.wav` |
 | `25_quality_retry.json` | 生成并保留 3 个候选；ASR + 波形质量或纯波形质量自动选优 | `voice_reference.wav` |
-| `26_memory_control.json` | 连续生成自动重载、显存和模型缓存状态 | `voice_reference.wav` |
+| `26_memory_control.json` | 连续生成自动重载、显存/模型状态和参考条件缓存统计 | `voice_reference.wav` |
 | `27_audiocpp_experimental.json` | 隔离的 audio.cpp IndexTTS2.5 GGUF 实验后端 | `voice_reference.wav` |
 | `28_low_vram_fp16.json` | 低显存 FP16、CPU 参考编码器与快速默认情感 | `voice_reference.wav` |
 | `29_runtime_benchmark.json` | 对当前模型加载器实际生效模式测量中位/最佳 RTF 与峰值显存 | `voice_reference.wav` |
@@ -81,6 +81,9 @@ CPU 可减少常驻显存；“快速默认情感”只在未提供独立情感�
 普通批量格式中的正文可以直接包含 `<文字|读音>`，例如
 `旁白|小明<要求|YAO4 QIU2>这个题。|ZH|1.0`；解析器不会把标注中的竖线当成字段分隔符。
 “显存管理”的“全部释放”会同时清理本扩展加载的 IndexTTS 与可选 Whisper 模型。
+示例 26 默认使用 `reference_cache_status`，可查看条目、容量、命中/未命中与命中率。需要手动清理时改为
+`clear_reference_cache`；它只删除 `ComfyUI/models/TTS/IndexTTS-2.5/reference_condition_cache/` 下本节点生成的
+`safetensors` 条目，不删除模型、角色音频或其他 ComfyUI 缓存。
 
 重新生成全部示例：
 

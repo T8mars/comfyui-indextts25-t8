@@ -35,7 +35,7 @@
         "2",
         0
       ],
-      "text": "模型每完成二十次推理后自动安全重载，状态节点只管理本扩展。",
+      "text": "模型每完成二十次推理后自动安全重载；状态节点还会报告参考条件缓存命中率。",
       "language": "ZH",
       "duration_factor": 1.0,
       "target_duration_mode": "off",
@@ -53,7 +53,7 @@
   "4": {
     "class_type": "T8_IndexTTS25_MemoryControl",
     "inputs": {
-      "action": "status",
+      "action": "reference_cache_status",
       "idle_seconds": 300.0
     }
   },

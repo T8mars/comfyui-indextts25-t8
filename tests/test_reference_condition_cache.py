@@ -25,3 +25,23 @@ def test_disabled_cache_does_not_write(tmp_path: Path) -> None:
     cache = ReferenceConditionCache(None, "model")
     assert cache.save("speaker", audio, {"spk_cond": torch.ones(1)}) is None
     assert cache.load("speaker", audio, "cpu") is None
+
+
+def test_cache_management_reports_session_stats_and_preserves_other_files(tmp_path: Path) -> None:
+    audio = tmp_path / "reference.wav"
+    audio.write_bytes(b"reference-audio")
+    cache = ReferenceConditionCache(tmp_path / "cache", "model")
+    assert cache.load("speaker", audio, "cpu") is None
+    cache.save("speaker", audio, {"spk_cond": torch.ones(1)})
+    assert cache.load("speaker", audio, "cpu") is not None
+    unrelated = tmp_path / "cache" / "notes.json"
+    unrelated.write_text("{}", encoding="utf-8")
+
+    before = cache.status()
+    assert before["entries"] == 1
+    assert before["hits"] == 1
+    assert before["misses"] == 1
+    assert before["hit_rate"] == 0.5
+    assert cache.clear() == 1
+    assert cache.status()["entries"] == 0
+    assert unrelated.exists()
