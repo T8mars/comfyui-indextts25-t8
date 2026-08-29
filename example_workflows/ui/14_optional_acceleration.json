@@ -148,7 +148,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_ModelLoader",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.20.7"
+        "ver": "0.20.8"
       },
       "widgets_values": [
         "IndexTTS-2.5",
@@ -243,7 +243,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_Environment",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.20.7"
+        "ver": "0.20.8"
       },
       "widgets_values": [
         "auto"
@@ -413,7 +413,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_Generate",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.20.7"
+        "ver": "0.20.8"
       },
       "widgets_values": [
         "这是可选加速模式的安全回退测试。",

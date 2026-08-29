@@ -269,69 +269,138 @@ def test_model_download_stops_before_network_when_space_is_insufficient(
     assert download_started == []
 
 
-def test_huggingface_download_interrupt_terminates_worker_without_waiting(
-    monkeypatch,
+def test_huggingface_download_stream_is_cancellable_without_worker(
+    tmp_path: Path, monkeypatch
 ):
     class UserInterrupt(BaseException):
         pass
 
-    class FakeProcess:
-        def __init__(self):
-            self.returncode = None
-            self.terminated = False
-            self.killed = False
-            self.waits = []
+    import huggingface_hub
+    import huggingface_hub.file_download
+    import huggingface_hub.utils
 
-        def poll(self):
-            return self.returncode
+    expected = b"abcdef"
+    manifest = {"files": {"nested/model.bin": _metadata(expected)}}
+    events = []
 
-        def terminate(self):
-            self.terminated = True
-            self.returncode = -15
+    def interrupt_on_second_chunk(event):
+        events.append(event)
+        if event.get("phase") == "downloading" and event.get("received", 0) >= 6:
+            raise UserInterrupt()
 
-        def kill(self):
-            self.killed = True
-            self.returncode = -9
+    progress = downloader.ModelDownloadProgress(
+        manifest,
+        "huggingface",
+        interrupt_on_second_chunk,
+        include_auxiliary=True,
+        clock=lambda: float(len(events) + 1),
+    )
+    progress.preflight(["nested/model.bin"], free_bytes=1024)
+    progress.begin_file("nested/model.bin", 1)
 
-        def wait(self, timeout=None):
-            self.waits.append(timeout)
-            return self.returncode
+    monkeypatch.setattr(
+        huggingface_hub,
+        "get_hf_file_metadata",
+        lambda *_args, **_kwargs: SimpleNamespace(size=len(expected)),
+    )
+    monkeypatch.setattr(
+        huggingface_hub,
+        "hf_hub_url",
+        lambda *_args, **_kwargs: "https://huggingface.co/model.bin",
+    )
+    monkeypatch.setattr(
+        huggingface_hub.utils,
+        "build_hf_headers",
+        lambda **_kwargs: {"authorization": "Bearer hidden"},
+    )
 
-    process = FakeProcess()
-    captured = {}
+    def fake_http_get(_url, stream, *, _tqdm_bar, **_kwargs):
+        _tqdm_bar.update(3)
+        stream.write(expected[:3])
+        _tqdm_bar.update(3)
+        stream.write(expected[3:])
 
-    def fake_popen(command, **kwargs):
-        captured["command"] = command
-        captured["kwargs"] = kwargs
-        return process
-
-    monkeypatch.setattr(downloader.subprocess, "Popen", fake_popen)
-
-    def interrupt():
-        raise UserInterrupt()
+    monkeypatch.setattr(huggingface_hub.file_download, "http_get", fake_http_get)
 
     with pytest.raises(UserInterrupt):
         downloader._download_hf_file_cancellable(
-            {
-                "repo_id": "t8star/IndexTTS-2.5-Comfy",
-                "revision": "a" * 40,
-                "filename": "model.safetensors",
-                "local_dir": "models",
-                "force_download": False,
-            },
-            interrupt,
+            repository="t8star/IndexTTS-2.5-Comfy",
+            revision="a" * 40,
+            relative="nested/model.bin",
+            target=tmp_path,
+            force_download=False,
+            expected_size=len(expected),
+            progress=progress,
         )
 
-    assert process.terminated is True
-    assert process.killed is False
-    assert process.waits == [downloader.HF_DOWNLOAD_STOP_SECONDS]
-    assert captured["command"][:4] == [
-        sys.executable,
-        "-m",
-        "services.downloader",
-        "--internal-hf-download",
-    ]
-    assert captured["kwargs"]["cwd"] == str(downloader.PLUGIN_ROOT)
+    assert not (tmp_path / "nested/model.bin").exists()
+    assert (tmp_path / "nested/.model.bin.incomplete").read_bytes() == expected[:3]
+
+
+def test_huggingface_download_stream_resumes_and_promotes_atomically(
+    tmp_path: Path, monkeypatch
+):
+    import huggingface_hub
+    import huggingface_hub.file_download
+    import huggingface_hub.utils
+
+    expected = b"abcdef"
+    manifest = {"files": {"model.bin": _metadata(expected)}}
+    progress = downloader.ModelDownloadProgress(
+        manifest,
+        "huggingface",
+        lambda _event: None,
+        include_auxiliary=True,
+    )
+    progress.preflight(["model.bin"], free_bytes=1024)
+    progress.begin_file("model.bin", 1)
+    incomplete = tmp_path / ".model.bin.incomplete"
+    incomplete.write_bytes(expected[:2])
+    captured = {}
+
+    monkeypatch.setattr(
+        huggingface_hub,
+        "get_hf_file_metadata",
+        lambda *_args, **_kwargs: SimpleNamespace(size=len(expected)),
+    )
+    monkeypatch.setattr(
+        huggingface_hub,
+        "hf_hub_url",
+        lambda *_args, **_kwargs: "https://huggingface.co/model.bin",
+    )
+    monkeypatch.setattr(
+        huggingface_hub.utils,
+        "build_hf_headers",
+        lambda **_kwargs: {},
+    )
+
+    def fake_http_get(_url, stream, *, resume_size, headers, _tqdm_bar, **_kwargs):
+        captured.update(resume_size=resume_size, headers=headers)
+        remaining = expected[resume_size:]
+        _tqdm_bar.update(len(remaining))
+        stream.write(remaining)
+
+    monkeypatch.setattr(huggingface_hub.file_download, "http_get", fake_http_get)
+    downloader._download_hf_file_cancellable(
+        repository="t8star/IndexTTS-2.5-Comfy",
+        revision="a" * 40,
+        relative="model.bin",
+        target=tmp_path,
+        force_download=False,
+        expected_size=len(expected),
+        progress=progress,
+    )
+
+    assert captured["resume_size"] == 2
+    assert captured["headers"]["Range"] == "bytes=0-"
+    assert (tmp_path / "model.bin").read_bytes() == expected
+    assert not incomplete.exists()
+
+
+def test_model_downloader_has_no_command_execution_worker():
+    source = Path(downloader.__file__).read_text(encoding="utf-8")
+    assert "subprocess" not in source
+    assert "Popen" not in source
 
 
 def test_comfy_requirements_do_not_replace_torch_or_pull_training_stacks():

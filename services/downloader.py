@@ -1,11 +1,8 @@
 from __future__ import annotations
 
 import argparse
-import json
 import shutil
-import subprocess
 import sys
-import tempfile
 import time
 from pathlib import Path
 from typing import Callable
@@ -35,8 +32,6 @@ LICENSE_NOTICE = (
     "本项目是第三方衍生集成；原始权利人不对本衍生品背书、担保或承担责任。"
 )
 DISK_RESERVE_BYTES = 1024 * 1024 * 1024
-HF_DOWNLOAD_POLL_SECONDS = 0.2
-HF_DOWNLOAD_STOP_SECONDS = 5.0
 
 
 class ModelDownloadProgress:
@@ -202,75 +197,85 @@ def _selected_files(manifest: dict, *, include_auxiliary: bool) -> list[str]:
     ]
 
 
-def _terminate_download_process(process: subprocess.Popen) -> None:
-    """Stop and reap a controlled Hugging Face download worker."""
+class _CancellableHubProgress:
+    """Forward Hub HTTP chunks to the node progress/cancellation callback."""
 
-    if process.poll() is not None:
-        return
-    try:
-        process.terminate()
-    except ProcessLookupError:
-        # The worker may have exited between poll() and terminate().  wait()
-        # still needs to run so Windows/Unix process resources are reaped.
-        pass
-    try:
-        process.wait(timeout=HF_DOWNLOAD_STOP_SECONDS)
-    except subprocess.TimeoutExpired:
-        try:
-            process.kill()
-        except ProcessLookupError:
-            pass
-        process.wait(timeout=HF_DOWNLOAD_STOP_SECONDS)
+    def __init__(self, progress: ModelDownloadProgress, received: int) -> None:
+        self.progress = progress
+        self.received = int(received)
+
+    def update(self, chunk_size: int) -> None:
+        # The ComfyUI progress callback checks the global interruption flag.
+        # Raising here unwinds huggingface_hub's streaming request immediately.
+        self.received += max(0, int(chunk_size))
+        self.progress.update_file(self.received)
 
 
 def _download_hf_file_cancellable(
-    kwargs: dict,
-    poll_progress: Callable[[], None] | None,
+    *,
+    repository: str,
+    revision: str,
+    relative: str,
+    target: Path,
+    force_download: bool,
+    expected_size: int,
+    progress: ModelDownloadProgress,
 ) -> None:
-    """Download in a reapable process so ComfyUI cancellation closes the socket."""
+    """Stream one pinned Hub file without launching executable code."""
 
-    payload = json.dumps(kwargs, ensure_ascii=False, separators=(",", ":"))
-    command = [
-        sys.executable,
-        "-m",
-        "services.downloader",
-        "--internal-hf-download",
-        payload,
-    ]
-    creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-    with tempfile.TemporaryFile() as log:
-        process = subprocess.Popen(
-            command,
-            cwd=str(PLUGIN_ROOT),
-            stdout=log,
-            stderr=subprocess.STDOUT,
-            creationflags=creationflags,
+    from huggingface_hub import get_hf_file_metadata, hf_hub_url
+    from huggingface_hub.file_download import http_get
+    from huggingface_hub.utils import build_hf_headers
+
+    target_root = target.expanduser().resolve()
+    destination = target_root.joinpath(*Path(relative).parts).resolve()
+    if destination != target_root and target_root not in destination.parents:
+        raise ValueError(f"模型清单包含越界路径：{relative}")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    incomplete = destination.with_name(f".{destination.name}.incomplete")
+    if force_download:
+        incomplete.unlink(missing_ok=True)
+
+    resume_size = incomplete.stat().st_size if incomplete.is_file() else 0
+    if resume_size > expected_size:
+        incomplete.unlink()
+        resume_size = 0
+    progress.resume_file(resume_size)
+
+    headers = build_hf_headers(library_name="comfyui-indextts25-t8")
+    # A Range header keeps the transfer on huggingface_hub's chunked HTTP path
+    # even when an optional native transfer helper is enabled, so every chunk
+    # remains cancellable through the progress callback.
+    headers["Range"] = "bytes=0-"
+    url = hf_hub_url(repository, relative, revision=revision)
+    progress.update_file(resume_size)
+    metadata = get_hf_file_metadata(url, headers=headers)
+    metadata_size = int(metadata.size) if metadata.size is not None else expected_size
+    if metadata_size != expected_size:
+        raise RuntimeError(
+            f"Hugging Face 文件大小与固定清单不一致：{relative}；"
+            f"清单 {expected_size} 字节，远端 {metadata_size} 字节。"
         )
-        try:
-            while process.poll() is None:
-                if poll_progress is not None:
-                    poll_progress()
-                time.sleep(HF_DOWNLOAD_POLL_SECONDS)
-        except BaseException:
-            _terminate_download_process(process)
-            raise
-        if process.returncode:
-            log.seek(0)
-            detail = log.read().decode("utf-8", errors="replace").strip()
-            raise RuntimeError(
-                "Hugging Face 模型文件下载失败"
-                f"（exit={process.returncode}）：{detail[-3000:]}"
-            )
+    progress.update_file(resume_size)
 
+    with incomplete.open("ab") as stream:
+        http_get(
+            url,
+            stream,
+            resume_size=resume_size,
+            headers=headers,
+            expected_size=expected_size,
+            displayed_filename=relative,
+            _tqdm_bar=_CancellableHubProgress(progress, resume_size),
+        )
 
-def _internal_hf_download(payload: str) -> int:
-    kwargs = json.loads(payload)
-    if not isinstance(kwargs, dict):
-        raise ValueError("内部 Hugging Face 下载参数无效。")
-    from huggingface_hub import hf_hub_download
-
-    hf_hub_download(**kwargs)
-    return 0
+    actual_size = incomplete.stat().st_size
+    if actual_size != expected_size:
+        raise RuntimeError(
+            f"Hugging Face 文件下载不完整：{relative}；"
+            f"应为 {expected_size} 字节，实际 {actual_size} 字节。"
+        )
+    incomplete.replace(destination)
 
 
 def download_main_model(
@@ -289,38 +294,12 @@ def download_main_model(
     if source == "huggingface":
         from huggingface_hub import hf_hub_download
 
-        if progress is not None:
-            from huggingface_hub import get_hf_file_metadata, hf_hub_url
-            from huggingface_hub.file_download import get_local_download_paths
-
         selected = set(_selected_files(manifest, include_auxiliary=include_auxiliary))
         requested = sorted(selected.intersection([*missing, *mismatched]) or selected)
         for index, relative in enumerate(requested, start=1):
             if progress is not None:
                 progress.begin_file(relative, index)
             force_download = relative in mismatched
-            incomplete_path = None
-            if progress is not None:
-                try:
-                    metadata = get_hf_file_metadata(
-                        hf_hub_url(repository, relative, revision=revision)
-                    )
-                    if metadata.etag:
-                        incomplete_path = get_local_download_paths(
-                            target, relative
-                        ).incomplete_path(metadata.etag)
-                except Exception:
-                    incomplete_path = None
-
-            started_wall = time.time()
-            if (
-                progress is not None
-                and not force_download
-                and incomplete_path is not None
-                and incomplete_path.is_file()
-            ):
-                progress.resume_file(incomplete_path.stat().st_size)
-
             download_kwargs = {
                 "repo_id": repository,
                 "revision": revision,
@@ -331,21 +310,15 @@ def download_main_model(
             if progress is None:
                 hf_hub_download(**download_kwargs)
             else:
-
-                def poll_progress() -> None:
-                    if progress is not None and incomplete_path is not None:
-                        try:
-                            stat = incomplete_path.stat()
-                            if not force_download or stat.st_mtime >= started_wall:
-                                progress.update_file(stat.st_size)
-                        except FileNotFoundError:
-                            pass
-                    elif progress is not None:
-                        # Keep checking ComfyUI's interruption flag even if the Hub
-                        # metadata request could not reveal the partial-file path.
-                        progress.update_file(progress.current_received)
-
-                _download_hf_file_cancellable(download_kwargs, poll_progress)
+                _download_hf_file_cancellable(
+                    repository=repository,
+                    revision=revision,
+                    relative=relative,
+                    target=target,
+                    force_download=force_download,
+                    expected_size=int(manifest["files"][relative]["size"]),
+                    progress=progress,
+                )
                 progress.complete_file()
     elif source == "modelscope":
         try:
@@ -513,10 +486,6 @@ def resolve_target(args: argparse.Namespace) -> Path:
 
 def main(argv: list[str] | None = None) -> int:
     actual_argv = list(sys.argv[1:] if argv is None else argv)
-    if actual_argv[:1] == ["--internal-hf-download"]:
-        if len(actual_argv) != 2:
-            raise ValueError("内部 Hugging Face 下载参数数量无效。")
-        return _internal_hf_download(actual_argv[1])
     parser = build_parser()
     args = parser.parse_args(actual_argv)
     try:

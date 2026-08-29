@@ -13,6 +13,10 @@ surfaces are documented here for reviewers and users.
   `huggingface` or `modelscope`, downloads the pinned model revision recorded in
   `manifests/model_2_5.json`, and validates the formal model files against the
   pinned size/SHA-256 manifest.
+- The opt-in Hugging Face downloader streams fixed-manifest files in the current
+  Python process. It does not launch a worker executable or construct commands;
+  partial files remain resumable and are atomically promoted only after their
+  expected size is reached, followed by the full manifest validation.
 - The vendored core may download fixed auxiliary model repositories only when
   their expected files are missing. The destination is the selected IndexTTS
   model directory; responses are never executed as Python or shell code.
