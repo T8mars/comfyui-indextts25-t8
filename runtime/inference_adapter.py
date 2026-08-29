@@ -3,6 +3,7 @@ from __future__ import annotations
 import gc
 import inspect
 import json
+import sys
 import time
 from typing import Any
 
@@ -55,7 +56,6 @@ def _supports_native_target_duration(model) -> bool:
 
 def _progress_callback():
     try:
-        import comfy.model_management
         import comfy.utils
 
         progress = comfy.utils.ProgressBar(100)
@@ -70,13 +70,18 @@ def _progress_callback():
 
 
 def throw_if_processing_interrupted() -> None:
-    """Honor ComfyUI's stop request without requiring ComfyUI in unit tests."""
+    """Honor ComfyUI's stop request without initializing ComfyUI on our behalf."""
 
-    try:
-        import comfy.model_management
-    except (ImportError, ModuleNotFoundError):
+    model_management = sys.modules.get("comfy.model_management")
+    if model_management is None:
         return
-    comfy.model_management.throw_exception_if_processing_interrupted()
+    callback = getattr(
+        model_management,
+        "throw_exception_if_processing_interrupted",
+        None,
+    )
+    if callback is not None:
+        callback()
 
 
 def _result_duration_seconds(result: Any) -> float:

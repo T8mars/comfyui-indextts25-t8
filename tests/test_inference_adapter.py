@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -31,6 +32,22 @@ class NativeDurationFakeModel(FakeModel):
     def infer(self, target_duration=None, **kwargs):
         self.target_duration = target_duration
         return super().infer(**kwargs)
+
+
+def test_interrupt_check_only_uses_an_already_loaded_comfy_module(monkeypatch):
+    monkeypatch.delitem(sys.modules, "comfy.model_management", raising=False)
+    inference_adapter.throw_if_processing_interrupted()
+
+    checks = []
+    monkeypatch.setitem(
+        sys.modules,
+        "comfy.model_management",
+        SimpleNamespace(
+            throw_exception_if_processing_interrupted=lambda: checks.append(True)
+        ),
+    )
+    inference_adapter.throw_if_processing_interrupted()
+    assert checks == [True]
 
 
 def _patch_plan(monkeypatch, text="hello"):

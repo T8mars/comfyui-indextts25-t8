@@ -21,9 +21,9 @@ Creator: **Bilibili: T8star-Aix**.
 
 This repository is locked to the IndexTTS 2.5 inference core and the official 2.5 model manifest. It will not fall back to or accidentally load IndexTTS 2.0.
 
-Current baseline: **ComfyUI Node 0.20.6 · Desktop 0.21.1 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**.
+Current baseline: **ComfyUI Node 0.20.7 · Desktop 0.21.1 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**.
 
-### v0.20.6 stability, cancellation, and package fixes
+### v0.20.7 stability, cancellation, and package fixes
 
 - Fixed GPT acceleration tensors falling back to the default `cuda:0` device when the loader selects `cuda:1` or a higher-numbered GPU.
 - Fixed delayed cancellation and orphaned subprocesses across audio.cpp, Hugging Face model downloads, segmented generation, and ASR candidate review.
@@ -31,6 +31,7 @@ Current baseline: **ComfyUI Node 0.20.6 · Desktop 0.21.1 · Core `ee40fa7d` · 
 - Dialogue lines without an explicit language now inherit the matching Voice Profile language; per-line string `false`, invalid actual subtitle times, and example 33 role mapping are also corrected.
 - Added concurrency protection to the model hash cache and made the update check enforce its 1 MiB limit while streaming.
 - Removed unused training weights from Registry packages and bundled the complete upstream BigVGAN third-party license texts.
+- Stop checks now reuse ComfyUI's already-loaded runtime module instead of initializing CUDA from CPU-only environments.
 
 ### v0.20.5 remove the networked audio.cpp installer
 
