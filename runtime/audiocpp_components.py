@@ -203,13 +203,18 @@ def _release_assets(backend: str) -> tuple[dict[str, Any], list[dict[str, Any]]]
     return release, selected
 
 
+def _is_windows_platform() -> bool:
+    """Keep platform probing patchable without mutating the process-wide os module."""
+    return os.name == "nt"
+
+
 def install_runtime(
     backend: str,
     *,
     data_root: str | Path | None = None,
     callback: ProgressCallback | None = None,
 ) -> dict[str, Any]:
-    if os.name != "nt":
+    if not _is_windows_platform():
         raise RuntimeError("当前一键安装器面向 Windows；其他系统请使用 audio.cpp 官方包。")
     backend = str(backend).lower()
     release, assets = _release_assets(backend)

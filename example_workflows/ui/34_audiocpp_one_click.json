@@ -74,7 +74,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_AudioCppInstaller",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.20.0"
+        "ver": "0.20.1"
       },
       "widgets_values": [
         "install_all",
@@ -226,7 +226,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_AudioCppGenerate",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.20.0"
+        "ver": "0.20.1"
       },
       "widgets_values": [
         "",

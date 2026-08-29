@@ -71,7 +71,7 @@ def test_component_runtime_install_and_status(tmp_path: Path, monkeypatch):
         ],
     }
     monkeypatch.setattr(manager, "_request_json", lambda _url: release)
-    monkeypatch.setattr(manager.os, "name", "nt")
+    monkeypatch.setattr(manager, "_is_windows_platform", lambda: True)
     monkeypatch.setattr(manager.urllib.request, "urlopen", lambda *args, **kwargs: _Response(data))
     result = manager.install_runtime("cpu", data_root=tmp_path)
     assert Path(result["executable"]).read_bytes() == b"exe"

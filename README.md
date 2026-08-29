@@ -21,7 +21,11 @@ IndexTTS 2.5 的 ComfyUI V3 原生节点集成。节点菜单位于：
 
 本目录固定使用 IndexTTS 2.5 推理核心和正式 2.5 模型清单，不会回退或误载 IndexTTS 2.0。
 
-当前版本基线：**ComfyUI Node 0.20.0 · Desktop 0.21.0 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**。
+当前版本基线：**ComfyUI Node 0.20.1 · Desktop 0.21.0 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**。
+
+### v0.20.1 跨平台测试修复
+
+- audio.cpp 安装器的平台检测改为局部、可测试的判断，避免 Linux 测试环境被 Windows 平台模拟污染；用户功能与 v0.20.0 保持一致。
 
 ### v0.20.0 共享音色库与 audio.cpp 一键可选组件
 

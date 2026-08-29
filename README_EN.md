@@ -21,7 +21,11 @@ Creator: **Bilibili: T8star-Aix**.
 
 This repository is locked to the IndexTTS 2.5 inference core and the official 2.5 model manifest. It will not fall back to or accidentally load IndexTTS 2.0.
 
-Current baseline: **ComfyUI Node 0.20.0 · Desktop 0.21.0 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**.
+Current baseline: **ComfyUI Node 0.20.1 · Desktop 0.21.0 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**.
+
+### v0.20.1 cross-platform test fix
+
+- Platform detection in the audio.cpp installer is now local and safely mockable, preventing Windows simulation from contaminating Linux test processes. User-facing behavior is unchanged from v0.20.0.
 
 ### v0.20.0 shared voice library and one-click optional audio.cpp components
 
