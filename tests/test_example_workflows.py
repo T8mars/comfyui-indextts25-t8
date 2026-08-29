@@ -200,6 +200,29 @@ def test_v3_dynamic_combo_api_inputs_are_flattened():
             assert all(not isinstance(value, dict) for value in node["inputs"].values())
 
 
+def test_saved_voice_builder_keeps_ui_and_api_role_override_in_sync():
+    workflow, prompt = build_example_workflows.saved_voice_pair()
+    ui_node = next(
+        node
+        for node in workflow["nodes"]
+        if node["type"] == "T8_IndexTTS25_SavedVoice"
+    )
+    api_node = next(
+        node
+        for node in prompt.values()
+        if node["class_type"] == "T8_IndexTTS25_SavedVoice"
+    )
+    widget_names = [
+        item["name"] for item in ui_node["inputs"] if "widget" in item
+    ]
+    ui_values = dict(zip(widget_names, ui_node["widgets_values"]))
+    assert ui_values["role_name_override"] == "旁白"
+    assert (
+        ui_values["role_name_override"]
+        == api_node["inputs"]["role_name_override"]
+    )
+
+
 def test_api_prompts_expand_with_the_current_comfyui_v3_schema():
     _io = pytest.importorskip("comfy_api.latest")._io
 

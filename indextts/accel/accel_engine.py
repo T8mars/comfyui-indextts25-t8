@@ -1,5 +1,5 @@
 import sys
-from typing import List, Optional
+from typing import Callable, List, Optional
 
 import torch
 from torch import nn
@@ -57,9 +57,10 @@ class AccelInferenceEngine:
         """
         self.model = model
         self.lm_head = lm_head
+        self.device = next(model.parameters()).device
         self.block_size = block_size
         self.num_blocks = num_blocks
-        self.use_cuda_graph = use_cuda_graph and torch.cuda.is_available()
+        self.use_cuda_graph = use_cuda_graph and self.device.type == "cuda"
         self.hidden_size = (
             model.config.hidden_size
             if hasattr(model, "config")
@@ -72,6 +73,7 @@ class AccelInferenceEngine:
             block_size=block_size,
             num_blocks=num_blocks,
             dtype=torch.float16,  # Force fp16 for FlashAttention
+            device=self.device,
         )
         self.kv_manager.wire_kv_cache_to_model(model)
         self.sampler = Sampler()
@@ -112,21 +114,21 @@ class AccelInferenceEngine:
                     slot_idx = block_id * self.block_size + block_offset
                     slot_mapping.append(slot_idx)
 
-        input_ids = torch.tensor(input_ids, dtype=torch.int64, pin_memory=True).cuda(
-            non_blocking=True
+        input_ids = torch.tensor(input_ids, dtype=torch.int64, pin_memory=True).to(
+            self.device, non_blocking=True
         )
-        positions = torch.tensor(positions, dtype=torch.int64, pin_memory=True).cuda(
-            non_blocking=True
+        positions = torch.tensor(positions, dtype=torch.int64, pin_memory=True).to(
+            self.device, non_blocking=True
         )
         cu_seqlens_q = torch.tensor(
             cu_seqlens_q, dtype=torch.int32, pin_memory=True
-        ).cuda(non_blocking=True)
+        ).to(self.device, non_blocking=True)
         cu_seqlens_k = torch.tensor(
             cu_seqlens_k, dtype=torch.int32, pin_memory=True
-        ).cuda(non_blocking=True)
+        ).to(self.device, non_blocking=True)
         slot_mapping = torch.tensor(
             slot_mapping, dtype=torch.int32, pin_memory=True
-        ).cuda(non_blocking=True)
+        ).to(self.device, non_blocking=True)
 
         block_tables = None
         if cu_seqlens_k[-1] > cu_seqlens_q[-1]:
@@ -137,7 +139,7 @@ class AccelInferenceEngine:
                 block_tables_list.append(table)
             block_tables = torch.tensor(
                 block_tables_list, dtype=torch.int32, pin_memory=True
-            ).cuda(non_blocking=True)
+            ).to(self.device, non_blocking=True)
 
         set_forward_context(
             True,
@@ -174,18 +176,18 @@ class AccelInferenceEngine:
                 req.block_table[-1] * self.block_size + req.last_block_num_tokens - 1
             )
 
-        input_ids = torch.tensor(input_ids, dtype=torch.int64, pin_memory=True).cuda(
-            non_blocking=True
+        input_ids = torch.tensor(input_ids, dtype=torch.int64, pin_memory=True).to(
+            self.device, non_blocking=True
         )
-        positions = torch.tensor(positions, dtype=torch.int64, pin_memory=True).cuda(
-            non_blocking=True
+        positions = torch.tensor(positions, dtype=torch.int64, pin_memory=True).to(
+            self.device, non_blocking=True
         )
         slot_mapping = torch.tensor(
             slot_mapping, dtype=torch.int32, pin_memory=True
-        ).cuda(non_blocking=True)
+        ).to(self.device, non_blocking=True)
         context_lens = torch.tensor(
             context_lens, dtype=torch.int32, pin_memory=True
-        ).cuda(non_blocking=True)
+        ).to(self.device, non_blocking=True)
 
         max_len = max(len(req.block_table) for req in requests)
         block_tables_list = []
@@ -194,7 +196,7 @@ class AccelInferenceEngine:
             block_tables_list.append(table)
         block_tables = torch.tensor(
             block_tables_list, dtype=torch.int32, pin_memory=True
-        ).cuda(non_blocking=True)
+        ).to(self.device, non_blocking=True)
 
         assert block_tables.dim() == 2, (
             f"block_tables must be 2D, got shape {block_tables.shape}"
@@ -216,26 +218,35 @@ class AccelInferenceEngine:
         temperatures = [temperature] * len(requests)
         temperatures = torch.tensor(
             temperatures, dtype=torch.float32, pin_memory=True
-        ).cuda(non_blocking=True)
+        ).to(self.device, non_blocking=True)
         return temperatures
 
     def _capture_cuda_graphs(self, tts_mel_embedding=None, tts_text_pos_embedding=None):
+        with torch.cuda.device(self.device):
+            self._capture_cuda_graphs_on_device(
+                tts_mel_embedding=tts_mel_embedding,
+                tts_text_pos_embedding=tts_text_pos_embedding,
+            )
+
+    def _capture_cuda_graphs_on_device(
+        self, tts_mel_embedding=None, tts_text_pos_embedding=None
+    ):
         print("Capturing CUDA graphs for decode optimization...")
         max_bs = 8  # Support up to batch size 8
         max_num_blocks = (2048 + self.block_size - 1) // self.block_size
         model_dtype = next(self.model.parameters()).dtype
-        input_ids = torch.ones(max_bs, dtype=torch.int64, device="cuda")
-        positions = torch.ones(max_bs, dtype=torch.int64, device="cuda")
-        slot_mapping = torch.zeros(max_bs, dtype=torch.int32, device="cuda")
-        context_lens = torch.zeros(max_bs, dtype=torch.int32, device="cuda")
+        input_ids = torch.ones(max_bs, dtype=torch.int64, device=self.device)
+        positions = torch.ones(max_bs, dtype=torch.int64, device=self.device)
+        slot_mapping = torch.zeros(max_bs, dtype=torch.int32, device=self.device)
+        context_lens = torch.zeros(max_bs, dtype=torch.int32, device=self.device)
         block_tables = torch.zeros(
-            max_bs, max_num_blocks, dtype=torch.int32, device="cuda"
+            max_bs, max_num_blocks, dtype=torch.int32, device=self.device
         )
         outputs = torch.zeros(
-            max_bs, self.hidden_size, dtype=model_dtype, device="cuda"
+            max_bs, self.hidden_size, dtype=model_dtype, device=self.device
         )
         inputs_embeds_buffer = torch.zeros(
-            max_bs, self.hidden_size, dtype=model_dtype, device="cuda"
+            max_bs, self.hidden_size, dtype=model_dtype, device=self.device
         )
 
         self.graph_bs = [1, 2, 4, 8]
@@ -245,7 +256,9 @@ class AccelInferenceEngine:
         for bs in reversed(self.graph_bs):
             graph = torch.cuda.CUDAGraph()
 
-            slot_mapping[:bs] = torch.arange(bs, dtype=torch.int32, device="cuda")
+            slot_mapping[:bs] = torch.arange(
+                bs, dtype=torch.int32, device=self.device
+            )
             context_lens[:bs] = bs + 1
             block_tables[:bs, :] = 0
 
@@ -296,7 +309,7 @@ class AccelInferenceEngine:
                 self.graph_pool = graph.pool()
 
             self.graphs[bs] = graph
-            torch.cuda.synchronize()
+            torch.cuda.synchronize(self.device)
             reset_forward_context()
 
         self.graph_vars = {
@@ -392,6 +405,7 @@ class AccelInferenceEngine:
         tts_text_pos_embedding: Optional[
             torch.nn.Module
         ] = None,  # TTS: text_pos_embedding layer
+        interrupt_callback: Optional[Callable[[], None]] = None,
     ) -> torch.Tensor:
         """
         Generate tokens.
@@ -407,6 +421,9 @@ class AccelInferenceEngine:
         Returns:
             Generated token IDs [batch_size, total_len]
         """
+        if interrupt_callback is not None:
+            interrupt_callback()
+
         batch_size = input_ids.size(0)
         device = input_ids.device
 
@@ -472,11 +489,11 @@ class AccelInferenceEngine:
             start_token_id = input_ids[0, -1] if input_ids.size(1) > 0 else 8192
 
             start_emb = tts_mel_embedding(
-                torch.tensor([[start_token_id]], device="cuda")
+                torch.tensor([[start_token_id]], device=self.device)
             )  # [1, 1, hidden_dim]
 
             start_pos = torch.tensor(
-                [[tts_embeddings.size(1)]], device="cuda", dtype=torch.long
+                [[tts_embeddings.size(1)]], device=self.device, dtype=torch.long
             )
             pos_emb = tts_text_pos_embedding.emb(start_pos)
             start_emb = start_emb + pos_emb
@@ -567,6 +584,16 @@ class AccelInferenceEngine:
         remaining_tokens = max_new_tokens - 1
 
         for step in range(remaining_tokens):
+            if interrupt_callback is not None:
+                try:
+                    interrupt_callback()
+                except BaseException:
+                    for req in sequences:
+                        if req.block_table:
+                            self.kv_manager.remove_seq(req)
+                    self.current_sequences = []
+                    reset_forward_context()
+                    raise
             decode_ids, decode_pos = self._prepare_decode(sequences)
 
             context = get_forward_context()

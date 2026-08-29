@@ -3,6 +3,8 @@ from __future__ import annotations
 import hashlib
 import os
 import re
+import sys
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -63,6 +65,31 @@ def test_model_hash_cache_detects_same_stat_replacement(tmp_path: Path, monkeypa
 
     report = model_store.validate_model_dir(tmp_path, verify_hashes=True)
     assert report.mismatched == ("gpt.pth",)
+
+
+def test_model_hash_cache_is_thread_safe_and_bounded(tmp_path: Path):
+    paths = []
+    expected = {}
+    for index in range(192):
+        data = bytes([index % 251]) * 1024
+        path = tmp_path / f"model-{index}.bin"
+        path.write_bytes(data)
+        paths.append(path)
+        expected[path] = hashlib.sha256(data).hexdigest()
+
+    with model_store._HASH_CACHE_LOCK:
+        model_store._HASH_CACHE.clear()
+    previous_interval = sys.getswitchinterval()
+    try:
+        sys.setswitchinterval(1e-6)
+        with ThreadPoolExecutor(max_workers=32) as executor:
+            results = list(executor.map(model_store._sha256, paths))
+    finally:
+        sys.setswitchinterval(previous_interval)
+
+    assert results == [expected[path] for path in paths]
+    with model_store._HASH_CACHE_LOCK:
+        assert len(model_store._HASH_CACHE) <= model_store._HASH_CACHE_MAX_ENTRIES
 
 
 def test_manifest_is_pinned_to_formal_index_tts_25():
@@ -240,6 +267,71 @@ def test_model_download_stops_before_network_when_space_is_insufficient(
         )
 
     assert download_started == []
+
+
+def test_huggingface_download_interrupt_terminates_worker_without_waiting(
+    monkeypatch,
+):
+    class UserInterrupt(BaseException):
+        pass
+
+    class FakeProcess:
+        def __init__(self):
+            self.returncode = None
+            self.terminated = False
+            self.killed = False
+            self.waits = []
+
+        def poll(self):
+            return self.returncode
+
+        def terminate(self):
+            self.terminated = True
+            self.returncode = -15
+
+        def kill(self):
+            self.killed = True
+            self.returncode = -9
+
+        def wait(self, timeout=None):
+            self.waits.append(timeout)
+            return self.returncode
+
+    process = FakeProcess()
+    captured = {}
+
+    def fake_popen(command, **kwargs):
+        captured["command"] = command
+        captured["kwargs"] = kwargs
+        return process
+
+    monkeypatch.setattr(downloader.subprocess, "Popen", fake_popen)
+
+    def interrupt():
+        raise UserInterrupt()
+
+    with pytest.raises(UserInterrupt):
+        downloader._download_hf_file_cancellable(
+            {
+                "repo_id": "t8star/IndexTTS-2.5-Comfy",
+                "revision": "a" * 40,
+                "filename": "model.safetensors",
+                "local_dir": "models",
+                "force_download": False,
+            },
+            interrupt,
+        )
+
+    assert process.terminated is True
+    assert process.killed is False
+    assert process.waits == [downloader.HF_DOWNLOAD_STOP_SECONDS]
+    assert captured["command"][:4] == [
+        sys.executable,
+        "-m",
+        "services.downloader",
+        "--internal-hf-download",
+    ]
+    assert captured["kwargs"]["cwd"] == str(downloader.PLUGIN_ROOT)
 
 
 def test_comfy_requirements_do_not_replace_torch_or_pull_training_stacks():

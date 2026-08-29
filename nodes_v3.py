@@ -19,6 +19,7 @@ from .runtime.inference_adapter import (
     NativeTargetDurationUnsupported,
     _progress_callback,
     run_inference,
+    throw_if_processing_interrupted,
 )
 from .runtime.audio_processing import (
     POSTPROCESS_PRESETS,
@@ -1225,6 +1226,7 @@ class T8IndexTTS25VoiceProfile(io.ComfyNode):
                     display_name="默认语言",
                     options=["ZH", "EN", "JA", "ES", "AR"],
                     default="ZH",
+                    tooltip="台词未单独填写语言时，多角色生成会使用该角色的默认语言。",
                 ),
                 EmotionType.Input(
                     "emotion",
@@ -1268,6 +1270,14 @@ def _emotion_mode_label(emotion: EmotionConfig | None) -> str:
         "vector": "八维向量",
         "text": "文本描述",
     }.get(emotion.mode, emotion.mode)
+
+
+def _resolve_line_language(line, profile: VoiceProfile) -> str:
+    """Use a per-line language when supplied, otherwise the role's default."""
+
+    if bool(getattr(line, "language_explicit", True)):
+        return str(line.language)
+    return str(profile.language or line.language)
 
 
 def _resolve_line_emotion(line, profile: VoiceProfile) -> tuple[EmotionConfig | None, str]:
@@ -1455,6 +1465,7 @@ class T8IndexTTS25DialogueScript(io.ComfyNode):
                     display_name="默认语言",
                     options=["ZH", "EN", "JA", "ES", "AR"],
                     default="ZH",
+                    tooltip="用于脚本解析预览和兜底；生成时，逐句显式语言优先，其次使用角色音色的默认语言。",
                 ),
             ],
             outputs=[
@@ -1663,10 +1674,11 @@ class T8IndexTTS25TimelineEditor(io.ComfyNode):
         payload = {
             "unit": "milliseconds",
             "columns": [
-                "index",
-                "role",
-                "language",
-                "start_ms",
+                    "index",
+                    "role",
+                    "language",
+                    "language_explicit",
+                    "start_ms",
                 "end_ms",
                 "duration_factor",
                 "text",
@@ -1909,8 +1921,9 @@ class T8IndexTTS25DialogueGenerate(io.ComfyNode):
         sample_rate: int | None = None
         try:
             for offset, line in enumerate(dialogue_script.lines):
+                throw_if_processing_interrupted()
                 profile = role_library.profiles[line.role]
-                language = line.language or profile.language
+                language = _resolve_line_language(line, profile)
                 resolved_emotion, emotion_source = _resolve_line_emotion(line, profile)
                 native_slot = bool(
                     fit_srt_slots and line.slot_ms and slot_duration_mode == "native"
@@ -1989,6 +2002,7 @@ class T8IndexTTS25DialogueGenerate(io.ComfyNode):
                 selected_seed = int(seed) + offset
                 if review_enabled:
                     for retry_index in range(retry_count + 1):
+                        throw_if_processing_interrupted()
                         candidate_seed = int(seed) + offset + retry_index * 100_003
                         if retry_index > 0:
                             try:
@@ -2038,6 +2052,7 @@ class T8IndexTTS25DialogueGenerate(io.ComfyNode):
                             candidate_status = status
                             candidate_adjustment = duration_adjustment
                             candidate_ms = actual_ms
+                        throw_if_processing_interrupted()
                         try:
                             transcript = transcribe_waveform(
                                 candidate["waveform"],
@@ -2047,6 +2062,7 @@ class T8IndexTTS25DialogueGenerate(io.ComfyNode):
                                 model_name=asr_model,
                                 device=asr_device,
                                 download_root=_asr_download_root(),
+                                interrupt_callback=throw_if_processing_interrupted,
                             )
                             review = {
                                 **transcript,
@@ -2069,6 +2085,7 @@ class T8IndexTTS25DialogueGenerate(io.ComfyNode):
                                 "model": asr_model,
                                 "error": str(exc).strip() or type(exc).__name__,
                             }
+                        throw_if_processing_interrupted()
                         asr_attempts.append(
                             {
                                 "attempt": retry_index + 1,
@@ -2152,6 +2169,7 @@ class T8IndexTTS25DialogueGenerate(io.ComfyNode):
         )
         for line_report, placement in zip(line_reports, placements):
             line_report["timeline"] = placement.to_dict()
+        throw_if_processing_interrupted()
         combined_audio, postprocess_report = postprocess_audio(
             {"waveform": waveform, "sample_rate": sample_rate},
             postprocess_preset,
@@ -2293,6 +2311,7 @@ class T8IndexTTS25ASRProofread(io.ComfyNode):
             raise RuntimeError(
                 "所选 ASR 后端不可用；请安装 openai-whisper / faster-whisper，或切换后端。"
             )
+        throw_if_processing_interrupted()
         transcript = transcribe_waveform(
             audio["waveform"],
             int(audio["sample_rate"]),
@@ -2301,7 +2320,9 @@ class T8IndexTTS25ASRProofread(io.ComfyNode):
             model_name=model_name,
             device=device,
             download_root=_asr_download_root(),
+            interrupt_callback=throw_if_processing_interrupted,
         )
+        throw_if_processing_interrupted()
         review = {
             **transcript,
             **review_transcript(expected_text, transcript["text"], language, threshold),
@@ -3154,6 +3175,7 @@ class T8IndexTTS25Generate(io.ComfyNode):
             quality_warning = "所选 ASR 后端不可用；已改用音频技术指标选优并保留全部候选。"
 
         def generate_candidate(candidate_seed: int) -> tuple[dict, str, dict]:
+            throw_if_processing_interrupted()
             native_requested = (
                 target_duration_mode == "native" and float(target_duration_seconds) > 0
             )
@@ -3231,6 +3253,7 @@ class T8IndexTTS25Generate(io.ComfyNode):
                 )
             if native_fallback:
                 candidate_status += " | 原生目标时长不可用，已回退为二次推理适配"
+            throw_if_processing_interrupted()
             candidate_audio, postprocess_report = postprocess_audio(
                 candidate_audio, postprocess_preset, postprocess_strength
             )
@@ -3256,6 +3279,7 @@ class T8IndexTTS25Generate(io.ComfyNode):
             attempts: list[dict] = []
             candidate_records: list[tuple[dict, str, dict, dict]] = []
             for attempt_index in range(retry_count + 1):
+                throw_if_processing_interrupted()
                 candidate_seed = int(seed) + attempt_index * 100_003
                 if attempt_index:
                     candidate, candidate_status, candidate_metadata = (
@@ -3278,6 +3302,7 @@ class T8IndexTTS25Generate(io.ComfyNode):
                     "technical": technical,
                 }
                 if quality_enabled:
+                    throw_if_processing_interrupted()
                     try:
                         transcript = transcribe_waveform(
                             candidate["waveform"],
@@ -3287,6 +3312,7 @@ class T8IndexTTS25Generate(io.ComfyNode):
                             model_name=quality_asr_model,
                             device=quality_asr_device,
                             download_root=_asr_download_root(),
+                            interrupt_callback=throw_if_processing_interrupted,
                         )
                         review.update(transcript)
                         review.update(
@@ -3299,6 +3325,7 @@ class T8IndexTTS25Generate(io.ComfyNode):
                         )
                     except Exception as exc:
                         review["error"] = str(exc).strip() or type(exc).__name__
+                    throw_if_processing_interrupted()
                 review["combined_score"] = combined_candidate_score(
                     float(technical["score"]), review.get("similarity")
                 )

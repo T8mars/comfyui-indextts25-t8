@@ -5,8 +5,15 @@ import sys
 from pathlib import Path
 
 
+ROOT = Path(__file__).resolve().parents[1]
+UNUSED_BUNDLED_WEIGHTS = {
+    "indextts/utils/maskgct/models/codec/facodec/modules/JDC/bst.t7",
+    "indextts/utils/maskgct/models/tts/maskgct/ckpt/wav2vec2bert_stats.pt",
+}
+
+
 def test_package_bootstrap_exposes_bundled_indextts_without_comfy_sys_path():
-    root = Path(__file__).resolve().parents[1]
+    root = ROOT
     script = f"""
 import importlib.util
 import os
@@ -47,3 +54,20 @@ assert declared is not None and module.__version__ == declared.group(1)
         check=False,
     )
     assert completed.returncode == 0, completed.stderr
+
+
+def test_registry_package_contract_excludes_unused_weights_and_keeps_licenses():
+    ignored = {
+        line.strip().replace("\\", "/")
+        for line in (ROOT / ".comfyignore").read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    }
+    assert UNUSED_BUNDLED_WEIGHTS <= ignored
+
+    expected_licenses = {
+        ROOT / "incl_licenses" / f"LICENSE_{index}" for index in range(1, 9)
+    }
+    assert all(path.is_file() and path.stat().st_size > 0 for path in expected_licenses)
+    notices = (ROOT / "THIRD_PARTY_NOTICES.md").read_text(encoding="utf-8")
+    assert "incl_licenses/LICENSE_1" in notices
+    assert "incl_licenses/LICENSE_8" in notices

@@ -7,6 +7,7 @@ import time
 from typing import Any
 
 import torch
+from transformers import StoppingCriteria, StoppingCriteriaList
 
 from .audio_adapter import indextts_result_to_audio
 from .audio_processing import concatenate_with_pauses
@@ -19,6 +20,14 @@ from .types import DEFAULT_EMOTION, DEFAULT_SAMPLING, EmotionConfig, ModelHandle
 
 class NativeTargetDurationUnsupported(RuntimeError):
     """Raised when a selected external runtime predates native duration control."""
+
+
+class _ComfyInterruptStoppingCriteria(StoppingCriteria):
+    """Check ComfyUI's stop flag between autoregressive token steps."""
+
+    def __call__(self, input_ids, scores, **kwargs) -> bool:
+        throw_if_processing_interrupted()
+        return False
 
 
 def _native_chunk_durations(plan, target_duration_seconds: float | None) -> list[float | None]:
@@ -52,12 +61,22 @@ def _progress_callback():
         progress = comfy.utils.ProgressBar(100)
 
         def update(value: float, desc: str = "") -> None:
-            comfy.model_management.throw_exception_if_processing_interrupted()
+            throw_if_processing_interrupted()
             progress.update_absolute(max(0, min(100, round(float(value) * 100))))
 
         return update
     except Exception:
         return lambda value, desc="": None
+
+
+def throw_if_processing_interrupted() -> None:
+    """Honor ComfyUI's stop request without requiring ComfyUI in unit tests."""
+
+    try:
+        import comfy.model_management
+    except (ImportError, ModuleNotFoundError):
+        return
+    comfy.model_management.throw_exception_if_processing_interrupted()
 
 
 def _result_duration_seconds(result: Any) -> float:
@@ -165,6 +184,7 @@ def run_inference(
                                 torch.cuda.empty_cache()
                         notes.append("低显存模式已在生成前释放 QwenEmotion")
                 for block_index, chunk in enumerate(plan.chunks):
+                    throw_if_processing_interrupted()
                     with scoped_seed(int(seed) + block_index, handle.device):
                         def generate_with_limit(limit: int):
                             infer_kwargs = dict(
@@ -183,6 +203,10 @@ def run_inference(
                                 max_text_tokens_per_segment=int(limit),
                                 duration_factor=float(duration_factor),
                                 text_normalization=bool(sampling.text_normalization),
+                                interrupt_callback=throw_if_processing_interrupted,
+                                stopping_criteria=StoppingCriteriaList(
+                                    [_ComfyInterruptStoppingCriteria()]
+                                ),
                                 **sampling.generation_kwargs(),
                             )
                             if native_chunk_durations[block_index] is not None:
@@ -204,6 +228,7 @@ def run_inference(
                             duration_factor=duration_factor,
                             check_duration=native_chunk_durations[block_index] is None,
                         )
+                        throw_if_processing_interrupted()
                         results.append(result)
                         guard_report["speech_block"] = block_index + 1
                         long_text_guard_reports.append(guard_report)

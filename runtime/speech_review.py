@@ -9,7 +9,7 @@ import re
 import threading
 import unicodedata
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any, Callable, Sequence
 
 import torch
 import torchaudio
@@ -389,7 +389,10 @@ def _transcribe_waveform_locked(
     device: str = "auto",
     download_root: str | Path | None = None,
     backend: str = "auto",
+    interrupt_callback: Callable[[], None] | None = None,
 ) -> dict[str, Any]:
+    if interrupt_callback is not None:
+        interrupt_callback()
     language = str(language or "AUTO").upper()
     if language not in ASR_LANGUAGE_CODES:
         raise ValueError("ASR 语言只能是 AUTO、ZH、EN、JA、ES 或 AR。")
@@ -404,9 +407,13 @@ def _transcribe_waveform_locked(
         audio = torchaudio.functional.resample(audio, int(sample_rate), 16000)
     samples = audio.squeeze(0).clamp(-1, 1).numpy()
     resolved_backend = resolve_asr_backend(backend)
+    if interrupt_callback is not None:
+        interrupt_callback()
     model, resolved_device = load_asr_model(
         model_name, device, download_root, resolved_backend
     )
+    if interrupt_callback is not None:
+        interrupt_callback()
     if resolved_backend == "openai_whisper":
         result = model.transcribe(
             samples,
@@ -418,6 +425,8 @@ def _transcribe_waveform_locked(
             temperature=0.0,
             word_timestamps=True,
         )
+        if interrupt_callback is not None:
+            interrupt_callback()
         segments = result.get("segments") or ()
         text, detected_language, words = (
             str(result.get("text") or "").strip(),
@@ -434,7 +443,11 @@ def _transcribe_waveform_locked(
             condition_on_previous_text=False,
             word_timestamps=True,
         )
-        segments = list(segment_iter)
+        segments = []
+        for segment in segment_iter:
+            if interrupt_callback is not None:
+                interrupt_callback()
+            segments.append(segment)
         text, detected_language, words = (
             "".join(str(segment.text) for segment in segments).strip(),
             str(getattr(info, "language", None) or ASR_LANGUAGE_CODES[language] or ""),

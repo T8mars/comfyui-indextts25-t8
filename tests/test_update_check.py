@@ -54,10 +54,20 @@ def test_fetch_disables_redirects_and_caps_response(monkeypatch) -> None:
     captured = {}
 
     class FakeResponse:
-        content = b"{}"
+        chunks = [b"{}"]
+        headers = {}
+        closed = False
 
         def raise_for_status(self) -> None:
             return None
+
+        def iter_content(self, chunk_size):
+            captured["chunk_size"] = chunk_size
+            yield from self.chunks
+
+        def close(self):
+            self.closed = True
+            captured["closed"] = True
 
     class FakeSession:
         def get(self, url, **kwargs):
@@ -71,7 +81,17 @@ def test_fetch_disables_redirects_and_caps_response(monkeypatch) -> None:
     assert captured["url"] == URLS["official_code"]
     assert captured["kwargs"]["allow_redirects"] is False
     assert captured["kwargs"]["timeout"] == 2.0
+    assert captured["kwargs"]["stream"] is True
+    assert captured["chunk_size"] == 64 * 1024
 
-    FakeResponse.content = b"x" * (update_check.MAX_RESPONSE_BYTES + 1)
+    FakeResponse.headers = {"Content-Length": "unknown"}
+    assert update_check._fetch(URLS["official_code"], 2.0) == "{}"
+
+    FakeResponse.chunks = [
+        b"x" * update_check.MAX_RESPONSE_BYTES,
+        b"y",
+        b"this chunk must not be consumed",
+    ]
     with pytest.raises(ValueError, match="1 MiB"):
         update_check._fetch(URLS["official_code"], 2.0)
+    assert captured["closed"] is True

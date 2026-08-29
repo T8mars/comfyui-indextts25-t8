@@ -1005,6 +1005,9 @@ class IndexTTS2:
     ):
         print(">> starting inference...")
         self._set_gr_progress(0, "starting inference...")
+        interrupt_callback = generation_kwargs.pop("interrupt_callback", None)
+        if interrupt_callback is not None:
+            interrupt_callback()
         target_duration = normalize_target_duration(target_duration)
         diffusion_steps = int(diffusion_steps)
         inference_cfg_rate = float(inference_cfg_rate)
@@ -1226,6 +1229,7 @@ class IndexTTS2:
                         num_beams=num_beams,
                         repetition_penalty=repetition_penalty,
                         max_generate_length=max_mel_tokens,
+                        interrupt_callback=interrupt_callback,
                         **generation_kwargs,
                     )
 
@@ -1294,12 +1298,17 @@ class IndexTTS2:
                         diffusion_steps,
                         temperature=cfm_temperature,
                         inference_cfg_rate=inference_cfg_rate,
+                        interrupt_callback=interrupt_callback,
                     )
+                    if interrupt_callback is not None:
+                        interrupt_callback()
                     vc_target = vc_target[:, :, ref_mel.size(-1) :]
                     s2mel_time += time.perf_counter() - m_start_time
 
                     m_start_time = time.perf_counter()
                     wav = self.bigvgan(vc_target.float()).squeeze().unsqueeze(0)
+                    if interrupt_callback is not None:
+                        interrupt_callback()
                     print(wav.shape)
                     bigvgan_time += time.perf_counter() - m_start_time
                     wav = wav.squeeze(1)

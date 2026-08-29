@@ -39,12 +39,28 @@ def _fetch(url: str, timeout_seconds: float) -> str:
         },
         timeout=max(1.0, float(timeout_seconds)),
         allow_redirects=False,
+        stream=True,
     )
-    response.raise_for_status()
-    body = bytes(response.content)
-    if len(body) > MAX_RESPONSE_BYTES:
-        raise ValueError("更新检查响应超过 1 MiB 安全上限。")
-    return body.decode("utf-8")
+    try:
+        response.raise_for_status()
+        content_length = getattr(response, "headers", {}).get("Content-Length")
+        if content_length is not None:
+            try:
+                advertised_size = int(content_length)
+            except (TypeError, ValueError):
+                advertised_size = None
+            if advertised_size is not None and advertised_size > MAX_RESPONSE_BYTES:
+                raise ValueError("更新检查响应超过 1 MiB 安全上限。")
+        body = bytearray()
+        for chunk in response.iter_content(chunk_size=64 * 1024):
+            if not chunk:
+                continue
+            if len(body) + len(chunk) > MAX_RESPONSE_BYTES:
+                raise ValueError("更新检查响应超过 1 MiB 安全上限。")
+            body.extend(chunk)
+        return bytes(body).decode("utf-8")
+    finally:
+        response.close()
 
 
 def check_updates(

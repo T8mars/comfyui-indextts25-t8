@@ -452,10 +452,11 @@ class UnifiedVoice(nn.Module):
             accel_gpt = GPT2AccelModel(gpt_config)
             accel_gpt.load_state_dict(self.gpt.state_dict(), strict=False)
 
+            accel_device = next(self.gpt.parameters()).device
             if half:
-                accel_gpt = accel_gpt.half().cuda()
+                accel_gpt = accel_gpt.half().to(accel_device)
             else:
-                accel_gpt = accel_gpt.cuda()
+                accel_gpt = accel_gpt.to(accel_device)
             accel_gpt.eval()
 
             lm_head_with_norm = nn.Sequential(self.final_norm, self.mel_head)
@@ -718,7 +719,8 @@ class UnifiedVoice(nn.Module):
                          emo_speech_condition=None, cond_lengths=None, emo_cond_lengths=None, emo_vec=None,
                          use_speed=False, campplus_embedding=None, wav=None,
                          input_tokens=None, num_return_sequences=1,
-                         max_generate_length=None, typical_sampling=False, typical_mass=.9, **hf_generate_kwargs):
+                         max_generate_length=None, typical_sampling=False, typical_mass=.9,
+                         interrupt_callback=None, **hf_generate_kwargs):
         """
         Args:
             speech_condition: (b, d, frames) or (d, frames)
@@ -811,6 +813,7 @@ class UnifiedVoice(nn.Module):
                 tts_embeddings=inputs_embeds,  # [pad][cond][text] embeddings (87 tokens, NO start_mel_token)
                 tts_mel_embedding=self.inference_model.embeddings,  # mel_embedding layer
                 tts_text_pos_embedding=self.inference_model.text_pos_embedding,  # text_pos_embedding layer
+                interrupt_callback=interrupt_callback,
             )
         else:
             output = self.inference_model.generate(inputs, 

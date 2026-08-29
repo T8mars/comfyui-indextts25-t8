@@ -48,6 +48,29 @@ def test_srt_rewrite_accepts_legacy_numeric_and_shifted_widget_values():
     assert report["text_mode"] == "asr_passed"
     assert len(report["warnings"]) == 2
 
+
+def test_srt_rewrite_falls_back_from_invalid_actual_timestamps():
+    lines = [DialogueLine(1, "旁白", "安全字幕", "ZH")]
+    rewritten, report = rewrite_srt(
+        lines,
+        [
+            {
+                "index": 1,
+                "actual_duration_ms": 750,
+                "timeline": {
+                    "actual_start_ms": -500,
+                    "actual_end_ms": -100,
+                },
+            }
+        ],
+        timing_mode="actual",
+        text_mode="original",
+    )
+    assert "00:00:00,000 --> 00:00:00,750" in rewritten
+    assert report["lines"][0]["end_ms"] > report["lines"][0]["start_ms"]
+    assert any("实际时间无效" in item for item in report["warnings"])
+
+
 def test_timeline_editor_rejects_unbounded_allocations():
     lines = [DialogueLine(1, "旁白", "测试", "ZH")]
     with pytest.raises(ValueError, match="0–86400000"):

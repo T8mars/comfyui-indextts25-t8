@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Iterable
@@ -14,6 +15,8 @@ MODEL_FOLDER_NAME = "IndexTTS-2.5"
 MISSING_MODEL_OPTION = "[未找到] 请将模型放入 models/TTS/IndexTTS-2.5"
 MODEL_REPOSITORY_URL = "https://huggingface.co/t8star/IndexTTS-2.5-Comfy"
 _HASH_CACHE: dict[tuple[str, int, int, int], str] = {}
+_HASH_CACHE_LOCK = threading.RLock()
+_HASH_CACHE_MAX_ENTRIES = 64
 
 
 @dataclass(frozen=True, slots=True)
@@ -206,7 +209,8 @@ def _sha256(path: Path, on_chunk: Callable[[int], None] | None = None) -> str:
         stat.st_mtime_ns,
         _file_change_token(path, stat),
     )
-    cached = _HASH_CACHE.get(key)
+    with _HASH_CACHE_LOCK:
+        cached = _HASH_CACHE.get(key)
     if cached is not None:
         if on_chunk is not None:
             on_chunk(stat.st_size)
@@ -218,9 +222,13 @@ def _sha256(path: Path, on_chunk: Callable[[int], None] | None = None) -> str:
             if on_chunk is not None:
                 on_chunk(len(chunk))
     value = digest.hexdigest()
-    _HASH_CACHE[key] = value
-    while len(_HASH_CACHE) > 64:
-        _HASH_CACHE.pop(next(iter(_HASH_CACHE)))
+    with _HASH_CACHE_LOCK:
+        cached = _HASH_CACHE.get(key)
+        if cached is not None:
+            return cached
+        _HASH_CACHE[key] = value
+        while len(_HASH_CACHE) > _HASH_CACHE_MAX_ENTRIES:
+            _HASH_CACHE.pop(next(iter(_HASH_CACHE)))
     return value
 
 

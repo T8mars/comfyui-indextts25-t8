@@ -77,6 +77,7 @@ class KVCacheManager:
         block_size: int,
         num_blocks: int,
         dtype: torch.dtype,
+        device: torch.device | str,
     ):
         self.num_layers = num_layers
         self.num_heads = num_heads
@@ -90,8 +91,8 @@ class KVCacheManager:
         self.free_block_ids: deque = deque(range(num_blocks))
         self.used_block_ids: Set[int] = set()
 
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-        cache_dtype = torch.float16 if device == "cuda" else dtype
+        device = torch.device(device)
+        cache_dtype = torch.float16 if device.type == "cuda" else dtype
         self.kv_cache = torch.empty(
             2,
             num_layers,

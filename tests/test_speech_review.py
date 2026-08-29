@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import threading
+from types import SimpleNamespace
 
 import numpy as np
+import pytest
 import torch
 
 from runtime import speech_review
@@ -104,3 +106,42 @@ def test_clear_asr_cache_waits_for_active_transcription(monkeypatch):
     assert not clearer.is_alive()
     assert errors == []
     assert clear_finished.is_set()
+
+
+def test_faster_whisper_checks_interruption_while_consuming_segments(monkeypatch):
+    consumed = []
+
+    class FakeFasterWhisper:
+        def transcribe(self, _audio, **_kwargs):
+            def segments():
+                for index in range(3):
+                    consumed.append(index)
+                    yield SimpleNamespace(text=str(index), words=[])
+
+            return segments(), SimpleNamespace(language="en")
+
+    monkeypatch.setattr(
+        speech_review,
+        "load_asr_model",
+        lambda *args, **kwargs: (FakeFasterWhisper(), "cpu"),
+    )
+    monkeypatch.setattr(
+        speech_review, "resolve_asr_backend", lambda _backend: "faster_whisper"
+    )
+    checks = 0
+
+    def interrupt():
+        nonlocal checks
+        checks += 1
+        if checks == 5:
+            raise RuntimeError("processing interrupted")
+
+    with pytest.raises(RuntimeError, match="processing interrupted"):
+        speech_review.transcribe_waveform(
+            torch.zeros(1, 16000),
+            16000,
+            language="EN",
+            interrupt_callback=interrupt,
+        )
+
+    assert consumed == [0, 1]

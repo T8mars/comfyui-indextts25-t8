@@ -48,6 +48,21 @@ def test_all_voice_presets_produce_finite_bounded_audio():
         assert float(result["waveform"].abs().max()) <= 1.0
 
 
+def test_voice_presets_are_nyquist_safe_for_low_sample_rates():
+    for sample_rate in (4000, 8000):
+        impulse = torch.zeros(sample_rate // 10)
+        impulse[0] = 0.5
+        source = {
+            "waveform": impulse.view(1, 1, -1),
+            "sample_rate": sample_rate,
+        }
+        for preset in ("voice_clarity", "clear_narration", "deharsh", "warm"):
+            result, report = postprocess_audio(source, preset, 1.0)
+            assert report["preset"] == preset
+            assert torch.isfinite(result["waveform"]).all()
+            assert float(result["waveform"].abs().max()) <= 1.0
+
+
 def test_concatenation_preserves_leading_and_between_block_pauses_exactly():
     result = concatenate_with_pauses(
         [_audio(10), _audio(20)],

@@ -1,3 +1,6 @@
+import ast
+from pathlib import Path
+
 import torch
 
 from runtime.acceleration import (
@@ -68,3 +71,29 @@ def test_preflight_includes_dependency_versions_without_importing_models():
         "triton",
         "ninja",
     }
+
+
+def test_gpt_acceleration_never_uses_implicit_default_cuda_device():
+    root = Path(__file__).resolve().parents[1]
+    files = (
+        root / "indextts" / "gpt" / "model_v2.py",
+        root / "indextts" / "gpt" / "model_v2_5.py",
+        root / "indextts" / "accel" / "accel_engine.py",
+        root / "indextts" / "accel" / "kv_manager.py",
+    )
+    violations = []
+    for path in files:
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            if isinstance(node.func, ast.Attribute) and node.func.attr == "cuda":
+                violations.append((path.name, node.lineno, "implicit .cuda()"))
+            for keyword in node.keywords:
+                if (
+                    keyword.arg == "device"
+                    and isinstance(keyword.value, ast.Constant)
+                    and keyword.value.value == "cuda"
+                ):
+                    violations.append((path.name, node.lineno, "device='cuda'"))
+    assert violations == []

@@ -15,6 +15,10 @@ indextts/s2mel/dac/utils/
 indextts/s2mel/wav2vecbert_extract.py
 indextts/s2mel/modules/rmvpe.py
 
+# Upstream training checkpoints/constants are not referenced by the bundled inference path.
+indextts/utils/maskgct/models/codec/facodec/modules/JDC/bst.t7
+indextts/utils/maskgct/models/tts/maskgct/ckpt/wav2vec2bert_stats.pt
+
 # Local caches should never be published if they become tracked accidentally.
 __pycache__/
 .pytest_cache/

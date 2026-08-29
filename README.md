@@ -21,7 +21,16 @@ IndexTTS 2.5 的 ComfyUI V3 原生节点集成。节点菜单位于：
 
 本目录固定使用 IndexTTS 2.5 推理核心和正式 2.5 模型清单，不会回退或误载 IndexTTS 2.0。
 
-当前版本基线：**ComfyUI Node 0.20.5 · Desktop 0.21.1 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**。
+当前版本基线：**ComfyUI Node 0.20.6 · Desktop 0.21.1 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**。
+
+### v0.20.6 稳定性、取消响应与发布包修复
+
+- 修复多 GPU 使用 `cuda:1` 及更高编号显卡时，GPT 加速张量错误落到默认 `cuda:0` 的问题。
+- 修复停止 audio.cpp、Hugging Face 模型下载、分段生成及 ASR 候选检查时响应不及时或遗留子进程的问题。
+- 修复 4/8 kHz 低采样率音频使用人声后处理预设时可能产生非法数值的问题。
+- 多角色台词未显式填写语言时，正确继承对应角色音色的默认语言；同时修复逐句情感字符串 `false`、非法字幕实际时间及示例 33 角色映射。
+- 模型哈希缓存增加并发保护；更新检查改为真正的 1 MiB 流式上限。
+- Registry 包移除未使用训练权重，并随包提供 BigVGAN 上游第三方许可证全文。
 
 ### v0.20.5 移除 audio.cpp 联网安装器
 

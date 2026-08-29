@@ -16,6 +16,14 @@
 `manifests/model_2_5.json` 对完整模型文件执行 SHA-256 校验。完整模型仓库只重新组织推理必需的原始文件，
 不修改上游模型权重。
 
+## 随包第三方源码许可证
+
+节点包中的 BigVGAN 推理源码沿用 NVIDIA BigVGAN 及其引用项目的开源代码。对应的 MIT、
+Apache-2.0、BSD-3-Clause 等完整许可证文本已按 NVIDIA BigVGAN 上游提交
+`7d2b454564a6c7d014227f635b7423881f14bdac` 原样保存在 `incl_licenses/LICENSE_1` 至
+`incl_licenses/LICENSE_8`，并会随 Registry 安装包一同发布。这些第三方许可证与本项目根目录的
+IndexTTS 模型使用许可证同时适用；第三方代码的权利仍归各自作者所有。
+
 ## 可选 audio.cpp 实验连接器
 
 本节点仅提供对 [audio.cpp](https://github.com/0xShug0/audio.cpp) 命令行接口的隔离调用，

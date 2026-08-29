@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import argparse
+import json
 import shutil
+import subprocess
 import sys
+import tempfile
 import time
-from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Callable
 
@@ -33,6 +35,8 @@ LICENSE_NOTICE = (
     "本项目是第三方衍生集成；原始权利人不对本衍生品背书、担保或承担责任。"
 )
 DISK_RESERVE_BYTES = 1024 * 1024 * 1024
+HF_DOWNLOAD_POLL_SECONDS = 0.2
+HF_DOWNLOAD_STOP_SECONDS = 5.0
 
 
 class ModelDownloadProgress:
@@ -198,6 +202,77 @@ def _selected_files(manifest: dict, *, include_auxiliary: bool) -> list[str]:
     ]
 
 
+def _terminate_download_process(process: subprocess.Popen) -> None:
+    """Stop and reap a controlled Hugging Face download worker."""
+
+    if process.poll() is not None:
+        return
+    try:
+        process.terminate()
+    except ProcessLookupError:
+        # The worker may have exited between poll() and terminate().  wait()
+        # still needs to run so Windows/Unix process resources are reaped.
+        pass
+    try:
+        process.wait(timeout=HF_DOWNLOAD_STOP_SECONDS)
+    except subprocess.TimeoutExpired:
+        try:
+            process.kill()
+        except ProcessLookupError:
+            pass
+        process.wait(timeout=HF_DOWNLOAD_STOP_SECONDS)
+
+
+def _download_hf_file_cancellable(
+    kwargs: dict,
+    poll_progress: Callable[[], None] | None,
+) -> None:
+    """Download in a reapable process so ComfyUI cancellation closes the socket."""
+
+    payload = json.dumps(kwargs, ensure_ascii=False, separators=(",", ":"))
+    command = [
+        sys.executable,
+        "-m",
+        "services.downloader",
+        "--internal-hf-download",
+        payload,
+    ]
+    creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    with tempfile.TemporaryFile() as log:
+        process = subprocess.Popen(
+            command,
+            cwd=str(PLUGIN_ROOT),
+            stdout=log,
+            stderr=subprocess.STDOUT,
+            creationflags=creationflags,
+        )
+        try:
+            while process.poll() is None:
+                if poll_progress is not None:
+                    poll_progress()
+                time.sleep(HF_DOWNLOAD_POLL_SECONDS)
+        except BaseException:
+            _terminate_download_process(process)
+            raise
+        if process.returncode:
+            log.seek(0)
+            detail = log.read().decode("utf-8", errors="replace").strip()
+            raise RuntimeError(
+                "Hugging Face 模型文件下载失败"
+                f"（exit={process.returncode}）：{detail[-3000:]}"
+            )
+
+
+def _internal_hf_download(payload: str) -> int:
+    kwargs = json.loads(payload)
+    if not isinstance(kwargs, dict):
+        raise ValueError("内部 Hugging Face 下载参数无效。")
+    from huggingface_hub import hf_hub_download
+
+    hf_hub_download(**kwargs)
+    return 0
+
+
 def download_main_model(
     target: Path,
     source: str,
@@ -246,16 +321,18 @@ def download_main_model(
             ):
                 progress.resume_file(incomplete_path.stat().st_size)
 
-            with ThreadPoolExecutor(max_workers=1) as pool:
-                future = pool.submit(
-                    hf_hub_download,
-                    repo_id=repository,
-                    revision=revision,
-                    filename=relative,
-                    local_dir=str(target),
-                    force_download=force_download,
-                )
-                while not future.done():
+            download_kwargs = {
+                "repo_id": repository,
+                "revision": revision,
+                "filename": relative,
+                "local_dir": str(target),
+                "force_download": force_download,
+            }
+            if progress is None:
+                hf_hub_download(**download_kwargs)
+            else:
+
+                def poll_progress() -> None:
                     if progress is not None and incomplete_path is not None:
                         try:
                             stat = incomplete_path.stat()
@@ -263,10 +340,13 @@ def download_main_model(
                                 progress.update_file(stat.st_size)
                         except FileNotFoundError:
                             pass
-                    time.sleep(0.2)
-                future.result()
-                if progress is not None:
-                    progress.complete_file()
+                    elif progress is not None:
+                        # Keep checking ComfyUI's interruption flag even if the Hub
+                        # metadata request could not reveal the partial-file path.
+                        progress.update_file(progress.current_received)
+
+                _download_hf_file_cancellable(download_kwargs, poll_progress)
+                progress.complete_file()
     elif source == "modelscope":
         try:
             from modelscope.hub.snapshot_download import snapshot_download
@@ -432,8 +512,13 @@ def resolve_target(args: argparse.Namespace) -> Path:
 
 
 def main(argv: list[str] | None = None) -> int:
+    actual_argv = list(sys.argv[1:] if argv is None else argv)
+    if actual_argv[:1] == ["--internal-hf-download"]:
+        if len(actual_argv) != 2:
+            raise ValueError("内部 Hugging Face 下载参数数量无效。")
+        return _internal_hf_download(actual_argv[1])
     parser = build_parser()
-    args = parser.parse_args(argv)
+    args = parser.parse_args(actual_argv)
     try:
         target = resolve_target(args)
     except ValueError as exc:

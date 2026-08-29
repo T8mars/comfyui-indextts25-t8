@@ -84,6 +84,12 @@ def _compress(waveform: torch.Tensor, threshold_db: float = -18.0, ratio: float 
     return waveform.sign() * compressed
 
 
+def _safe_biquad_frequency(sample_rate: int, requested_hz: float) -> float:
+    """Keep fixed voice-EQ bands comfortably below the input Nyquist rate."""
+
+    return min(float(requested_hz), max(1e-3, float(sample_rate) * 0.45))
+
+
 def _filters(waveform: torch.Tensor, sample_rate: int, preset: str) -> torch.Tensor:
     try:
         import torchaudio.functional as AF
@@ -91,18 +97,54 @@ def _filters(waveform: torch.Tensor, sample_rate: int, preset: str) -> torch.Ten
         raise RuntimeError("音频后处理需要与 PyTorch 匹配的 torchaudio。") from exc
     channels = waveform.reshape(-1, waveform.shape[-1])
     if preset in {"voice_clarity", "clear_narration", "warm"}:
-        channels = AF.highpass_biquad(channels, sample_rate, 70.0)
+        channels = AF.highpass_biquad(
+            channels, sample_rate, _safe_biquad_frequency(sample_rate, 70.0)
+        )
     if preset == "voice_clarity":
-        channels = AF.equalizer_biquad(channels, sample_rate, 3200.0, gain=3.0, Q=0.7)
+        channels = AF.equalizer_biquad(
+            channels,
+            sample_rate,
+            _safe_biquad_frequency(sample_rate, 3200.0),
+            gain=3.0,
+            Q=0.7,
+        )
     elif preset == "clear_narration":
-        channels = AF.equalizer_biquad(channels, sample_rate, 2800.0, gain=2.5, Q=0.8)
+        channels = AF.equalizer_biquad(
+            channels,
+            sample_rate,
+            _safe_biquad_frequency(sample_rate, 2800.0),
+            gain=2.5,
+            Q=0.8,
+        )
         channels = _compress(channels, -20.0, 3.0)
     elif preset == "deharsh":
-        channels = AF.equalizer_biquad(channels, sample_rate, 4800.0, gain=-4.0, Q=1.1)
-        channels = AF.lowpass_biquad(channels, sample_rate, min(10_500.0, sample_rate * 0.45))
+        channels = AF.equalizer_biquad(
+            channels,
+            sample_rate,
+            _safe_biquad_frequency(sample_rate, 4800.0),
+            gain=-4.0,
+            Q=1.1,
+        )
+        channels = AF.lowpass_biquad(
+            channels,
+            sample_rate,
+            _safe_biquad_frequency(sample_rate, 10_500.0),
+        )
     elif preset == "warm":
-        channels = AF.equalizer_biquad(channels, sample_rate, 220.0, gain=3.0, Q=0.8)
-        channels = AF.equalizer_biquad(channels, sample_rate, 5200.0, gain=-1.5, Q=0.9)
+        channels = AF.equalizer_biquad(
+            channels,
+            sample_rate,
+            _safe_biquad_frequency(sample_rate, 220.0),
+            gain=3.0,
+            Q=0.8,
+        )
+        channels = AF.equalizer_biquad(
+            channels,
+            sample_rate,
+            _safe_biquad_frequency(sample_rate, 5200.0),
+            gain=-1.5,
+            Q=0.9,
+        )
     elif preset == "normalize":
         pass
     return channels.reshape_as(waveform)

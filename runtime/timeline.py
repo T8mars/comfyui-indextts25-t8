@@ -100,6 +100,9 @@ def apply_timeline_edits(
         if not 0.5 <= factor <= 2.0:
             raise ValueError(f"时间轴第 {position} 行时长系数必须在 0.5–2.0。")
         original = originals[index]
+        language_explicit = bool(
+            value.get("language_explicit", original.language_explicit)
+        ) or language != original.language
         if "emotion" in value:
             emotion = parse_emotion_override(value.get("emotion"), index=index)
         elif any(
@@ -135,6 +138,7 @@ def apply_timeline_edits(
                 emotion_vector=emotion[2],
                 emotion_strength=emotion[3],
                 emotion_use_random=emotion[4],
+                language_explicit=language_explicit,
             )
         )
     return result
@@ -191,22 +195,40 @@ def rewrite_srt(
         if isinstance(item, dict)
     }
     blocks, rows, cursor = [], [], 0
+    timing_warnings: list[str] = []
     for output_index, line in enumerate(lines, 1):
         report, timeline = (
             reports.get(line.index, {}),
             (reports.get(line.index, {}).get("timeline") or {}),
         )
+        actual_range: tuple[int, int] | None = None
         if timing_mode == "actual" and timeline:
-            start, end = (
-                int(timeline.get("actual_start_ms", cursor)),
-                int(timeline.get("actual_end_ms", cursor + 1)),
-            )
+            try:
+                actual_start = int(timeline.get("actual_start_ms", cursor))
+                actual_end = int(timeline.get("actual_end_ms", cursor + 1))
+            except (TypeError, ValueError, OverflowError):
+                actual_start = actual_end = -1
+            if 0 <= actual_start < actual_end <= MAX_TIMELINE_MS:
+                actual_range = (actual_start, actual_end)
+            else:
+                timing_warnings.append(
+                    f"第 {line.index} 条实际时间无效，已回退到原始或顺延时间。"
+                )
+        if actual_range is not None:
+            start, end = actual_range
         elif line.start_ms is not None and line.end_ms is not None:
             start, end = int(line.start_ms), int(line.end_ms)
         else:
+            try:
+                duration = int(report.get("actual_duration_ms", 1000))
+            except (TypeError, ValueError, OverflowError):
+                duration = 1000
+            duration = max(1, duration)
+            if cursor >= MAX_TIMELINE_MS:
+                raise ValueError(f"字幕时间不能超过 {MAX_TIMELINE_MS} 毫秒。")
             start, end = (
                 cursor,
-                cursor + max(1, int(report.get("actual_duration_ms", 1000))),
+                min(MAX_TIMELINE_MS, cursor + duration),
             )
         end, cursor = max(start + 1, end), max(cursor, end)
         asr = report.get("asr") or {}
@@ -238,6 +260,7 @@ def rewrite_srt(
             }
         )
     warnings = [item for item in (timing_warning, text_warning) if item]
+    warnings.extend(timing_warnings)
     return "\n\n".join(blocks) + ("\n" if blocks else ""), {
         "timing_mode": timing_mode,
         "text_mode": text_mode,

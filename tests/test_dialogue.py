@@ -22,6 +22,74 @@ def test_parse_batch_and_srt_roles():
     assert srt[0].slot_ms == 1000
 
 
+def test_parsers_track_whether_language_was_explicitly_supplied():
+    batch = parse_batch_script("A|hello\nB|hola|ES", default_language="ZH")
+    assert [(line.language, line.language_explicit) for line in batch] == [
+        ("ZH", False),
+        ("ES", True),
+    ]
+    json_lines = parse_batch_script(
+        json.dumps([{"role": "A", "text": "hello"}]),
+        default_language="EN",
+    )
+    assert (json_lines[0].language, json_lines[0].language_explicit) == ("EN", False)
+    srt = parse_srt(
+        "1\n00:00:00,000 --> 00:00:01,000\n[A] hello",
+        default_language="EN",
+    )
+    assert (srt[0].language, srt[0].language_explicit) == ("EN", False)
+
+
+def test_emotion_random_flag_strictly_parses_boolean_strings():
+    vector = [0.0] * 8
+    assert parse_batch_script(
+        json.dumps(
+            [
+                {
+                    "role": "A",
+                    "text": "hello",
+                    "emotion": {
+                        "mode": "vector",
+                        "vector": vector,
+                        "use_random": "false",
+                    },
+                }
+            ]
+        )
+    )[0].emotion_use_random is False
+    assert parse_batch_script(
+        json.dumps(
+            [
+                {
+                    "role": "A",
+                    "text": "hello",
+                    "emotion": {
+                        "mode": "vector",
+                        "vector": vector,
+                        "use_random": "true",
+                    },
+                }
+            ]
+        )
+    )[0].emotion_use_random is True
+    with pytest.raises(ValueError, match="use_random.*true.*false"):
+        parse_batch_script(
+            json.dumps(
+                [
+                    {
+                        "role": "A",
+                        "text": "hello",
+                        "emotion": {
+                            "mode": "vector",
+                            "vector": vector,
+                            "use_random": "yes",
+                        },
+                    }
+                ]
+            )
+        )
+
+
 def test_json_script_and_role_validation():
     lines = parse_batch_script(
         json.dumps([{"role": "A", "text": "Hi", "language": "EN"}])

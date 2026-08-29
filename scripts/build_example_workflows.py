@@ -632,7 +632,9 @@ def add_voice_profile(
     )
 
 
-def add_saved_voice(workflow: Workflow, pos=(400, 0)) -> int:
+def add_saved_voice(
+    workflow: Workflow, pos=(400, 0), *, role_name_override: str = ""
+) -> int:
     return workflow.add(
         SAVED_VOICE_NODE,
         pos,
@@ -648,7 +650,12 @@ def add_saved_voice(workflow: Workflow, pos=(400, 0)) -> int:
             output("voice_info", "STRING"),
             output("voice_report", "STRING"),
         ],
-        ["未找到音色包（请放入 voices 目录）", "", "saved", 0],
+        [
+            "未找到音色包（请放入 voices 目录）",
+            role_name_override,
+            "saved",
+            0,
+        ],
         title="选择 Desktop 导出的已保存音色",
     )
 
@@ -1070,12 +1077,12 @@ def api_audiocpp_generate(audio_id: str) -> dict[str, Any]:
     }
 
 
-def api_saved_voice() -> dict[str, Any]:
+def api_saved_voice(*, role_name_override: str = "") -> dict[str, Any]:
     return {
         "class_type": SAVED_VOICE_NODE,
         "inputs": {
             "saved_voice": "未找到音色包（请放入 voices 目录）",
-            "role_name_override": "旁白",
+            "role_name_override": role_name_override,
             "language_override": "saved",
             "refresh_token": 0,
         },
@@ -2237,7 +2244,10 @@ def audiocpp_pair() -> tuple[dict[str, Any], dict[str, Any]]:
 def saved_voice_pair() -> tuple[dict[str, Any], dict[str, Any]]:
     workflow = Workflow("33 已保存音色库：无需重复上传参考音频")
     model = add_model(workflow, pos=(0, 0))
-    voice = add_saved_voice(workflow, pos=(430, 0))
+    role_name_override = "旁白"
+    voice = add_saved_voice(
+        workflow, pos=(430, 0), role_name_override=role_name_override
+    )
     library = add_role_library(workflow, 1, pos=(910, 40))
     script = add_dialogue_script(
         workflow,
@@ -2255,7 +2265,7 @@ def saved_voice_pair() -> tuple[dict[str, Any], dict[str, Any]]:
     workflow.connect(generate, "audio", save, "audio")
     api = {
         "1": api_model(),
-        "2": api_saved_voice(),
+        "2": api_saved_voice(role_name_override=role_name_override),
         "3": api_role_library(["2"]),
         "4": api_dialogue_script(
             "batch",

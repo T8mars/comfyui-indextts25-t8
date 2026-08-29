@@ -34,6 +34,10 @@ class DialogueLine:
     emotion_vector: tuple[float, ...] | None = None
     emotion_strength: float = 1.0
     emotion_use_random: bool = False
+    # Manually constructed legacy lines are treated as explicit so their
+    # existing language semantics do not change. Parsers set this to False
+    # only when the source line omitted its language column.
+    language_explicit: bool = True
 
     @property
     def slot_ms(self) -> int | None:
@@ -130,7 +134,22 @@ def parse_emotion_override(
         raise ValueError(f"{label}强度必须是 0–1 的数值。") from exc
     if not 0.0 <= strength <= 1.0:
         raise ValueError(f"{label}强度必须在 0–1。")
-    use_random = bool(value.get("use_random", value.get("emotion_use_random", False)))
+    use_random_value = value.get(
+        "use_random", value.get("emotion_use_random", False)
+    )
+    if isinstance(use_random_value, bool):
+        use_random = use_random_value
+    elif use_random_value is None:
+        use_random = False
+    elif isinstance(use_random_value, (int, float)) and use_random_value in {0, 1}:
+        use_random = bool(use_random_value)
+    elif isinstance(use_random_value, str) and use_random_value.strip().lower() in {
+        "true",
+        "false",
+    }:
+        use_random = use_random_value.strip().lower() == "true"
+    else:
+        raise ValueError(f"{label}的 use_random 必须是 true 或 false。")
 
     vector: tuple[float, ...] | None = None
     if mode == "vector":
@@ -239,6 +258,7 @@ def parse_srt(
                 emotion_vector=emotion_vector,
                 emotion_strength=emotion_strength,
                 emotion_use_random=emotion_use_random,
+                language_explicit=False,
             )
         )
     return result
@@ -277,11 +297,23 @@ def _mapping_line(
     emotion_mode, emotion_text, emotion_vector, emotion_strength, emotion_use_random = (
         parse_emotion_override(emotion_value, index=index)
     )
+    language_value = value.get("language")
+    language_explicit_value = value.get("language_explicit")
+    language_explicit = (
+        bool(str(language_value or "").strip())
+        if language_explicit_value is None
+        else (
+            language_explicit_value.strip().lower() == "true"
+            if isinstance(language_explicit_value, str)
+            and language_explicit_value.strip().lower() in {"true", "false"}
+            else bool(language_explicit_value)
+        )
+    )
     return DialogueLine(
         index,
         role,
         text,
-        _language(value.get("language"), default_language),
+        _language(language_value, default_language),
         start,
         end,
         factor,
@@ -290,6 +322,7 @@ def _mapping_line(
         emotion_vector,
         emotion_strength,
         emotion_use_random,
+        language_explicit,
     )
 
 
@@ -376,7 +409,7 @@ def parse_batch_script(
                         "text": parts[1],
                         "language": parts[2]
                         if len(parts) > 2 and parts[2]
-                        else default_language,
+                        else None,
                         "duration_factor": parts[3]
                         if len(parts) > 3 and parts[3]
                         else 1.0,

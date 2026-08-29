@@ -9,6 +9,7 @@ from typing import Any, Sequence
 
 
 LANGUAGES = {"AUTO": "auto", "ZH": "zh", "EN": "en", "JA": "ja", "ES": "es", "AR": "ar"}
+PROCESS_TERMINATE_GRACE_SECONDS = 2.0
 
 
 def _path(value, label: str, *, file: bool | None = None) -> Path:
@@ -18,6 +19,29 @@ def _path(value, label: str, *, file: bool | None = None) -> Path:
     if file is True and not path.is_file():
         raise ValueError(f"{label}必须是文件：{path}")
     return path
+
+
+async def _terminate_process(process) -> None:
+    """Stop a child and reap it, escalating when graceful termination stalls."""
+
+    if process.returncode is not None:
+        return
+    try:
+        process.terminate()
+    except ProcessLookupError:
+        # The child may have exited between the returncode check and terminate().
+        # Still await the asyncio transport so the process is fully reaped.
+        pass
+    try:
+        await asyncio.wait_for(
+            process.wait(), timeout=PROCESS_TERMINATE_GRACE_SECONDS
+        )
+    except asyncio.TimeoutError:
+        try:
+            process.kill()
+        except ProcessLookupError:
+            pass
+        await process.wait()
 
 
 async def _run_process(command: Sequence[str], timeout: float) -> tuple[int, str, str]:
@@ -32,10 +56,15 @@ async def _run_process(command: Sequence[str], timeout: float) -> tuple[int, str
         stdout, stderr = await asyncio.wait_for(
             process.communicate(), timeout=max(1.0, float(timeout))
         )
-    except TimeoutError:
-        process.kill()
-        await process.communicate()
+    except asyncio.TimeoutError:
+        await _terminate_process(process)
         raise TimeoutError(f"audio.cpp 运行超过 {float(timeout):.1f} 秒，已终止。")
+    except BaseException:
+        # asyncio.CancelledError and ComfyUI interruption both deliberately derive
+        # from BaseException. Never leave the native runtime running after the node
+        # has been cancelled.
+        await _terminate_process(process)
+        raise
     return (
         int(process.returncode or 0),
         stdout.decode("utf-8", errors="replace"),

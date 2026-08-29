@@ -47,6 +47,12 @@ def test_adapter_maps_all_controls_without_global_side_effects(tmp_path: Path, m
     _patch_plan(monkeypatch)
     fake = FakeModel()
     monkeypatch.setattr(inference_adapter, "_progress_callback", lambda: (lambda value, desc="": None))
+    interrupt_checks = []
+    monkeypatch.setattr(
+        inference_adapter,
+        "throw_if_processing_interrupted",
+        lambda: interrupt_checks.append(True),
+    )
     monkeypatch.setattr(inference_adapter.MODEL_CACHE, "acquire", lambda handle: SimpleNamespace(model=fake, lock=__import__("threading").RLock()))
     completed = []
     monkeypatch.setattr(
@@ -76,9 +82,15 @@ def test_adapter_maps_all_controls_without_global_side_effects(tmp_path: Path, m
     assert fake.kwargs["emo_text"] == "happy"
     assert fake.kwargs["interval_silence"] == 321
     assert fake.kwargs["do_sample"] is True
+    assert callable(fake.kwargs["interrupt_callback"])
+    criteria = fake.kwargs["stopping_criteria"]
+    assert len(criteria) == 1
+    stopped = criteria(torch.ones(1, 1, dtype=torch.long), torch.zeros(1, 1))
+    assert not bool(stopped.any())
     assert audio["waveform"].shape == (1, 1, 3)
     assert "seed=123" in status
     assert completed == [True]
+    assert len(interrupt_checks) == 3
 
 
 def test_adapter_maps_cfm_controls_and_native_target_duration(tmp_path: Path, monkeypatch):

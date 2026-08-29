@@ -480,6 +480,39 @@ def test_timeline_asr_and_subtitle_nodes_form_a_complete_editing_chain(monkeypat
     assert "[旁白] 识别字幕" in rewritten[0]
 
 
+def test_asr_stop_check_after_transcription_is_not_swallowed(monkeypatch):
+    _load_plugin()
+    from comfyui_indextts25_t8_test import nodes_v3
+
+    monkeypatch.setattr(nodes_v3, "asr_available", lambda *args: True)
+    monkeypatch.setattr(
+        nodes_v3,
+        "transcribe_waveform",
+        lambda *args, **kwargs: {"text": "识别完成"},
+    )
+    checks = 0
+
+    def interrupt_after_asr():
+        nonlocal checks
+        checks += 1
+        if checks == 2:
+            raise RuntimeError("processing interrupted")
+
+    monkeypatch.setattr(
+        nodes_v3, "throw_if_processing_interrupted", interrupt_after_asr
+    )
+    with pytest.raises(RuntimeError, match="processing interrupted"):
+        nodes_v3.T8IndexTTS25ASRProofread.execute(
+            {"waveform": torch.zeros(1, 1, 16000), "sample_rate": 16000},
+            "识别完成",
+            "ZH",
+            "auto",
+            "tiny",
+            "cpu",
+            0.8,
+        )
+
+
 def test_dialogue_generation_can_auto_review_and_return_rewritten_srt(
     tmp_path, monkeypatch
 ):
@@ -807,6 +840,26 @@ def test_role_library_and_merge_alias_preserve_each_roles_emotion():
         assert library.profiles["角色B"].emotion is tense
         assert "角色A（八维向量）" in info
         assert "角色B（文本描述）" in info
+
+
+def test_role_default_language_is_used_only_when_line_omits_language():
+    _load_plugin()
+    from comfyui_indextts25_t8_test.nodes_v3 import _resolve_line_language
+    from comfyui_indextts25_t8_test.runtime.dialogue import DialogueLine
+    from comfyui_indextts25_t8_test.runtime.types import VoiceProfile
+
+    profile = VoiceProfile("角色A", {}, "EN")
+    inherited = DialogueLine(
+        1, "角色A", "hello", "ZH", language_explicit=False
+    )
+    explicit = DialogueLine(
+        2, "角色A", "你好", "ZH", language_explicit=True
+    )
+    legacy = DialogueLine(3, "角色A", "兼容旧构造", "JA")
+
+    assert _resolve_line_language(inherited, profile) == "EN"
+    assert _resolve_line_language(explicit, profile) == "ZH"
+    assert _resolve_line_language(legacy, profile) == "JA"
 
 
 def test_role_emotion_merge_rejects_duplicate_names():
