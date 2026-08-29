@@ -89,6 +89,71 @@ def test_registers_all_pure_v3_nodes():
     assert not hasattr(plugin, "NODE_CLASS_MAPPINGS")
 
 
+def test_audiocpp_generation_uses_the_installed_backend_for_managed_paths(
+    tmp_path,
+    monkeypatch,
+):
+    _load_plugin()
+    from comfyui_indextts25_t8_test import nodes_v3
+
+    executable = tmp_path / "audiocpp_cli.exe"
+    model = tmp_path / "model.gguf"
+    executable.write_bytes(b"exe")
+    model.write_bytes(b"model")
+    captured = {}
+
+    monkeypatch.setattr(
+        nodes_v3,
+        "audiocpp_component_status",
+        lambda **_kwargs: {
+            "runtimeReady": True,
+            "modelReady": True,
+            "executable": str(executable),
+            "modelPath": str(model),
+            "installedBackend": "cpu",
+            "runtime": {"executable": str(executable), "backend": "cpu"},
+            "model": {"modelPath": str(model)},
+        },
+    )
+
+    async def fake_probe(_path):
+        return {"available": True, "summary": "ok"}
+
+    async def fake_run(*args, **kwargs):
+        captured["backend"] = kwargs["backend"]
+        Path(args[3]).write_bytes(b"wav")
+        return {"backend": kwargs["backend"]}
+
+    monkeypatch.setattr(nodes_v3, "probe_audiocpp", fake_probe)
+    monkeypatch.setattr(nodes_v3, "run_audiocpp", fake_run)
+    monkeypatch.setattr(
+        nodes_v3,
+        "comfy_audio_to_reference_wav",
+        lambda *_args, **_kwargs: (tmp_path / "speaker.wav", []),
+    )
+    monkeypatch.setattr(
+        nodes_v3.torchaudio,
+        "load",
+        lambda _path: (torch.zeros((1, 100)), 24000),
+    )
+
+    result = asyncio.run(
+        nodes_v3.T8IndexTTS25AudioCppGenerate.execute(
+            "",
+            "",
+            {"waveform": torch.zeros(1, 1, 100), "sample_rate": 24000},
+            "测试",
+            "ZH",
+            "cuda",
+            1.0,
+            True,
+        )
+    )
+
+    assert captured["backend"] == "cpu"
+    assert json.loads(result[1])["backend"] == "cpu"
+
+
 def test_context_emotion_node_returns_editable_script_without_generating_audio(
     tmp_path, monkeypatch
 ):

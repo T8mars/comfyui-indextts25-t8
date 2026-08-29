@@ -1197,11 +1197,11 @@ class T8IndexTTS25SavedVoice(io.ComfyNode):
         language_override: str,
         refresh_token: int,
     ) -> io.NodeOutput:
-        del refresh_token
         profile, report = load_saved_voice(
             saved_voice,
             role_name_override=role_name_override,
             language_override=language_override,
+            refresh_token=refresh_token,
         )
         info = (
             f"角色={profile.name} | language={profile.language} | "
@@ -2753,9 +2753,42 @@ class T8IndexTTS25AudioCppGenerate(io.ComfyNode):
         memory_saver: bool,
         emotion: EmotionConfig | None = None,
     ) -> io.NodeOutput:
-        installed = audiocpp_component_status()
+        installed = audiocpp_component_status(verify_hash=True)
         executable_path = str(executable_path or installed.get("executable") or "").strip()
         gguf_model_path = str(gguf_model_path or installed.get("modelPath") or "").strip()
+
+        def managed_path_key(value):
+            return str(Path(str(value)).expanduser().resolve()).casefold() if str(value).strip() else ""
+
+        managed_executable_values = {
+            managed_path_key(installed.get("executable")),
+            managed_path_key((installed.get("runtime") or {}).get("executable")),
+        }
+        managed_model_values = {
+            managed_path_key(installed.get("modelPath")),
+            managed_path_key((installed.get("model") or {}).get("modelPath")),
+        }
+        executable_is_managed = (
+            not executable_path or managed_path_key(executable_path) in managed_executable_values
+        )
+        model_is_managed = (
+            not gguf_model_path or managed_path_key(gguf_model_path) in managed_model_values
+        )
+        if executable_is_managed and not installed.get("runtimeReady"):
+            raise RuntimeError(
+                "已安装的 audio.cpp 运行时缺失或校验失败，请重新运行一键组件节点。"
+            )
+        if model_is_managed and not installed.get("modelReady"):
+            raise RuntimeError(
+                "已安装的 audio.cpp GGUF 模型缺失或校验失败，请重新下载/校验模型。"
+            )
+        if executable_is_managed:
+            executable_path = str(installed.get("executable") or executable_path)
+        if model_is_managed:
+            gguf_model_path = str(installed.get("modelPath") or gguf_model_path)
+        installed_backend = str(installed.get("installedBackend") or "").strip()
+        if executable_is_managed and installed_backend:
+            backend = installed_backend
         if not executable_path or not gguf_model_path:
             raise RuntimeError(
                 "audio.cpp 组件路径不完整。请先运行“audio.cpp 一键组件”节点，"

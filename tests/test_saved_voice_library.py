@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import zipfile
 from pathlib import Path
 
@@ -10,7 +11,7 @@ import torch
 from runtime import voice_library
 
 
-def _bundle(path: Path, *, unsafe: bool = False) -> Path:
+def _bundle(path: Path, *, unsafe: bool = False, audio: bytes = b"fake-wave") -> Path:
     manifest = {
         "schemaVersion": 1,
         "profiles": [
@@ -31,7 +32,7 @@ def _bundle(path: Path, *, unsafe: bool = False) -> Path:
     }
     with zipfile.ZipFile(path, "w") as archive:
         archive.writestr("manifest.json", json.dumps(manifest, ensure_ascii=False))
-        archive.writestr("../voice.wav" if unsafe else "audio/voice.wav", b"fake-wave")
+        archive.writestr("../voice.wav" if unsafe else "audio/voice.wav", audio)
     return path
 
 
@@ -76,4 +77,51 @@ def test_unsafe_voice_bundle_is_not_listed_and_cannot_load(tmp_path: Path):
     bundle = _bundle(tmp_path / "unsafe.t8voice.zip", unsafe=True)
     assert voice_library.scan_saved_voices(tmp_path) == []
     with pytest.raises(ValueError, match="不安全路径"):
+        voice_library._read_manifest(bundle)
+
+
+def test_saved_voice_cache_repairs_partial_files_and_refreshes(tmp_path: Path):
+    _bundle(tmp_path / "demo.t8voice.zip", audio=b"complete-wave")
+    entry = voice_library.scan_saved_voices(tmp_path)[0]
+    cached = voice_library._cache_file(entry, "audio/voice.wav", tmp_path)
+    cached.write_bytes(b"partial")
+
+    repaired = voice_library._cache_file(entry, "audio/voice.wav", tmp_path)
+    refreshed = voice_library._cache_file(
+        entry,
+        "audio/voice.wav",
+        tmp_path,
+        refresh_token=1,
+    )
+
+    assert repaired.read_bytes() == b"complete-wave"
+    assert refreshed.read_bytes() == b"complete-wave"
+    assert refreshed != repaired
+
+
+def test_saved_voice_cache_detects_same_stat_bundle_replacement(tmp_path: Path):
+    bundle = _bundle(tmp_path / "demo.t8voice.zip", audio=b"old-wave")
+    original_stat = bundle.stat()
+    first_entry = voice_library.scan_saved_voices(tmp_path)[0]
+    first = voice_library._cache_file(first_entry, "audio/voice.wav", tmp_path)
+    first_fingerprint = voice_library.saved_voice_fingerprint(tmp_path)
+
+    _bundle(bundle, audio=b"new-wave")
+    assert bundle.stat().st_size == original_stat.st_size
+    os.utime(bundle, ns=(original_stat.st_atime_ns, original_stat.st_mtime_ns))
+    second_entry = voice_library.scan_saved_voices(tmp_path)[0]
+    second = voice_library._cache_file(second_entry, "audio/voice.wav", tmp_path)
+
+    assert first.read_bytes() == b"old-wave"
+    assert second.read_bytes() == b"new-wave"
+    assert second != first
+    assert voice_library.saved_voice_fingerprint(tmp_path) != first_fingerprint
+
+
+def test_saved_voice_bundle_rejects_unlisted_files(tmp_path: Path):
+    bundle = _bundle(tmp_path / "extra.t8voice.zip")
+    with zipfile.ZipFile(bundle, "a") as archive:
+        archive.writestr("audio/extra.wav", b"extra")
+
+    with pytest.raises(ValueError, match="未列入清单"):
         voice_library._read_manifest(bundle)
