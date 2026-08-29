@@ -37,7 +37,6 @@ AUDIO_POSTPROCESS_NODE = "T8_IndexTTS25_AudioPostProcess"
 REFERENCE_QUALITY_NODE = "T8_IndexTTS25_ReferenceQuality"
 MEMORY_CONTROL_NODE = "T8_IndexTTS25_MemoryControl"
 AUDIOCPP_GENERATE_NODE = "T8_IndexTTS25_AudioCppGenerate"
-AUDIOCPP_INSTALLER_NODE = "T8_IndexTTS25_AudioCppInstaller"
 ENVIRONMENT_NODE = "T8_IndexTTS25_Environment"
 RUNTIME_BENCHMARK_NODE = "T8_IndexTTS25_RuntimeBenchmark"
 UPDATE_CHECK_NODE = "T8_IndexTTS25_UpdateCheck"
@@ -595,27 +594,7 @@ def add_audiocpp_generate(workflow: Workflow, pos=(420, 0)) -> int:
             1.0,
             True,
         ],
-    )
-
-
-def add_audiocpp_installer(workflow: Workflow, pos=(0, 0)) -> int:
-    return workflow.add(
-        AUDIOCPP_INSTALLER_NODE,
-        pos,
-        (420, 280),
-        [
-            widget_input("action", "COMBO"),
-            widget_input("backend", "COMBO"),
-            widget_input("quantization", "COMBO"),
-            widget_input("confirm_download", "BOOLEAN"),
-        ],
-        [
-            output("executable_path", "STRING"),
-            output("gguf_model_path", "STRING"),
-            output("component_report", "STRING"),
-        ],
-        ["install_all", "cuda", "q8_0", True],
-        title="首次运行将下载官方 audio.cpp + Q8 GGUF（约 4GB）",
+        title="请先手动填写本地 audiocpp_cli 与 GGUF 绝对路径",
     )
 
 
@@ -1087,18 +1066,6 @@ def api_audiocpp_generate(audio_id: str) -> dict[str, Any]:
             "backend": "cuda",
             "duration_factor": 1.0,
             "memory_saver": True,
-        },
-    }
-
-
-def api_audiocpp_installer() -> dict[str, Any]:
-    return {
-        "class_type": AUDIOCPP_INSTALLER_NODE,
-        "inputs": {
-            "action": "install_all",
-            "backend": "cuda",
-            "quantization": "q8_0",
-            "confirm_download": True,
         },
     }
 
@@ -2302,29 +2269,6 @@ def saved_voice_pair() -> tuple[dict[str, Any], dict[str, Any]]:
     return workflow.as_dict(), api
 
 
-def audiocpp_one_click_pair() -> tuple[dict[str, Any], dict[str, Any]]:
-    workflow = Workflow("34 audio.cpp 一键安装并生成（可选组件）")
-    installer = add_audiocpp_installer(workflow, pos=(0, 0))
-    speaker = add_load_audio(
-        workflow, "voice_reference.wav", pos=(0, 360), title="音色参考音频"
-    )
-    generate = add_audiocpp_generate(workflow, pos=(520, 80))
-    save = add_save(workflow, "IndexTTS25_T8/audiocpp_one_click", pos=(1100, 240))
-    workflow.connect(installer, "executable_path", generate, "executable_path")
-    workflow.connect(installer, "gguf_model_path", generate, "gguf_model_path")
-    workflow.connect(speaker, "AUDIO", generate, "speaker_audio")
-    workflow.connect(generate, "audio", save, "audio")
-    api = {
-        "1": api_audiocpp_installer(),
-        "2": api_audio("voice_reference.wav"),
-        "3": api_audiocpp_generate("2"),
-        "4": api_save("3", "IndexTTS25_T8/audiocpp_one_click"),
-    }
-    api["3"]["inputs"]["executable_path"] = ["1", 0]
-    api["3"]["inputs"]["gguf_model_path"] = ["1", 1]
-    return workflow.as_dict(), api
-
-
 def low_vram_fp16_pair() -> tuple[dict[str, Any], dict[str, Any]]:
     workflow = Workflow("28 低显存 FP16 与 CPU 参考编码器")
     model = add_model(
@@ -2410,7 +2354,6 @@ EXAMPLES = {
     "31_per_line_emotion": per_line_emotion_pair,
     "32_context_emotion_suggestions": context_emotion_suggestion_pair,
     "33_saved_voice_library": saved_voice_pair,
-    "34_audiocpp_one_click": audiocpp_one_click_pair,
 }
 
 

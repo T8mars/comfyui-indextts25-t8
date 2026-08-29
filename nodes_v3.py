@@ -40,12 +40,6 @@ from .runtime.context_emotion import suggest_context_emotions
 from .runtime.benchmark import summarize_measurements
 from .runtime.audiocpp_backend import probe as probe_audiocpp
 from .runtime.audiocpp_backend import run as run_audiocpp
-from .runtime.audiocpp_components import (
-    component_status as audiocpp_component_status,
-    default_component_data_root,
-    install_model as install_audiocpp_model,
-    install_runtime as install_audiocpp_runtime,
-)
 from .runtime.model_cache import MODEL_CACHE
 from .runtime.reference_cache import comfy_audio_to_reference_wav
 from .runtime.acceleration import (
@@ -2583,94 +2577,6 @@ class T8IndexTTS25MemoryControl(io.ComfyNode):
         )
 
 
-class T8IndexTTS25AudioCppInstaller(io.ComfyNode):
-    @classmethod
-    def define_schema(cls) -> io.Schema:
-        return io.Schema(
-            node_id="T8_IndexTTS25_AudioCppInstaller",
-            display_name="IndexTTS 2.5 audio.cpp 一键组件 · T8star-Aix",
-            category=CATEGORY,
-            search_aliases=["audio.cpp 安装", "GGUF 下载", "optional component"],
-            description=(
-                "按需下载官方 audio.cpp Windows 运行时和 GGUF 模型；支持断点续传、"
-                "SHA-256 校验，且不会替换默认 Python 推理。"
-            ),
-            inputs=[
-                io.Combo.Input(
-                    "action",
-                    display_name="操作",
-                    options=["status_only", "install_runtime", "install_model", "install_all"],
-                    default="status_only",
-                ),
-                io.Combo.Input(
-                    "backend",
-                    display_name="Windows 后端",
-                    options=["cuda", "vulkan", "cpu"],
-                    default="cuda",
-                ),
-                io.Combo.Input(
-                    "quantization",
-                    display_name="GGUF 精度",
-                    options=["q8_0", "f16", "original"],
-                    default="q8_0",
-                    tooltip="推荐 q8_0（约 3.3 GiB）；f16 约 4.2 GiB；original 约 7.3 GiB。",
-                ),
-                io.Boolean.Input(
-                    "confirm_download",
-                    display_name="确认下载可选组件",
-                    default=False,
-                    tooltip="只有执行安装时才需要勾选；status_only 不需要。",
-                ),
-            ],
-            outputs=[
-                io.String.Output("executable_path", display_name="audiocpp_cli 路径"),
-                io.String.Output("gguf_model_path", display_name="GGUF 模型路径"),
-                io.String.Output("component_report", display_name="组件状态 JSON"),
-            ],
-        )
-
-    @classmethod
-    def validate_inputs(cls, action: str, confirm_download: bool, **kwargs) -> bool | str:
-        if action != "status_only" and not confirm_download:
-            return "安装可选组件前必须勾选“确认下载可选组件”。"
-        return True
-
-    @classmethod
-    def execute(
-        cls,
-        action: str,
-        backend: str,
-        quantization: str,
-        confirm_download: bool,
-    ) -> io.NodeOutput:
-        del confirm_download
-        progress = _progress_callback()
-
-        def update(event: dict) -> None:
-            raw = float(event.get("percent") or 0.0)
-            value = raw / 100.0 if raw > 1.0 else raw
-            progress(value, str(event.get("label") or event.get("phase") or "audio.cpp"))
-
-        if action in {"install_runtime", "install_all"}:
-            install_audiocpp_runtime(backend, callback=update)
-        if action in {"install_model", "install_all"}:
-            install_audiocpp_model(quantization, callback=update)
-        if action not in {"status_only", "install_runtime", "install_model", "install_all"}:
-            raise ValueError(f"未知 audio.cpp 组件操作：{action}")
-        status = audiocpp_component_status()
-        status.update(
-            action=action,
-            backend=backend,
-            quantization=quantization,
-            dataRoot=str(default_component_data_root()),
-        )
-        return io.NodeOutput(
-            status.get("executable", ""),
-            status.get("modelPath", ""),
-            json.dumps(status, ensure_ascii=False, indent=2),
-        )
-
-
 class T8IndexTTS25AudioCppGenerate(io.ComfyNode):
     @classmethod
     def define_schema(cls) -> io.Schema:
@@ -2681,8 +2587,8 @@ class T8IndexTTS25AudioCppGenerate(io.ComfyNode):
             essentials_category="Audio",
             search_aliases=["audio.cpp", "GGUF", "IndexTTS quantized", "实验后端"],
             description=(
-                "调用 audio.cpp CLI 和 IndexTTS2.5 GGUF；路径留空时自动使用“一键组件”"
-                "安装结果。与默认 Python 模型加载器完全隔离，不会改变现有工作流。"
+                "调用用户手动安装的本地 audio.cpp CLI 和 IndexTTS2.5 GGUF；"
+                "必须填写绝对路径，节点不会联网下载组件。"
             ),
             inputs=[
                 io.String.Input(
@@ -2753,46 +2659,12 @@ class T8IndexTTS25AudioCppGenerate(io.ComfyNode):
         memory_saver: bool,
         emotion: EmotionConfig | None = None,
     ) -> io.NodeOutput:
-        installed = audiocpp_component_status(verify_hash=True)
-        executable_path = str(executable_path or installed.get("executable") or "").strip()
-        gguf_model_path = str(gguf_model_path or installed.get("modelPath") or "").strip()
-
-        def managed_path_key(value):
-            return str(Path(str(value)).expanduser().resolve()).casefold() if str(value).strip() else ""
-
-        managed_executable_values = {
-            managed_path_key(installed.get("executable")),
-            managed_path_key((installed.get("runtime") or {}).get("executable")),
-        }
-        managed_model_values = {
-            managed_path_key(installed.get("modelPath")),
-            managed_path_key((installed.get("model") or {}).get("modelPath")),
-        }
-        executable_is_managed = (
-            not executable_path or managed_path_key(executable_path) in managed_executable_values
-        )
-        model_is_managed = (
-            not gguf_model_path or managed_path_key(gguf_model_path) in managed_model_values
-        )
-        if executable_is_managed and not installed.get("runtimeReady"):
-            raise RuntimeError(
-                "已安装的 audio.cpp 运行时缺失或校验失败，请重新运行一键组件节点。"
-            )
-        if model_is_managed and not installed.get("modelReady"):
-            raise RuntimeError(
-                "已安装的 audio.cpp GGUF 模型缺失或校验失败，请重新下载/校验模型。"
-            )
-        if executable_is_managed:
-            executable_path = str(installed.get("executable") or executable_path)
-        if model_is_managed:
-            gguf_model_path = str(installed.get("modelPath") or gguf_model_path)
-        installed_backend = str(installed.get("installedBackend") or "").strip()
-        if executable_is_managed and installed_backend:
-            backend = installed_backend
+        executable_path = str(executable_path or "").strip()
+        gguf_model_path = str(gguf_model_path or "").strip()
         if not executable_path or not gguf_model_path:
             raise RuntimeError(
-                "audio.cpp 组件路径不完整。请先运行“audio.cpp 一键组件”节点，"
-                "或手动填写 audiocpp_cli 与 GGUF 路径。"
+                "audio.cpp 组件路径不完整。请从官方页面手动下载运行时和 GGUF，"
+                "并填写 audiocpp_cli 与 GGUF 的绝对路径；本节点不会联网安装组件。"
             )
         probe = await probe_audiocpp(executable_path)
         if not probe.get("available"):
@@ -3560,7 +3432,6 @@ class T8IndexTTS25Extension(ComfyExtension):
             T8IndexTTS25SubtitleRewrite,
             T8IndexTTS25ReferenceQuality,
             T8IndexTTS25MemoryControl,
-            T8IndexTTS25AudioCppInstaller,
             T8IndexTTS25AudioCppGenerate,
             T8IndexTTS25AudioPostProcess,
             T8IndexTTS25Environment,
@@ -3592,7 +3463,6 @@ __all__ = [
     "T8IndexTTS25SubtitleRewrite",
     "T8IndexTTS25ReferenceQuality",
     "T8IndexTTS25MemoryControl",
-    "T8IndexTTS25AudioCppInstaller",
     "T8IndexTTS25AudioCppGenerate",
     "T8IndexTTS25AudioPostProcess",
     "T8IndexTTS25Environment",

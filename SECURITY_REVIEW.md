@@ -16,6 +16,9 @@ surfaces are documented here for reviewers and users.
 - The vendored core may download fixed auxiliary model repositories only when
   their expected files are missing. The destination is the selected IndexTTS
   model directory; responses are never executed as Python or shell code.
+- The audio.cpp one-click installer was removed in 0.20.5. The remaining
+  experimental node has no component-download code and requires explicit local
+  absolute paths for both the CLI and GGUF model.
 
 ## Optional audio.cpp process
 

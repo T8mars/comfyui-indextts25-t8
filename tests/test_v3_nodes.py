@@ -50,7 +50,6 @@ def test_registers_all_pure_v3_nodes():
         "T8_IndexTTS25_SubtitleRewrite",
         "T8_IndexTTS25_ReferenceQuality",
         "T8_IndexTTS25_MemoryControl",
-        "T8_IndexTTS25_AudioCppInstaller",
         "T8_IndexTTS25_AudioCppGenerate",
         "T8_IndexTTS25_AudioPostProcess",
         "T8_IndexTTS25_Environment",
@@ -89,7 +88,7 @@ def test_registers_all_pure_v3_nodes():
     assert not hasattr(plugin, "NODE_CLASS_MAPPINGS")
 
 
-def test_audiocpp_generation_uses_the_installed_backend_for_managed_paths(
+def test_audiocpp_generation_uses_explicit_local_paths(
     tmp_path,
     monkeypatch,
 ):
@@ -101,20 +100,6 @@ def test_audiocpp_generation_uses_the_installed_backend_for_managed_paths(
     executable.write_bytes(b"exe")
     model.write_bytes(b"model")
     captured = {}
-
-    monkeypatch.setattr(
-        nodes_v3,
-        "audiocpp_component_status",
-        lambda **_kwargs: {
-            "runtimeReady": True,
-            "modelReady": True,
-            "executable": str(executable),
-            "modelPath": str(model),
-            "installedBackend": "cpu",
-            "runtime": {"executable": str(executable), "backend": "cpu"},
-            "model": {"modelPath": str(model)},
-        },
-    )
 
     async def fake_probe(_path):
         return {"available": True, "summary": "ok"}
@@ -139,8 +124,8 @@ def test_audiocpp_generation_uses_the_installed_backend_for_managed_paths(
 
     result = asyncio.run(
         nodes_v3.T8IndexTTS25AudioCppGenerate.execute(
-            "",
-            "",
+            str(executable),
+            str(model),
             {"waveform": torch.zeros(1, 1, 100), "sample_rate": 24000},
             "测试",
             "ZH",
@@ -150,8 +135,27 @@ def test_audiocpp_generation_uses_the_installed_backend_for_managed_paths(
         )
     )
 
-    assert captured["backend"] == "cpu"
-    assert json.loads(result[1])["backend"] == "cpu"
+    assert captured["backend"] == "cuda"
+    assert json.loads(result[1])["backend"] == "cuda"
+
+
+def test_audiocpp_generation_requires_manual_local_paths():
+    _load_plugin()
+    from comfyui_indextts25_t8_test import nodes_v3
+
+    with pytest.raises(RuntimeError, match="不会联网安装组件"):
+        asyncio.run(
+            nodes_v3.T8IndexTTS25AudioCppGenerate.execute(
+                "",
+                "",
+                {"waveform": torch.zeros(1, 1, 100), "sample_rate": 24000},
+                "测试",
+                "ZH",
+                "cuda",
+                1.0,
+                True,
+            )
+        )
 
 
 def test_context_emotion_node_returns_editable_script_without_generating_audio(

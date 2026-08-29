@@ -21,7 +21,13 @@ Creator: **Bilibili: T8star-Aix**.
 
 This repository is locked to the IndexTTS 2.5 inference core and the official 2.5 model manifest. It will not fall back to or accidentally load IndexTTS 2.0.
 
-Current baseline: **ComfyUI Node 0.20.4 · Desktop 0.21.1 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**.
+Current baseline: **ComfyUI Node 0.20.5 · Desktop 0.21.1 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**.
+
+### v0.20.5 remove the networked audio.cpp installer
+
+- Removed the audio.cpp Component Installer node and all in-node GitHub/Hugging Face runtime and GGUF download code so the optional network installer is no longer flagged by Comfy Registry.
+- Kept the isolated audio.cpp Experimental Generation node. Users must download components from the official pages and enter local absolute paths; the node never installs, updates, or modifies audio.cpp over the network.
+- Removed former example 34. The collection now contains 33 UI workflows and 33 API prompts; example 27 continues to demonstrate the manually installed local audio.cpp backend.
 
 ### v0.20.4 model integrity, concurrent release, and portable asset hardening
 
@@ -39,7 +45,7 @@ Current baseline: **ComfyUI Node 0.20.4 · Desktop 0.21.1 · Core `ee40fa7d` · 
 
 - Platform detection in the audio.cpp installer is now local and safely mockable, preventing Windows simulation from contaminating Linux test processes. User-facing behavior is unchanged from v0.20.0.
 
-### v0.20.0 shared voice library and one-click optional audio.cpp components
+### v0.20.0 shared voice library and one-click optional audio.cpp components (installer removed in v0.20.5)
 
 - New Saved Voice node reads `.t8voice.zip` bundles exported by Desktop. Each bundle carries voice audio, role name, language, role emotion, tags, favorite state, notes, and quality metadata, so workflows no longer need duplicate reference uploads.
 - Put bundles under `ComfyUI/models/TTS/IndexTTS-2.5/voices/`. Refresh the browser after adding or replacing a bundle; increment the node's refresh token when only file contents changed.
@@ -229,7 +235,7 @@ Desktop and Node are separate deliverables with independent versions; Core/Model
     - Never invokes ComfyUI-wide cleanup or unloads another node's models
 20. `IndexTTS 2.5 audio.cpp Experimental Generation · T8star-Aix`
     - Isolated optional `audiocpp_cli` + IndexTTS2.5 GGUF route with CUDA/CPU/Vulkan/HIP/Metal, five languages, speed, and emotion controls
-    - Does not replace Python inference; the CLI and roughly 3.5 GB Q8 GGUF are separate downloads
+    - Accepts only manually installed local CLI and GGUF absolute paths; it performs no downloads and does not replace Python inference
 21. `IndexTTS 2.5 Runtime Benchmark · T8star-Aix`
     - Warms up and measures the Model Loader mode that actually initialized, returning median/best RTF and CUDA peak VRAM
     - Keeps text, reference audio, and seed fixed; change the loader acceleration mode and rerun for a fair comparison
@@ -621,11 +627,11 @@ Bilibili|B IY1 . L IY1 . B IY1 . L IY1|EN
 
 The dictionary is embedded in workflow JSON and travels with the workflow. Existing manual annotations always win; dictionary replacements use longest match first and never rewrite inside `<text|pronunciation>`. Strict validation is enabled by default and fails before queueing. When disabled, invalid entries remain unchanged and are recorded in the report. This node requires no additional G2P model and never mutates the cached model's global glossary.
 
-See `example_workflows/README.md` for 34 ready-to-open UI workflows and 34 API prompts, including saved-voice and one-click audio.cpp examples. Upload `voice_reference.wav` and, for emotion-audio examples, `emotion_reference.wav` to ComfyUI input first.
+See `example_workflows/README.md` for 33 ready-to-open UI workflows and 33 API prompts, including saved-voice and manual local audio.cpp examples. Upload `voice_reference.wav` and, for emotion-audio examples, `emotion_reference.wav` to ComfyUI input first.
 
 ### Optional audio.cpp experimental backend
 
-Nothing is bundled or downloaded by default, and the default loader is never changed. On Windows, the Component Installer can explicitly download a verified runtime from the [official audio.cpp releases](https://github.com/0xShug0/audio.cpp/releases) and a GGUF from the [audio.cpp GGUF repository](https://huggingface.co/audio-cpp/audio.cpp-gguf) into `ComfyUI/models/TTS/IndexTTS-2.5/optional_components/audio.cpp/`; manual absolute paths remain supported. The Q8 model is roughly 3.5 GB. audio.cpp uses an independent C++ text normalizer, so unusual dates, units, URLs, and Japanese/Spanish tokenization boundaries can differ from the official Python path. Compare all five languages, emotion modes, pronunciation overrides, and speed before production use.
+Nothing is bundled, downloaded, or updated by the node, and the default loader is never changed. Download a runtime manually from the [official audio.cpp releases](https://github.com/0xShug0/audio.cpp/releases) and a GGUF from the [audio.cpp GGUF repository](https://huggingface.co/audio-cpp/audio.cpp-gguf), then enter the absolute `audiocpp_cli` and GGUF directory/file paths in Experimental Generation. The Q8 model is roughly 3.5 GB. audio.cpp uses an independent C++ text normalizer, so unusual dates, units, URLs, and Japanese/Spanish tokenization boundaries can differ from the official Python path. Compare all five languages, emotion modes, pronunciation overrides, and speed before production use.
 
 ## Environment and model checks
 

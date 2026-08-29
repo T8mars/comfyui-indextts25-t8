@@ -144,7 +144,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_AudioCppGenerate",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.20.4"
+        "ver": "0.20.5"
       },
       "widgets_values": [
         "",
@@ -154,7 +154,8 @@
         "cuda",
         1.0,
         true
-      ]
+      ],
+      "title": "请先手动填写本地 audiocpp_cli 与 GGUF 绝对路径"
     },
     {
       "id": 3,
