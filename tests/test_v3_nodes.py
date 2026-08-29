@@ -58,23 +58,29 @@ def test_registers_all_pure_v3_nodes():
         "T8_IndexTTS25_RuntimeBenchmark",
     ]
     assert all(schema.category == "T8star-Aix/Audio/IndexTTS 2.5" for schema in schemas)
-    assert schemas[5].outputs[0].io_type == "AUDIO"
-    assert schemas[12].outputs[0].io_type == "AUDIO"
-    assert schemas[15].outputs[0].io_type == "AUDIO"
-    assert schemas[16].outputs[0].io_type == "STRING"
-    assert schemas[17].outputs[0].io_type == "AUDIO"
+    schemas_by_id = {schema.node_id: schema for schema in schemas}
+    assert schemas_by_id["T8_IndexTTS25_Generate"].outputs[0].io_type == "AUDIO"
+    assert schemas_by_id["T8_IndexTTS25_DialogueGenerate"].outputs[0].io_type == "AUDIO"
+    assert schemas_by_id["T8_IndexTTS25_ReferenceQuality"].outputs[0].io_type == "AUDIO"
+    assert schemas_by_id["T8_IndexTTS25_MemoryControl"].outputs[0].io_type == "STRING"
+    assert schemas_by_id["T8_IndexTTS25_AudioCppGenerate"].outputs[0].io_type == "AUDIO"
     dialogue_script_input = next(
-        item for item in schemas[9].inputs if item.id == "script"
+        item for item in schemas_by_id["T8_IndexTTS25_DialogueScript"].inputs if item.id == "script"
     )
     assert dialogue_script_input.dynamic_prompts is False
     assert dialogue_script_input.as_dict()["dynamicPrompts"] is False
-    suggestion_inputs = {item.id: item for item in schemas[10].inputs}
+    suggestion_schema = schemas_by_id["T8_IndexTTS25_DialogueEmotionSuggest"]
+    suggestion_inputs = {item.id: item for item in suggestion_schema.inputs}
     assert suggestion_inputs["context_window"].as_dict()["default"] == 2
     assert suggestion_inputs["overwrite_existing"].as_dict()["default"] is False
-    assert "不会生成音频" in schemas[10].description
-    audiocpp_backend = next(item for item in schemas[17].inputs if item.id == "backend")
+    assert "不会生成音频" in suggestion_schema.description
+    audiocpp_backend = next(
+        item for item in schemas_by_id["T8_IndexTTS25_AudioCppGenerate"].inputs if item.id == "backend"
+    )
     assert "metal" in audiocpp_backend.as_dict()["options"]
-    loader_inputs = {item.id: item for item in schemas[0].inputs}
+    loader_inputs = {
+        item.id: item for item in schemas_by_id["T8_IndexTTS25_ModelLoader"].inputs
+    }
     assert "float16" in loader_inputs["precision"].as_dict()["options"]
     assert loader_inputs["reference_device"].as_dict()["default"] == "auto"
     assert loader_inputs["reuse_spk_cond_for_emo"].as_dict()["default"] is False

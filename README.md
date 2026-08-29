@@ -21,7 +21,11 @@ IndexTTS 2.5 的 ComfyUI V3 原生节点集成。节点菜单位于：
 
 本目录固定使用 IndexTTS 2.5 推理核心和正式 2.5 模型清单，不会回退或误载 IndexTTS 2.0。
 
-当前版本基线：**ComfyUI Node 0.20.1 · Desktop 0.21.0 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**。
+当前版本基线：**ComfyUI Node 0.20.2 · Desktop 0.21.0 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**。
+
+### v0.20.2 ComfyUI V3 测试修复
+
+- 节点架构测试改为按稳定的节点 ID 校验输入输出，不再依赖新增节点会改变的列表下标。
 
 ### v0.20.1 跨平台测试修复
 

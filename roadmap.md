@@ -1,9 +1,13 @@
 # T8star-Aix IndexTTS 2.5 路线图
 
 本路线图同时记录 ComfyUI 节点和桌面整合包的共同方向。项目只支持 **IndexTTS 2.5**。当前公开基线为
-**ComfyUI Node 0.20.1 / Desktop 0.21.0**。
+**ComfyUI Node 0.20.2 / Desktop 0.21.0**。
 ComfyUI 基础依赖不强装 DeepSpeed、FlashAttention、Triton；桌面整合包内置与固定 Python/torch/CUDA
 ABI 匹配的可选轮子，仍不默认启用。
+
+## v0.20.2
+
+- [x] 将 ComfyUI V3 节点架构测试从脆弱的列表下标改为稳定节点 ID，覆盖新增节点后的真实顺序。
 
 ## v0.20.1
 
