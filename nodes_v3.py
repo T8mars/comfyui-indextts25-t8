@@ -496,11 +496,35 @@ class T8IndexTTS25ModelLoader(io.ComfyNode):
                 )
             initial_report = validate_model_dir(model_dir, verify_hashes=False)
             downloaded_or_repaired = not initial_report.valid
+
+            comfy_progress = _progress_callback()
+            last_download_log = {"key": None, "bucket": -1}
+
+            def update_model_download(event: dict) -> None:
+                value = float(event.get("overall_fraction", 0.0))
+                message = str(event.get("message", "正在下载 IndexTTS 2.5 模型"))
+                comfy_progress(value, message)
+                phase = str(event.get("phase", ""))
+                filename = str(event.get("file", ""))
+                bucket = min(20, max(0, int(value * 20)))
+                key = (phase, filename)
+                if key != last_download_log["key"] or bucket != last_download_log["bucket"]:
+                    speed = int(event.get("bytes_per_second") or 0)
+                    eta = event.get("eta_seconds")
+                    details = [f"{value * 100:.1f}%", message]
+                    if speed > 0:
+                        details.append(f"{speed / (1024 ** 2):.1f} MiB/s")
+                    if eta is not None:
+                        details.append(f"ETA {int(eta)}s")
+                    logging.info("IndexTTS 2.5 model progress: %s", " | ".join(details))
+                    last_download_log.update(key=key, bucket=bucket)
+
             report = ensure_model_bundle(
                 model_dir,
                 "huggingface",
                 accept_license=True,
                 verify_hashes=True,
+                progress=update_model_download,
             )
         else:
             report = validate_model_dir(model_dir, verify_hashes=verify_hashes)

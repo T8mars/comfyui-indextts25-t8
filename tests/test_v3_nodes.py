@@ -350,13 +350,11 @@ def test_model_loader_auto_download_is_explicit_and_license_gated(
         download_missing=True,
         accept_model_license=True,
     )
-    assert calls == [
-        (
-            target,
-            "huggingface",
-            {"accept_license": True, "verify_hashes": True},
-        )
-    ]
+    assert len(calls) == 1
+    assert calls[0][0:2] == (target, "huggingface")
+    assert calls[0][2]["accept_license"] is True
+    assert calls[0][2]["verify_hashes"] is True
+    assert callable(calls[0][2]["progress"])
     assert "完整模型已自动下载/修复" in result[1]
 
 

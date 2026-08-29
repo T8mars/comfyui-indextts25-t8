@@ -106,16 +106,16 @@ def test_huggingface_download_repairs_only_requested_bundle_files(
             },
         },
     }
-    captured = {}
+    captured = []
 
-    def fake_snapshot_download(**kwargs):
-        captured.update(kwargs)
+    def fake_hf_hub_download(**kwargs):
+        captured.append(kwargs)
 
     monkeypatch.setattr(downloader, "load_manifest", lambda: manifest)
     monkeypatch.setitem(
         __import__("sys").modules,
         "huggingface_hub",
-        type("Hub", (), {"snapshot_download": staticmethod(fake_snapshot_download)}),
+        type("Hub", (), {"hf_hub_download": staticmethod(fake_hf_hub_download)}),
     )
 
     downloader.download_main_model(
@@ -123,11 +123,51 @@ def test_huggingface_download_repairs_only_requested_bundle_files(
         "huggingface",
         missing=("bpe.model", "hf_cache/helper.bin"),
     )
-    assert captured["repo_id"] == "t8star/IndexTTS-2.5-Comfy"
-    assert captured["revision"] == "a" * 40
-    assert "bpe.model" in captured["allow_patterns"]
-    assert "hf_cache/helper.bin" in captured["allow_patterns"]
-    assert "config.yaml" not in captured["allow_patterns"]
+    assert [item["filename"] for item in captured] == [
+        "bpe.model",
+        "hf_cache/helper.bin",
+    ]
+    assert all(item["repo_id"] == "t8star/IndexTTS-2.5-Comfy" for item in captured)
+    assert all(item["revision"] == "a" * 40 for item in captured)
+    assert all(item["force_download"] is False for item in captured)
+
+
+def test_model_download_progress_is_monotonic_and_reports_disk_preflight():
+    events = []
+    tick = [0.0]
+
+    def clock():
+        tick[0] += 1.0
+        return tick[0]
+
+    manifest = {
+        "files": {
+            "a.bin": {"size": 100, "sha256": "0" * 64},
+            "b.bin": {"size": 300, "sha256": "1" * 64},
+        }
+    }
+    progress = downloader.ModelDownloadProgress(
+        manifest,
+        "huggingface",
+        events.append,
+        include_auxiliary=True,
+        clock=clock,
+    )
+    progress.preflight(["b.bin"], free_bytes=10_000)
+    progress.begin_file("b.bin", 1)
+    progress.resume_file(100)
+    progress.update_file(200)
+    progress.complete_file()
+    progress.verify("b.bin", 300, 300)
+    progress.done()
+
+    assert events[0]["phase"] == "preflight"
+    assert events[0]["required_bytes"] == 300
+    assert events[0]["available_bytes"] == 10_000
+    assert events[-1]["phase"] == "complete"
+    assert events[-1]["overall_fraction"] == 1.0
+    fractions = [event["overall_fraction"] for event in events]
+    assert fractions == sorted(fractions)
 
 
 def test_comfy_requirements_do_not_replace_torch_or_pull_training_stacks():

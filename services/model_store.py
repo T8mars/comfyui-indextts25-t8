@@ -5,7 +5,7 @@ import json
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
+from typing import Callable, Iterable
 
 
 PLUGIN_ROOT = Path(__file__).resolve().parents[1]
@@ -126,16 +126,20 @@ def resolve_model(model_name: str, custom_model_path: str = "") -> Path:
     return models[model_name]
 
 
-def _sha256(path: Path) -> str:
+def _sha256(path: Path, on_chunk: Callable[[int], None] | None = None) -> str:
     stat = path.stat()
     key = (str(path.resolve()), stat.st_size, stat.st_mtime_ns)
     cached = _HASH_CACHE.get(key)
     if cached is not None:
+        if on_chunk is not None:
+            on_chunk(stat.st_size)
         return cached
     digest = hashlib.sha256()
     with path.open("rb") as stream:
         for chunk in iter(lambda: stream.read(8 * 1024 * 1024), b""):
             digest.update(chunk)
+            if on_chunk is not None:
+                on_chunk(len(chunk))
     value = digest.hexdigest()
     _HASH_CACHE[key] = value
     return value
@@ -146,23 +150,49 @@ def validate_model_dir(
     *,
     verify_hashes: bool = False,
     include_auxiliary: bool = True,
+    progress: Callable[[str, int, int], None] | None = None,
 ) -> ValidationReport:
     model_dir = Path(model_dir).expanduser().resolve()
     manifest = load_manifest()
     missing: list[str] = []
     mismatched: list[str] = []
-    for relative, metadata in manifest["files"].items():
-        if not include_auxiliary and metadata.get("group") == "auxiliary":
-            continue
+    selected = [
+        (relative, metadata)
+        for relative, metadata in manifest["files"].items()
+        if include_auxiliary or metadata.get("group") != "auxiliary"
+    ]
+    total = sum(int(metadata["size"]) for _, metadata in selected)
+    processed = 0
+    for relative, metadata in selected:
         path = model_dir.joinpath(*relative.split("/"))
         if not path.is_file():
             missing.append(relative)
+            processed += int(metadata["size"])
+            if progress is not None:
+                progress(relative, processed, total)
             continue
         if path.stat().st_size != int(metadata["size"]):
             mismatched.append(relative)
+            processed += int(metadata["size"])
+            if progress is not None:
+                progress(relative, processed, total)
             continue
-        if verify_hashes and _sha256(path).lower() != str(metadata["sha256"]).lower():
-            mismatched.append(relative)
+        if verify_hashes:
+            hashed = 0
+
+            def update_hash(size: int) -> None:
+                nonlocal hashed
+                hashed += size
+                if progress is not None:
+                    progress(relative, processed + hashed, total)
+
+            if _sha256(path, update_hash).lower() != str(metadata["sha256"]).lower():
+                mismatched.append(relative)
+            processed += int(metadata["size"])
+        else:
+            processed += int(metadata["size"])
+        if progress is not None:
+            progress(relative, processed, total)
     return ValidationReport(
         model_dir=model_dir,
         missing=tuple(missing),

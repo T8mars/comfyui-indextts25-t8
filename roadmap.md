@@ -1,9 +1,17 @@
 # T8star-Aix IndexTTS 2.5 路线图
 
 本路线图同时记录 ComfyUI 节点和桌面整合包的共同方向。项目只支持 **IndexTTS 2.5**。当前公开基线为
-**ComfyUI Node 0.18.0 / Desktop 0.18.0**。
+**ComfyUI Node 0.19.0 / Desktop 0.20.0**。
 ComfyUI 基础依赖不强装 DeepSpeed、FlashAttention、Triton；桌面整合包内置与固定 Python/torch/CUDA
 ABI 匹配的可选轮子，仍不默认启用。
+
+## v0.19.0
+
+- [x] 缺失模型自动下载把现有文件扫描、逐文件传输和 SHA-256 校验映射到 ComfyUI 任务进度。
+- [x] Hugging Face 下载保留断点续传，哈希损坏文件强制刷新；ComfyUI 显示总体任务进度，终端显示当前文件、阶段、速度和剩余时间。
+- [x] 下载前执行目标磁盘空间预检，安全下限不足时提前报出可操作错误。
+- [x] Desktop 0.20.0 同步提供可视化下载卡片、当前文件、总进度、速度、ETA、磁盘状态和精确失败原因。
+- [x] 推送前刷新全部 32 组 UI/API 示例并执行完整测试、compileall、V3 schema 和 Registry 包校验。
 
 ## v0.18.0
 
@@ -113,7 +121,7 @@ ABI 匹配的可选轮子，仍不默认启用。
 ## 验收记录
 
 - [x] 公共解析、时间轴、混音和加速探测测试通过。
-- [x] V3 节点 schema 与 31 组已发布 UI/API 工作流测试通过；下一版第 32 组已完成本地结构校验。
+- [x] V3 节点 schema 与全部 32 组 UI/API 工作流测试通过。
 - [x] 当前基础环境：73 项测试通过。
 - [x] Transformers 4.57.6：50 项测试通过，2 项按环境条件跳过。
 - [x] IndexTTS 2.5 真实模型联合冒烟：两段生成、前导/段间停顿、目标时长和人声后处理通过。

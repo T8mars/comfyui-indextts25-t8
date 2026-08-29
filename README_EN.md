@@ -21,7 +21,14 @@ Creator: **Bilibili: T8star-Aix**.
 
 This repository is locked to the IndexTTS 2.5 inference core and the official 2.5 model manifest. It will not fall back to or accidentally load IndexTTS 2.0.
 
-Current baseline: **ComfyUI Node 0.18.0 · Desktop 0.18.0 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**.
+Current baseline: **ComfyUI Node 0.19.0 · Desktop 0.20.0 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**.
+
+### v0.19.0 model-download progress and disk preflight
+
+- Model Loader now maps scanning, transfer, and SHA-256 verification to ComfyUI task progress when opt-in download/repair is enabled, instead of exposing progress only in the terminal.
+- Files are fetched individually from the pinned manifest. ComfyUI shows overall progress, while the terminal reports the active phase, filename, speed, and ETA. Hugging Face resume behavior remains intact, while damaged files are forcibly refreshed.
+- A conservative missing-byte estimate and available target-disk space are reported before large writes; critically low free space fails with an actionable error.
+- The complete set of 26 main and auxiliary files is verified again after repair, and failures retain the exact missing or mismatched path.
 
 ### v0.18.0 long-text/SRT stability and reference-cache management
 

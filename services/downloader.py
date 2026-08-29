@@ -3,7 +3,10 @@ from __future__ import annotations
 import argparse
 import shutil
 import sys
+import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from typing import Callable
 
 from filelock import FileLock
 
@@ -29,6 +32,149 @@ LICENSE_NOTICE = (
     "下载即表示你已阅读并接受节点目录中的 LICENSE、LICENSE_ZH.txt 与 DISCLAIMER。\n"
     "本项目是第三方衍生集成；原始权利人不对本衍生品背书、担保或承担责任。"
 )
+MINIMUM_FREE_BYTES = 512 * 1024 * 1024
+DISK_RESERVE_BYTES = 1024 * 1024 * 1024
+
+
+class ModelDownloadProgress:
+    """Translate a resumable model transfer into stable bundle-level events."""
+
+    def __init__(
+        self,
+        manifest: dict,
+        source: str,
+        callback: Callable[[dict], None] | None,
+        *,
+        include_auxiliary: bool,
+        clock: Callable[[], float] = time.monotonic,
+    ) -> None:
+        self.files = {
+            relative: metadata
+            for relative, metadata in manifest["files"].items()
+            if include_auxiliary or metadata.get("group") != "auxiliary"
+        }
+        self.source = source
+        self.callback = callback or (lambda event: None)
+        self.clock = clock
+        self.bundle_total = sum(int(item["size"]) for item in self.files.values())
+        self.required: list[str] = []
+        self.required_total = 0
+        self.completed = 0
+        self.current_file = ""
+        self.current_index = 0
+        self.current_received = 0
+        self.current_total = 0
+        self.network_bytes = 0
+        self.started_at = self.clock()
+        self.last_emit = 0.0
+
+    def emit(self, phase: str, *, force: bool = False, **values) -> None:
+        now = self.clock()
+        if not force and now - self.last_emit < 0.2:
+            return
+        self.last_emit = now
+        self.callback(
+            {
+                "phase": phase,
+                "source": self.source,
+                "bundle_total": self.bundle_total,
+                **values,
+            }
+        )
+
+    def scan(self, relative: str, processed: int, total: int) -> None:
+        fraction = processed / max(1, total)
+        self.emit(
+            "scanning",
+            file=relative,
+            overall_fraction=fraction * 0.1,
+            phase_fraction=fraction,
+            message=f"校验现有模型：{relative}",
+        )
+
+    def preflight(self, required: list[str], free_bytes: int) -> None:
+        self.required = list(required)
+        self.required_total = sum(int(self.files[item]["size"]) for item in required)
+        warning = free_bytes < self.required_total + DISK_RESERVE_BYTES
+        self.started_at = self.clock()
+        self.emit(
+            "preflight",
+            force=True,
+            required_bytes=self.required_total,
+            available_bytes=free_bytes,
+            disk_warning=warning,
+            file_count=len(required),
+            overall_fraction=0.1,
+            phase_fraction=1.0,
+            message=(
+                f"磁盘预检完成，需要下载或修复 {len(required)} 个文件"
+                + ("；可用空间低于保守估算" if warning and required else "")
+            ),
+        )
+
+    def begin_file(self, relative: str, index: int) -> None:
+        self.current_file = relative
+        self.current_index = index
+        self.current_received = 0
+        self.current_total = int(self.files[relative]["size"])
+        self._transfer(force=True)
+
+    def resume_file(self, received: int) -> None:
+        self.current_received = min(self.current_total, max(self.current_received, int(received)))
+        self._transfer(force=True)
+
+    def update_file(self, received: int) -> None:
+        value = min(self.current_total, max(self.current_received, int(received)))
+        self.network_bytes += max(0, value - self.current_received)
+        self.current_received = value
+        self._transfer()
+
+    def complete_file(self) -> None:
+        self.current_received = self.current_total
+        self._transfer(force=True)
+        self.completed += self.current_total
+        self.current_received = 0
+        self.current_total = 0
+
+    def _transfer(self, *, force: bool = False) -> None:
+        transferred = min(self.required_total, self.completed + self.current_received)
+        fraction = transferred / max(1, self.required_total)
+        elapsed = max(0.001, self.clock() - self.started_at)
+        speed = self.network_bytes / elapsed
+        remaining = max(0, self.required_total - transferred)
+        self.emit(
+            "downloading",
+            force=force,
+            file=self.current_file,
+            file_index=self.current_index,
+            file_count=len(self.required),
+            received=transferred,
+            total=self.required_total,
+            bytes_per_second=round(speed),
+            eta_seconds=round(remaining / speed) if speed > 0 else None,
+            overall_fraction=0.1 + fraction * 0.8,
+            phase_fraction=fraction,
+            message=f"下载 {self.current_file}",
+        )
+
+    def verify(self, relative: str, processed: int, total: int) -> None:
+        fraction = processed / max(1, total)
+        self.emit(
+            "verifying",
+            file=relative,
+            overall_fraction=0.9 + fraction * 0.1,
+            phase_fraction=fraction,
+            message=f"SHA-256 校验：{relative}",
+        )
+
+    def done(self) -> None:
+        self.emit(
+            "complete",
+            force=True,
+            overall_fraction=1.0,
+            phase_fraction=1.0,
+            message="完整模型下载和 SHA-256 校验完成",
+        )
 
 
 def _copy_snapshot(source: Path, target: Path) -> None:
@@ -58,33 +204,71 @@ def download_main_model(
     missing: tuple[str, ...] = (),
     mismatched: tuple[str, ...] = (),
     include_auxiliary: bool = True,
+    progress: ModelDownloadProgress | None = None,
 ) -> None:
     manifest = load_manifest()
     repository = str(manifest["modelRepository"])
     revision = str(manifest["modelRevision"])
     target.mkdir(parents=True, exist_ok=True)
     if source == "huggingface":
-        from huggingface_hub import snapshot_download
+        from huggingface_hub import hf_hub_download
+
+        if progress is not None:
+            from huggingface_hub import get_hf_file_metadata, hf_hub_url
+            from huggingface_hub.file_download import get_local_download_paths
 
         selected = set(_selected_files(manifest, include_auxiliary=include_auxiliary))
         requested = sorted(
             selected.intersection([*missing, *mismatched])
             or selected
         )
-        snapshot_download(
-            repo_id=repository,
-            revision=revision,
-            local_dir=str(target),
-            allow_patterns=[
-                *requested,
-                "README.md",
-                "LICENSE",
-                "LICENSE_ZH.txt",
-                "DISCLAIMER",
-                "THIRD_PARTY_NOTICES.md",
-            ],
-            force_download=bool(set(mismatched).intersection(requested)),
-        )
+        for index, relative in enumerate(requested, start=1):
+            if progress is not None:
+                progress.begin_file(relative, index)
+            force_download = relative in mismatched
+            incomplete_path = None
+            if progress is not None:
+                try:
+                    metadata = get_hf_file_metadata(
+                        hf_hub_url(repository, relative, revision=revision)
+                    )
+                    if metadata.etag:
+                        incomplete_path = get_local_download_paths(
+                            target, relative
+                        ).incomplete_path(metadata.etag)
+                except Exception:
+                    incomplete_path = None
+
+            started_wall = time.time()
+            if (
+                progress is not None
+                and not force_download
+                and incomplete_path is not None
+                and incomplete_path.is_file()
+            ):
+                progress.resume_file(incomplete_path.stat().st_size)
+
+            with ThreadPoolExecutor(max_workers=1) as pool:
+                future = pool.submit(
+                    hf_hub_download,
+                    repo_id=repository,
+                    revision=revision,
+                    filename=relative,
+                    local_dir=str(target),
+                    force_download=force_download,
+                )
+                while not future.done():
+                    if progress is not None and incomplete_path is not None:
+                        try:
+                            stat = incomplete_path.stat()
+                            if not force_download or stat.st_mtime >= started_wall:
+                                progress.update_file(stat.st_size)
+                        except FileNotFoundError:
+                            pass
+                    time.sleep(0.2)
+                future.result()
+                if progress is not None:
+                    progress.complete_file()
     elif source == "modelscope":
         try:
             from modelscope.hub.snapshot_download import snapshot_download
@@ -141,6 +325,7 @@ def ensure_model_bundle(
     accept_license: bool,
     verify_hashes: bool = True,
     skip_auxiliary: bool = False,
+    progress: Callable[[dict], None] | None = None,
 ) -> ValidationReport:
     """Download or repair one complete, pinned IndexTTS 2.5 model directory."""
 
@@ -148,12 +333,27 @@ def ensure_model_bundle(
         raise ValueError("下载模型前必须阅读并接受模型许可证和免责声明。")
     target = target.expanduser().resolve()
     target.mkdir(parents=True, exist_ok=True)
+    manifest = load_manifest()
+    reporter = ModelDownloadProgress(
+        manifest,
+        source,
+        progress,
+        include_auxiliary=not skip_auxiliary,
+    )
     with FileLock(str(target / ".download.lock")):
         initial = validate_model_dir(
             target,
             verify_hashes=verify_hashes,
             include_auxiliary=not skip_auxiliary,
+            progress=reporter.scan,
         )
+        required = list(dict.fromkeys([*initial.missing, *initial.mismatched]))
+        free_bytes = shutil.disk_usage(target).free
+        reporter.preflight(required, free_bytes)
+        if required and free_bytes < MINIMUM_FREE_BYTES:
+            raise RuntimeError(
+                "模型目录可用空间不足 512 MiB，无法安全继续下载；请清理空间或更换目录。"
+            )
         if not initial.valid:
             download_main_model(
                 target,
@@ -161,9 +361,9 @@ def ensure_model_bundle(
                 missing=initial.missing,
                 mismatched=initial.mismatched,
                 include_auxiliary=not skip_auxiliary,
+                progress=reporter,
             )
             if source == "modelscope":
-                manifest = load_manifest()
                 for relative_path in initial.mismatched:
                     if manifest["files"][relative_path].get("group") == "auxiliary":
                         target.joinpath(*relative_path.split("/")).unlink()
@@ -173,8 +373,10 @@ def ensure_model_bundle(
             target,
             verify_hashes=verify_hashes,
             include_auxiliary=not skip_auxiliary,
+            progress=reporter.verify,
         )
         report.require_valid()
+        reporter.done()
         return report
 
 
