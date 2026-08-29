@@ -21,7 +21,15 @@ IndexTTS 2.5 的 ComfyUI V3 原生节点集成。节点菜单位于：
 
 本目录固定使用 IndexTTS 2.5 推理核心和正式 2.5 模型清单，不会回退或误载 IndexTTS 2.0。
 
-当前版本基线：**ComfyUI Node 0.19.0 · Desktop 0.20.0 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**。
+当前版本基线：**ComfyUI Node 0.20.0 · Desktop 0.21.0 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**。
+
+### v0.20.0 共享音色库与 audio.cpp 一键可选组件
+
+- 新增“已保存音色”节点：直接读取 Desktop 导出的 `.t8voice.zip`，一个音色包同时携带音色音频、角色名、语言、角色情感、标签、收藏、备注和质量报告，不必在每个工作流重复上传参考音频。
+- 音色包放在 `ComfyUI/models/TTS/IndexTTS-2.5/voices/`。新增或替换后刷新浏览器；仅内容变化但文件名不变时，也可把节点“刷新令牌”加 1。
+- 新增“audio.cpp 一键组件”节点：由用户明确确认后下载官方 Windows CUDA/Vulkan/CPU 运行时和 Q8/F16/original GGUF，支持断点续传、磁盘预检与 SHA-256 校验。默认 Python 推理完全不受影响。
+- audio.cpp 生成节点的路径可留空，会自动使用一键组件安装结果；手动绝对路径仍然优先。
+- 示例扩充到 34 组：`33_saved_voice_library.json` 与 `34_audiocpp_one_click.json` 分别演示共享音色和一键组件。
 
 ### v0.19.0 模型下载进度与磁盘预检
 
@@ -162,6 +170,7 @@ Desktop 与 Node 是两个独立发行物，因此各自使用独立版本号；
    - 可生成 1–4 个候选并从独立 AUDIO 列表输出；ASR 可用时结合文本相似度与波形质量选优，否则使用波形质量选优
 7. `IndexTTS 2.5 角色音色 · T8star-Aix`
    - 将角色名、标准 AUDIO、默认语言和可选情感封装成工作流内音色
+   - 配套“已保存音色”节点可直接加载 Desktop `.t8voice.zip`，免去重复上传参考音频
 8. `IndexTTS 2.5 角色音色 / 情感合并 · T8star-Aix`
    - 自动增长输入，可汇总 1–16 个角色各自的音色与独立情感；重复角色名会在排队前报错
 9. `IndexTTS 2.5 Merge Voice Emotions · T8star-Aix`
@@ -203,7 +212,7 @@ Desktop 与 Node 是两个独立发行物，因此各自使用独立版本号；
    - 不调用 ComfyUI 全局清理，不会卸载其他节点正在使用的模型
 20. `IndexTTS 2.5 audio.cpp 实验生成 · T8star-Aix`
    - 隔离调用可选 `audiocpp_cli` 与 IndexTTS2.5 GGUF，支持 CUDA/CPU/Vulkan/HIP/Metal、五语种、语速与情感控制
-   - 不替换默认 Python 推理；CLI 和约 3.5GB 的 Q8 GGUF 均需用户另行下载
+   - 配套“一键组件”节点可按需安装 Windows CLI 与 GGUF；不替换默认 Python 推理
 21. `IndexTTS 2.5 真实性能基准 · T8star-Aix`
    - 对模型加载器实际生效的模式做预热和 1–5 次正式测量，报告中位/最佳 RTF 与 CUDA 峰值显存
    - 使用相同文本、参考音频和 seed；切换加载器加速模式后重跑即可公平对比
@@ -635,19 +644,20 @@ Bilibili|B IY1 . L IY1 . B IY1 . L IY1|EN
 不会改写 `<文字|读音>` 内部。严格校验默认开启，错误会在排队前给出；关闭后无效词条保持原文并
 写入报告。该节点不依赖额外 G2P 模型，也不会修改已缓存模型的全局 glossary。
 
-完整示例见 `example_workflows/README.md`，包含 32 组可直接打开的 UI 工作流和 32 组 API prompt：
+完整示例见 `example_workflows/README.md`，包含 34 组可直接打开的 UI 工作流和 34 组 API prompt：
 基础克隆、语速对比、情感参考音频、八维情感、文本情感、随机采样长文本、五语种生成，以及中文
 多音字、英文 CMU 音素、日语假名发音控制、多角色、JSON 批量台词、SRT、可选加速诊断、自动分段
 预览、显式停顿、原生目标秒数、CFM 高级参数、独立音频后处理、ASR 自动校对、时间轴编辑、字幕
-回写、多角色独立情感、参考音频检测、ASR 失败重试、模型回收、audio.cpp 实验后端和低显存 FP16。
+回写、多角色独立情感、参考音频检测、ASR 失败重试、模型回收、已保存音色库、audio.cpp 手动/一键后端和低显存 FP16。
 使用前把
 `voice_reference.wav`（情感音频示例还需 `emotion_reference.wav`）上传到 ComfyUI input。
 
 ### 可选 audio.cpp 实验后端
 
-节点只提供安全的无 shell CLI 连接器，不捆绑第三方二进制或 GGUF 模型，也不会改变默认加载器。
-从 [audio.cpp 官方发布页](https://github.com/0xShug0/audio.cpp/releases) 下载对应 Windows CLI，模型从
-[audio.cpp GGUF 仓库](https://huggingface.co/audio-cpp/audio.cpp-gguf) 的 `IndexTTS2.5-GGUF` 获取。
+默认不捆绑第三方二进制或 GGUF 模型，也不会改变默认加载器。Windows 用户可使用“一键组件”节点，
+明确勾选确认后从 [audio.cpp 官方发布页](https://github.com/0xShug0/audio.cpp/releases) 与
+[audio.cpp GGUF 仓库](https://huggingface.co/audio-cpp/audio.cpp-gguf) 下载；安装目录为
+`ComfyUI/models/TTS/IndexTTS-2.5/optional_components/audio.cpp/`。也可继续手动填写绝对路径。
 当前 Q8 文件约 3.5GB。audio.cpp 的文本归一化是独立 C++ 实现，少见日期、单位、网址，以及日语/西语
 分词边界可能与官方 Python 路径不同；正式使用前应对五语种、情感、发音标注和语速分别试听对比。
 

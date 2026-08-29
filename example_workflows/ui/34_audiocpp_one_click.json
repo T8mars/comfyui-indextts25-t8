@@ -1,20 +1,102 @@
 {
-  "last_node_id": 3,
-  "last_link_id": 2,
+  "last_node_id": 4,
+  "last_link_id": 4,
   "nodes": [
     {
       "id": 1,
+      "type": "T8_IndexTTS25_AudioCppInstaller",
+      "pos": [
+        0,
+        0
+      ],
+      "size": [
+        420,
+        280
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "action",
+          "type": "COMBO",
+          "widget": {
+            "name": "action"
+          },
+          "link": null
+        },
+        {
+          "name": "backend",
+          "type": "COMBO",
+          "widget": {
+            "name": "backend"
+          },
+          "link": null
+        },
+        {
+          "name": "quantization",
+          "type": "COMBO",
+          "widget": {
+            "name": "quantization"
+          },
+          "link": null
+        },
+        {
+          "name": "confirm_download",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "confirm_download"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "executable_path",
+          "type": "STRING",
+          "links": [
+            1
+          ]
+        },
+        {
+          "name": "gguf_model_path",
+          "type": "STRING",
+          "links": [
+            2
+          ]
+        },
+        {
+          "name": "component_report",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "T8_IndexTTS25_AudioCppInstaller",
+        "cnr_id": "comfyui-indextts25-t8",
+        "ver": "0.20.0"
+      },
+      "widgets_values": [
+        "install_all",
+        "cuda",
+        "q8_0",
+        true
+      ],
+      "title": "首次运行将下载官方 audio.cpp + Q8 GGUF（约 4GB）"
+    },
+    {
+      "id": 2,
       "type": "LoadAudio",
       "pos": [
         0,
-        340
+        360
       ],
       "size": [
         330,
         130
       ],
       "flags": {},
-      "order": 0,
+      "order": 1,
       "mode": 0,
       "inputs": [
         {
@@ -31,7 +113,7 @@
           "name": "AUDIO",
           "type": "AUDIO",
           "links": [
-            1
+            3
           ]
         }
       ],
@@ -45,18 +127,18 @@
       "title": "音色参考音频"
     },
     {
-      "id": 2,
+      "id": 3,
       "type": "T8_IndexTTS25_AudioCppGenerate",
       "pos": [
-        420,
-        0
+        520,
+        80
       ],
       "size": [
         520,
         560
       ],
       "flags": {},
-      "order": 1,
+      "order": 2,
       "mode": 0,
       "inputs": [
         {
@@ -65,7 +147,7 @@
           "widget": {
             "name": "executable_path"
           },
-          "link": null
+          "link": 1
         },
         {
           "name": "gguf_model_path",
@@ -73,12 +155,12 @@
           "widget": {
             "name": "gguf_model_path"
           },
-          "link": null
+          "link": 2
         },
         {
           "name": "speaker_audio",
           "type": "AUDIO",
-          "link": 1
+          "link": 3
         },
         {
           "name": "text",
@@ -132,7 +214,7 @@
           "name": "audio",
           "type": "AUDIO",
           "links": [
-            2
+            4
           ]
         },
         {
@@ -157,24 +239,24 @@
       ]
     },
     {
-      "id": 3,
+      "id": 4,
       "type": "SaveAudio",
       "pos": [
-        1020,
-        180
+        1100,
+        240
       ],
       "size": [
         320,
         130
       ],
       "flags": {},
-      "order": 2,
+      "order": 3,
       "mode": 0,
       "inputs": [
         {
           "name": "audio",
           "type": "AUDIO",
-          "link": 2
+          "link": 4
         },
         {
           "name": "filename_prefix",
@@ -197,7 +279,7 @@
         "cnr_id": "comfy-core"
       },
       "widgets_values": [
-        "IndexTTS25_T8/audiocpp_experimental"
+        "IndexTTS25_T8/audiocpp_one_click"
       ]
     }
   ],
@@ -206,27 +288,43 @@
       1,
       1,
       0,
+      3,
+      0,
+      "STRING"
+    ],
+    [
       2,
+      1,
+      1,
+      3,
+      1,
+      "STRING"
+    ],
+    [
+      3,
+      2,
+      0,
+      3,
       2,
       "AUDIO"
     ],
     [
-      2,
-      2,
-      0,
+      4,
       3,
+      0,
+      4,
       0,
       "AUDIO"
     ]
   ],
   "groups": [
     {
-      "title": "27 audio.cpp IndexTTS2.5 GGUF 隔离实验后端 · B站：T8star-Aix",
+      "title": "34 audio.cpp 一键安装并生成（可选组件） · B站：T8star-Aix",
       "bounding": [
         -40,
         -60,
-        1420,
-        640
+        1500,
+        720
       ],
       "color": "#3f789e",
       "font_size": 24,

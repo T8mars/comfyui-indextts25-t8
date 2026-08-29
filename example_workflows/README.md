@@ -41,6 +41,8 @@
 | `30_update_check.json` | 手动检查官方代码、官方模型和节点版本，只输出报告 | 无 |
 | `31_per_line_emotion.json` | 同一个角色逐句切换文本情感、八维向量与角色默认情感 | `role_a.wav`、`role_b.wav` |
 | `32_context_emotion_suggestions.json` | 结合前后文为每句建议八维情感；仅预览和编辑，不自动生成音频 | 无 |
+| `33_saved_voice_library.json` | 读取 Desktop 导出的 `.t8voice.zip`，无需重复上传参考音频 | `.t8voice.zip` 音色包 |
+| `34_audiocpp_one_click.json` | 明确确认后安装官方 audio.cpp + Q8 GGUF，并直接生成 | `voice_reference.wav` |
 
 ## 使用方法
 
@@ -63,13 +65,21 @@
 粘贴并修改报告中的 `lines`，再把它的“编辑后的台词脚本”连接到示例 11 或 13 的多角色生成节点。
 `每侧上下文台词数=2` 表示分析目标句时同时参考前后各两句，但提示词会明确区分不同角色。
 
+示例 33 使用桌面端“角色音色库 → 导出音色包”生成的 `.t8voice.zip`。把文件放到
+`ComfyUI/models/TTS/IndexTTS-2.5/voices/`，刷新浏览器后从“已保存音色”下拉框选择角色。音色包会携带
+该角色的默认语言、情感、标签和质量信息；工作流中不需要 `Load Audio`。
+
+示例 34 默认选择 `install_all / cuda / q8_0` 且已勾选下载确认，首次排队约下载 4GB；只想检查状态时，
+先把操作改成 `status_only`。AMD Windows 可选 `vulkan`，无独显可选 `cpu`。下载安装均执行大小与
+SHA-256 校验，并保存在模型目录的 `optional_components/audio.cpp/` 下。
+
 示例 20 需要可选的 `openai-whisper`，首次运行会从网络下载所选模型到
 `ComfyUI/models/TTS/Whisper/`。示例 21 的 `start_ms / end_ms` 单位均为毫秒；示例 22 内置的是可直接
 运行的真实报告结构示例，用于演示无需重新生成语音的字幕回写。
 
 示例 25 安装 Whisper 时会结合台词相似度和波形质量选优；未安装时仍会保留全部候选并按波形技术指标选优。
-示例 27 不使用默认 Python 模型加载器，需要先从 audio.cpp 官方发布页
-下载 `audiocpp_cli`，并另行下载 `IndexTTS2.5-GGUF`；打开工作流后把两个示例绝对路径改成自己的位置。
+示例 27 不使用默认 Python 模型加载器：路径留空时复用示例 34 安装的组件，也可以填写自己已有的
+`audiocpp_cli` 与 `IndexTTS2.5-GGUF` 绝对路径。
 
 示例 28 面向旧显卡和 10GB 以下显存：`float16` 可替代不受原生支持的 `bfloat16`，参考编码器放到
 CPU 可减少常驻显存；“快速默认情感”只在未提供独立情感时复用音色条件，速度更快但可能轻微改变听感。

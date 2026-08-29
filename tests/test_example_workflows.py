@@ -45,6 +45,8 @@ EXAMPLES = (
     "30_update_check",
     "31_per_line_emotion",
     "32_context_emotion_suggestions",
+    "33_saved_voice_library",
+    "34_audiocpp_one_click",
 )
 
 
@@ -220,6 +222,7 @@ def test_api_prompts_expand_with_the_current_comfyui_v3_schema():
         "T8_IndexTTS25_TextPreview": nodes_module.T8IndexTTS25TextPreview,
         "T8_IndexTTS25_Pronunciation": nodes_module.T8IndexTTS25Pronunciation,
         "T8_IndexTTS25_Generate": nodes_module.T8IndexTTS25Generate,
+        "T8_IndexTTS25_SavedVoice": nodes_module.T8IndexTTS25SavedVoice,
         "T8_IndexTTS25_VoiceProfile": nodes_module.T8IndexTTS25VoiceProfile,
         "T8_IndexTTS25_RoleLibrary": nodes_module.T8IndexTTS25RoleLibrary,
         "T8_IndexTTS25_MergeVoiceEmotions": nodes_module.T8IndexTTS25MergeVoiceEmotions,
@@ -231,6 +234,7 @@ def test_api_prompts_expand_with_the_current_comfyui_v3_schema():
         "T8_IndexTTS25_SubtitleRewrite": nodes_module.T8IndexTTS25SubtitleRewrite,
         "T8_IndexTTS25_ReferenceQuality": nodes_module.T8IndexTTS25ReferenceQuality,
         "T8_IndexTTS25_MemoryControl": nodes_module.T8IndexTTS25MemoryControl,
+        "T8_IndexTTS25_AudioCppInstaller": nodes_module.T8IndexTTS25AudioCppInstaller,
         "T8_IndexTTS25_AudioCppGenerate": nodes_module.T8IndexTTS25AudioCppGenerate,
         "T8_IndexTTS25_AudioPostProcess": nodes_module.T8IndexTTS25AudioPostProcess,
         "T8_IndexTTS25_Environment": nodes_module.T8IndexTTS25Environment,

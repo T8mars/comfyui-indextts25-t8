@@ -49,7 +49,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_UpdateCheck",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.19.0"
+        "ver": "0.20.0"
       },
       "widgets_values": [
         0,

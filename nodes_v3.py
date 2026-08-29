@@ -40,6 +40,12 @@ from .runtime.context_emotion import suggest_context_emotions
 from .runtime.benchmark import summarize_measurements
 from .runtime.audiocpp_backend import probe as probe_audiocpp
 from .runtime.audiocpp_backend import run as run_audiocpp
+from .runtime.audiocpp_components import (
+    component_status as audiocpp_component_status,
+    default_component_data_root,
+    install_model as install_audiocpp_model,
+    install_runtime as install_audiocpp_runtime,
+)
 from .runtime.model_cache import MODEL_CACHE
 from .runtime.reference_cache import comfy_audio_to_reference_wav
 from .runtime.acceleration import (
@@ -76,6 +82,12 @@ from .runtime.timeline import (
     render_timeline_image,
     rewrite_srt,
     timeline_json,
+)
+from .runtime.voice_library import (
+    default_voice_library_root,
+    load_saved_voice,
+    saved_voice_fingerprint,
+    saved_voice_options,
 )
 from .runtime.update_check import check_updates
 from .runtime.types import (
@@ -1110,6 +1122,96 @@ class T8IndexTTS25Pronunciation(io.ComfyNode):
             text, language, entries, strict=bool(strict)
         )
         return io.NodeOutput(result.text, format_pronunciation_report(result))
+
+
+class T8IndexTTS25SavedVoice(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        library_root = default_voice_library_root()
+        return io.Schema(
+            node_id="T8_IndexTTS25_SavedVoice",
+            display_name="IndexTTS 2.5 已保存音色 · T8star-Aix",
+            category=CATEGORY,
+            search_aliases=["已保存音色", "音色库", "saved voice", "voice bundle"],
+            description=(
+                "直接使用 Desktop 导出的 .t8voice.zip，不再为每个工作流重复上传参考音频。"
+                f"把音色包放到：{library_root}"
+            ),
+            inputs=[
+                io.Combo.Input(
+                    "saved_voice",
+                    display_name="已保存音色",
+                    options=saved_voice_options(),
+                    tooltip="新增音色包后请刷新浏览器，或修改下方刷新令牌。",
+                ),
+                io.String.Input(
+                    "role_name_override",
+                    display_name="角色名称覆盖（留空使用保存名称）",
+                    default="",
+                ),
+                io.Combo.Input(
+                    "language_override",
+                    display_name="语言覆盖",
+                    options=["saved", "ZH", "EN", "JA", "ES", "AR"],
+                    default="saved",
+                ),
+                io.Int.Input(
+                    "refresh_token",
+                    display_name="刷新令牌（音色包变化后 +1）",
+                    default=0,
+                    min=0,
+                    max=2147483647,
+                    advanced=True,
+                ),
+            ],
+            outputs=[
+                VoiceType.Output("voice", display_name="角色音色"),
+                io.String.Output("voice_info", display_name="音色信息"),
+                io.String.Output("voice_report", display_name="音色报告 JSON"),
+            ],
+        )
+
+    @classmethod
+    def fingerprint_inputs(
+        cls,
+        saved_voice: str,
+        role_name_override: str,
+        language_override: str,
+        refresh_token: int,
+    ) -> str:
+        return ":".join(
+            (
+                saved_voice_fingerprint(),
+                str(saved_voice),
+                str(role_name_override),
+                str(language_override),
+                str(refresh_token),
+            )
+        )
+
+    @classmethod
+    def execute(
+        cls,
+        saved_voice: str,
+        role_name_override: str,
+        language_override: str,
+        refresh_token: int,
+    ) -> io.NodeOutput:
+        del refresh_token
+        profile, report = load_saved_voice(
+            saved_voice,
+            role_name_override=role_name_override,
+            language_override=language_override,
+        )
+        info = (
+            f"角色={profile.name} | language={profile.language} | "
+            f"情感={_emotion_mode_label(profile.emotion)} | 音色包={Path(report['bundle']).name}"
+        )
+        return io.NodeOutput(
+            profile,
+            info,
+            json.dumps(report, ensure_ascii=False, indent=2),
+        )
 
 
 class T8IndexTTS25VoiceProfile(io.ComfyNode):
@@ -2481,6 +2583,94 @@ class T8IndexTTS25MemoryControl(io.ComfyNode):
         )
 
 
+class T8IndexTTS25AudioCppInstaller(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="T8_IndexTTS25_AudioCppInstaller",
+            display_name="IndexTTS 2.5 audio.cpp 一键组件 · T8star-Aix",
+            category=CATEGORY,
+            search_aliases=["audio.cpp 安装", "GGUF 下载", "optional component"],
+            description=(
+                "按需下载官方 audio.cpp Windows 运行时和 GGUF 模型；支持断点续传、"
+                "SHA-256 校验，且不会替换默认 Python 推理。"
+            ),
+            inputs=[
+                io.Combo.Input(
+                    "action",
+                    display_name="操作",
+                    options=["status_only", "install_runtime", "install_model", "install_all"],
+                    default="status_only",
+                ),
+                io.Combo.Input(
+                    "backend",
+                    display_name="Windows 后端",
+                    options=["cuda", "vulkan", "cpu"],
+                    default="cuda",
+                ),
+                io.Combo.Input(
+                    "quantization",
+                    display_name="GGUF 精度",
+                    options=["q8_0", "f16", "original"],
+                    default="q8_0",
+                    tooltip="推荐 q8_0（约 3.3 GiB）；f16 约 4.2 GiB；original 约 7.3 GiB。",
+                ),
+                io.Boolean.Input(
+                    "confirm_download",
+                    display_name="确认下载可选组件",
+                    default=False,
+                    tooltip="只有执行安装时才需要勾选；status_only 不需要。",
+                ),
+            ],
+            outputs=[
+                io.String.Output("executable_path", display_name="audiocpp_cli 路径"),
+                io.String.Output("gguf_model_path", display_name="GGUF 模型路径"),
+                io.String.Output("component_report", display_name="组件状态 JSON"),
+            ],
+        )
+
+    @classmethod
+    def validate_inputs(cls, action: str, confirm_download: bool, **kwargs) -> bool | str:
+        if action != "status_only" and not confirm_download:
+            return "安装可选组件前必须勾选“确认下载可选组件”。"
+        return True
+
+    @classmethod
+    def execute(
+        cls,
+        action: str,
+        backend: str,
+        quantization: str,
+        confirm_download: bool,
+    ) -> io.NodeOutput:
+        del confirm_download
+        progress = _progress_callback()
+
+        def update(event: dict) -> None:
+            raw = float(event.get("percent") or 0.0)
+            value = raw / 100.0 if raw > 1.0 else raw
+            progress(value, str(event.get("label") or event.get("phase") or "audio.cpp"))
+
+        if action in {"install_runtime", "install_all"}:
+            install_audiocpp_runtime(backend, callback=update)
+        if action in {"install_model", "install_all"}:
+            install_audiocpp_model(quantization, callback=update)
+        if action not in {"status_only", "install_runtime", "install_model", "install_all"}:
+            raise ValueError(f"未知 audio.cpp 组件操作：{action}")
+        status = audiocpp_component_status()
+        status.update(
+            action=action,
+            backend=backend,
+            quantization=quantization,
+            dataRoot=str(default_component_data_root()),
+        )
+        return io.NodeOutput(
+            status.get("executable", ""),
+            status.get("modelPath", ""),
+            json.dumps(status, ensure_ascii=False, indent=2),
+        )
+
+
 class T8IndexTTS25AudioCppGenerate(io.ComfyNode):
     @classmethod
     def define_schema(cls) -> io.Schema:
@@ -2491,8 +2681,8 @@ class T8IndexTTS25AudioCppGenerate(io.ComfyNode):
             essentials_category="Audio",
             search_aliases=["audio.cpp", "GGUF", "IndexTTS quantized", "实验后端"],
             description=(
-                "调用用户单独安装的 audio.cpp CLI 和 IndexTTS2.5 GGUF；"
-                "与默认 Python 模型加载器完全隔离，不会改变现有工作流。"
+                "调用 audio.cpp CLI 和 IndexTTS2.5 GGUF；路径留空时自动使用“一键组件”"
+                "安装结果。与默认 Python 模型加载器完全隔离，不会改变现有工作流。"
             ),
             inputs=[
                 io.String.Input(
@@ -2563,6 +2753,14 @@ class T8IndexTTS25AudioCppGenerate(io.ComfyNode):
         memory_saver: bool,
         emotion: EmotionConfig | None = None,
     ) -> io.NodeOutput:
+        installed = audiocpp_component_status()
+        executable_path = str(executable_path or installed.get("executable") or "").strip()
+        gguf_model_path = str(gguf_model_path or installed.get("modelPath") or "").strip()
+        if not executable_path or not gguf_model_path:
+            raise RuntimeError(
+                "audio.cpp 组件路径不完整。请先运行“audio.cpp 一键组件”节点，"
+                "或手动填写 audiocpp_cli 与 GGUF 路径。"
+            )
         probe = await probe_audiocpp(executable_path)
         if not probe.get("available"):
             raise RuntimeError(
@@ -3317,6 +3515,7 @@ class T8IndexTTS25Extension(ComfyExtension):
             T8IndexTTS25TextPreview,
             T8IndexTTS25Pronunciation,
             T8IndexTTS25Generate,
+            T8IndexTTS25SavedVoice,
             T8IndexTTS25VoiceProfile,
             T8IndexTTS25RoleLibrary,
             T8IndexTTS25MergeVoiceEmotions,
@@ -3328,6 +3527,7 @@ class T8IndexTTS25Extension(ComfyExtension):
             T8IndexTTS25SubtitleRewrite,
             T8IndexTTS25ReferenceQuality,
             T8IndexTTS25MemoryControl,
+            T8IndexTTS25AudioCppInstaller,
             T8IndexTTS25AudioCppGenerate,
             T8IndexTTS25AudioPostProcess,
             T8IndexTTS25Environment,
@@ -3347,6 +3547,7 @@ __all__ = [
     "T8IndexTTS25TextPreview",
     "T8IndexTTS25Pronunciation",
     "T8IndexTTS25Generate",
+    "T8IndexTTS25SavedVoice",
     "T8IndexTTS25VoiceProfile",
     "T8IndexTTS25RoleLibrary",
     "T8IndexTTS25MergeVoiceEmotions",
@@ -3358,6 +3559,7 @@ __all__ = [
     "T8IndexTTS25SubtitleRewrite",
     "T8IndexTTS25ReferenceQuality",
     "T8IndexTTS25MemoryControl",
+    "T8IndexTTS25AudioCppInstaller",
     "T8IndexTTS25AudioCppGenerate",
     "T8IndexTTS25AudioPostProcess",
     "T8IndexTTS25Environment",
