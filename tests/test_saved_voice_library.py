@@ -96,7 +96,8 @@ def test_saved_voice_cache_repairs_partial_files_and_refreshes(tmp_path: Path):
 
     assert repaired.read_bytes() == b"complete-wave"
     assert refreshed.read_bytes() == b"complete-wave"
-    assert refreshed != repaired
+    assert refreshed == repaired
+    assert len(list((tmp_path / ".cache").rglob("voice.wav"))) == 1
 
 
 def test_saved_voice_cache_detects_same_stat_bundle_replacement(tmp_path: Path):
@@ -124,4 +125,13 @@ def test_saved_voice_bundle_rejects_unlisted_files(tmp_path: Path):
         archive.writestr("audio/extra.wav", b"extra")
 
     with pytest.raises(ValueError, match="未列入清单"):
+        voice_library._read_manifest(bundle)
+
+
+def test_saved_voice_bundle_rejects_windows_case_aliases(tmp_path: Path):
+    bundle = _bundle(tmp_path / "case-alias.t8voice.zip")
+    with zipfile.ZipFile(bundle, "a") as archive:
+        archive.writestr("audio/Voice.wav", b"alias")
+
+    with pytest.raises(ValueError, match="Windows"):
         voice_library._read_manifest(bundle)

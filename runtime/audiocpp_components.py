@@ -20,7 +20,9 @@ from typing import Any, Callable
 
 
 AUDIOCPP_REPOSITORY = "0xShug0/audio.cpp"
-AUDIOCPP_RELEASE_API = f"https://api.github.com/repos/{AUDIOCPP_REPOSITORY}/releases/latest"
+AUDIOCPP_RELEASE_API = (
+    f"https://api.github.com/repos/{AUDIOCPP_REPOSITORY}/releases/latest"
+)
 AUDIOCPP_MODEL_REPOSITORY = "audio-cpp/audio.cpp-gguf"
 AUDIOCPP_MODEL_API = f"https://huggingface.co/api/models/{AUDIOCPP_MODEL_REPOSITORY}"
 AUDIOCPP_MODEL_FOLDER = "IndexTTS2.5-GGUF"
@@ -58,12 +60,22 @@ def _synchronized(method):
 def _write_json_atomic(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + ".tmp")
-    temporary.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    temporary.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
     temporary.replace(path)
 
 
 def _relative_path(root: Path, path: Path) -> str:
     return path.resolve().relative_to(root.resolve()).as_posix()
+
+
+def _contained_file(root: Path, path: Path) -> Path:
+    root = root.resolve()
+    candidate = path.expanduser().resolve()
+    if root not in candidate.parents or not candidate.is_file():
+        return Path()
+    return candidate
 
 
 def _resolved_manifest_path(
@@ -75,16 +87,84 @@ def _resolved_manifest_path(
 ) -> Path:
     relative = str(manifest.get(relative_key) or "").strip()
     if relative:
-        candidate = (root / PurePosixPath(relative)).resolve()
-        if root.resolve() in candidate.parents or candidate == root.resolve():
-            if candidate.is_file():
-                return candidate
-    absolute = Path(str(manifest.get(absolute_key) or ""))
-    if absolute.is_file():
-        return absolute.resolve()
-    if fallback is not None and fallback.is_file():
-        return fallback.resolve()
+        candidate = _contained_file(root, root / PurePosixPath(relative))
+        if candidate.is_file():
+            return candidate
+    absolute_value = str(manifest.get(absolute_key) or "").strip()
+    if absolute_value:
+        absolute = _contained_file(root, Path(absolute_value))
+        if absolute.is_file():
+            return absolute
+    if fallback is not None:
+        fallback = _contained_file(root, fallback)
+        if fallback.is_file():
+            return fallback
     return Path()
+
+
+def _file_change_token(path: Path, stat_result: os.stat_result) -> int:
+    """Return a content-change token that cannot be reset with ordinary utime calls."""
+
+    if os.name != "nt":
+        return int(getattr(stat_result, "st_ctime_ns", 0))
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        class FileBasicInfo(ctypes.Structure):
+            _fields_ = [
+                ("creation_time", ctypes.c_longlong),
+                ("last_access_time", ctypes.c_longlong),
+                ("last_write_time", ctypes.c_longlong),
+                ("change_time", ctypes.c_longlong),
+                ("file_attributes", wintypes.DWORD),
+            ]
+
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        create_file = kernel32.CreateFileW
+        create_file.argtypes = [
+            wintypes.LPCWSTR,
+            wintypes.DWORD,
+            wintypes.DWORD,
+            wintypes.LPVOID,
+            wintypes.DWORD,
+            wintypes.DWORD,
+            wintypes.HANDLE,
+        ]
+        create_file.restype = wintypes.HANDLE
+        get_info = kernel32.GetFileInformationByHandleEx
+        get_info.argtypes = [
+            wintypes.HANDLE,
+            ctypes.c_int,
+            wintypes.LPVOID,
+            wintypes.DWORD,
+        ]
+        get_info.restype = wintypes.BOOL
+        close_handle = kernel32.CloseHandle
+        close_handle.argtypes = [wintypes.HANDLE]
+        close_handle.restype = wintypes.BOOL
+        handle = create_file(
+            str(path),
+            0x0080,
+            0x00000001 | 0x00000002 | 0x00000004,
+            None,
+            3,
+            0x02000000,
+            None,
+        )
+        if handle == wintypes.HANDLE(-1).value:
+            raise OSError(ctypes.get_last_error(), "CreateFileW failed")
+        try:
+            info = FileBasicInfo()
+            if not get_info(handle, 0, ctypes.byref(info), ctypes.sizeof(info)):
+                raise OSError(
+                    ctypes.get_last_error(), "GetFileInformationByHandleEx failed"
+                )
+            return int(info.change_time)
+        finally:
+            close_handle(handle)
+    except (AttributeError, OSError, ValueError):
+        return int(getattr(stat_result, "st_ctime_ns", 0))
 
 
 def _verified_sha256(path: Path, expected: str) -> bool:
@@ -93,7 +173,7 @@ def _verified_sha256(path: Path, expected: str) -> bool:
         str(path.resolve()),
         int(stat.st_size),
         int(stat.st_mtime_ns),
-        int(getattr(stat, "st_ctime_ns", 0)),
+        _file_change_token(path, stat),
         expected,
     )
     cached = _HASH_CACHE.get(key)
@@ -111,17 +191,26 @@ def _file_integrity(
     expected_size: int = 0,
     expected_sha256: str = "",
     verify_hash: bool,
+    manifest_valid: bool,
 ) -> tuple[bool, str]:
+    if not manifest_valid:
+        return False, "manifest-invalid"
     if not path.is_file():
         return False, "missing"
-    if expected_size > 0 and path.stat().st_size != expected_size:
+    if expected_size <= 0:
+        return False, "metadata-invalid"
+    if path.stat().st_size != expected_size:
         return False, "size-mismatch"
     checksum = str(expected_sha256 or "").lower()
     if not re.fullmatch(r"[0-9a-f]{64}", checksum):
-        return True, "legacy-unverified"
+        return False, "metadata-invalid"
     if not verify_hash:
         return True, "size-verified"
-    return (True, "verified") if _verified_sha256(path, checksum) else (False, "sha256-mismatch")
+    return (
+        (True, "verified")
+        if _verified_sha256(path, checksum)
+        else (False, "sha256-mismatch")
+    )
 
 
 def default_component_data_root() -> Path:
@@ -171,6 +260,44 @@ def _checksum(value: str) -> str:
     return normalized
 
 
+def _resumable_download_bytes(
+    target: Path,
+    *,
+    expected_size: int,
+    expected_sha256: str,
+) -> int:
+    """Return usable staged bytes after removing misleading/corrupt files."""
+
+    part = target.with_suffix(target.suffix + ".part")
+    if target.is_file():
+        if (
+            target.stat().st_size == expected_size
+            and _sha256(target) == expected_sha256
+        ):
+            return expected_size
+        target.unlink(missing_ok=True)
+    if not part.is_file():
+        return 0
+    size = part.stat().st_size
+    if size > expected_size:
+        part.unlink(missing_ok=True)
+        return 0
+    if size == expected_size:
+        if _sha256(part) == expected_sha256:
+            return expected_size
+        part.unlink(missing_ok=True)
+        return 0
+    return size
+
+
+def _expanded_archive_bytes(paths: list[Path]) -> int:
+    total = 0
+    for path in paths:
+        with zipfile.ZipFile(path) as archive:
+            total += sum(max(0, int(item.file_size)) for item in archive.infolist())
+    return total
+
+
 def _sha256(path: Path, callback=None) -> str:
     digest = hashlib.sha256()
     processed = 0
@@ -196,7 +323,10 @@ def _download(
     target.parent.mkdir(parents=True, exist_ok=True)
     part = target.with_suffix(target.suffix + ".part")
     if target.is_file():
-        if target.stat().st_size == expected_size and _sha256(target) == expected_sha256:
+        if (
+            target.stat().st_size == expected_size
+            and _sha256(target) == expected_sha256
+        ):
             _emit(
                 callback,
                 phase="cached",
@@ -276,7 +406,9 @@ def _safe_extract(archive_path: Path, destination: Path) -> None:
     with zipfile.ZipFile(archive_path) as archive:
         for item in archive.infolist():
             candidate = PurePosixPath(item.filename.replace("\\", "/"))
-            if candidate.is_absolute() or any(part in {"", ".", ".."} for part in candidate.parts):
+            if candidate.is_absolute() or any(
+                part in {"", ".", ".."} for part in candidate.parts
+            ):
                 raise ValueError(f"audio.cpp 压缩包包含不安全路径：{item.filename}")
         archive.extractall(destination)
 
@@ -292,13 +424,21 @@ def _release_assets(backend: str) -> tuple[dict[str, Any], list[dict[str, Any]]]
     selected: list[dict[str, Any]] = []
     for pattern in _BACKEND_ASSETS[backend]:
         match = next(
-            (item for item in assets if re.search(pattern, str(item.get("name") or ""), re.I)),
+            (
+                item
+                for item in assets
+                if re.search(pattern, str(item.get("name") or ""), re.I)
+            ),
             None,
         )
         if match is None:
             raise RuntimeError(f"audio.cpp 最新 Release 缺少安装资产：{pattern}")
         asset_name = str(match.get("name") or "")
-        if Path(asset_name).name != asset_name or "/" in asset_name or "\\" in asset_name:
+        if (
+            Path(asset_name).name != asset_name
+            or "/" in asset_name
+            or "\\" in asset_name
+        ):
             raise RuntimeError("audio.cpp Release 返回了不安全的资产名称。")
         _checksum(match.get("digest"))
         selected.append(match)
@@ -318,7 +458,9 @@ def install_runtime(
     callback: ProgressCallback | None = None,
 ) -> dict[str, Any]:
     if not _is_windows_platform():
-        raise RuntimeError("当前一键安装器面向 Windows；其他系统请使用 audio.cpp 官方包。")
+        raise RuntimeError(
+            "当前一键安装器面向 Windows；其他系统请使用 audio.cpp 官方包。"
+        )
     backend = str(backend).lower()
     release, assets = _release_assets(backend)
     tag = str(release.get("tag_name") or "").strip()
@@ -327,10 +469,21 @@ def install_runtime(
     root = _root(data_root)
     downloads = root / "downloads" / tag
     install_dir = root / "runtime" / tag / backend
-    required = sum(int(item.get("size") or 0) for item in assets)
     root.mkdir(parents=True, exist_ok=True)
+    remaining_download_bytes = sum(
+        max(
+            0,
+            int(item.get("size") or 0)
+            - _resumable_download_bytes(
+                downloads / str(item["name"]),
+                expected_size=int(item.get("size") or 0),
+                expected_sha256=_checksum(item.get("digest")),
+            ),
+        )
+        for item in assets
+    )
     available = shutil.disk_usage(root).free
-    if available < required + DISK_RESERVE_BYTES:
+    if available < remaining_download_bytes + DISK_RESERVE_BYTES:
         raise RuntimeError("audio.cpp 安装空间不足。")
     downloaded = [
         _download(
@@ -343,15 +496,25 @@ def install_runtime(
         )
         for asset in assets
     ]
-    with tempfile.TemporaryDirectory(prefix="t8_audiocpp_install_") as temporary:
+    expanded_bytes = _expanded_archive_bytes(downloaded)
+    available = shutil.disk_usage(root).free
+    if available < expanded_bytes * 2 + DISK_RESERVE_BYTES:
+        raise RuntimeError("audio.cpp 解压空间不足：需要同时保留解压暂存和候选运行时。")
+    with tempfile.TemporaryDirectory(
+        prefix="t8_audiocpp_install_", dir=root
+    ) as temporary:
         staging = Path(temporary) / "payload"
         for archive in downloaded:
             _safe_extract(archive, staging)
         if not list(staging.rglob("audiocpp_cli.exe")):
             raise RuntimeError("官方压缩包内没有找到 audiocpp_cli.exe。")
         install_dir.parent.mkdir(parents=True, exist_ok=True)
-        candidate_dir = install_dir.with_name(f".{install_dir.name}.new-{os.getpid()}-{time.time_ns()}")
-        backup_dir = install_dir.with_name(f".{install_dir.name}.backup-{os.getpid()}-{time.time_ns()}")
+        candidate_dir = install_dir.with_name(
+            f".{install_dir.name}.new-{os.getpid()}-{time.time_ns()}"
+        )
+        backup_dir = install_dir.with_name(
+            f".{install_dir.name}.backup-{os.getpid()}-{time.time_ns()}"
+        )
         try:
             shutil.copytree(staging, candidate_dir)
         except Exception:
@@ -409,7 +572,9 @@ def _model_metadata(quantization: str) -> dict[str, Any]:
         raise RuntimeError("GGUF 仓库元数据格式无效。")
     revision = str(repository["sha"])
     folder = urllib.parse.quote(AUDIOCPP_MODEL_FOLDER, safe="")
-    tree = _request_json(f"{AUDIOCPP_MODEL_API}/tree/{revision}/{folder}?recursive=true&expand=true")
+    tree = _request_json(
+        f"{AUDIOCPP_MODEL_API}/tree/{revision}/{folder}?recursive=true&expand=true"
+    )
     wanted = f"{AUDIOCPP_MODEL_FOLDER}/{filename}"
     if not isinstance(tree, list):
         raise RuntimeError("GGUF 文件清单格式无效。")
@@ -440,19 +605,22 @@ def install_model(
     model_dir = root / "models" / AUDIOCPP_MODEL_FOLDER
     model_path = model_dir / metadata["filename"]
     download_target = model_path.with_suffix(model_path.suffix + ".download")
-    download_part = download_target.with_suffix(download_target.suffix + ".part")
     root.mkdir(parents=True, exist_ok=True)
     installed_valid = (
         model_path.is_file()
         and model_path.stat().st_size == int(metadata["size"])
         and _verified_sha256(model_path, metadata["sha256"])
     )
-    existing = max(
-        download_target.stat().st_size if download_target.is_file() else 0,
-        download_part.stat().st_size if download_part.is_file() else 0,
+    existing = _resumable_download_bytes(
+        download_target,
+        expected_size=int(metadata["size"]),
+        expected_sha256=metadata["sha256"],
     )
     remaining = max(0, int(metadata["size"]) - existing)
-    if not installed_valid and shutil.disk_usage(root).free < remaining + DISK_RESERVE_BYTES:
+    if (
+        not installed_valid
+        and shutil.disk_usage(root).free < remaining + DISK_RESERVE_BYTES
+    ):
         raise RuntimeError("GGUF 模型安装空间不足。")
     manifest = {
         "schemaVersion": COMPONENT_SCHEMA_VERSION,
@@ -476,8 +644,12 @@ def install_model(
             label=metadata["filename"],
             callback=callback,
         )
-        candidate_model = model_path.with_name(f".{model_path.name}.new-{os.getpid()}-{time.time_ns()}")
-        backup_model = model_path.with_name(f".{model_path.name}.backup-{os.getpid()}-{time.time_ns()}")
+        candidate_model = model_path.with_name(
+            f".{model_path.name}.new-{os.getpid()}-{time.time_ns()}"
+        )
+        backup_model = model_path.with_name(
+            f".{model_path.name}.backup-{os.getpid()}-{time.time_ns()}"
+        )
         model_dir.mkdir(parents=True, exist_ok=True)
         downloaded_model.replace(candidate_model)
         had_original = model_path.exists()
@@ -508,13 +680,23 @@ def component_status(
     runtime: dict[str, Any] = {}
     model: dict[str, Any] = {}
     try:
-        runtime = json.loads((root / "current-runtime.json").read_text(encoding="utf-8"))
+        runtime = json.loads(
+            (root / "current-runtime.json").read_text(encoding="utf-8")
+        )
     except (OSError, json.JSONDecodeError, TypeError):
         pass
+    if not isinstance(runtime, dict):
+        runtime = {}
     try:
-        model = json.loads((root / "models" / AUDIOCPP_MODEL_FOLDER / "t8-model.json").read_text(encoding="utf-8"))
+        model = json.loads(
+            (root / "models" / AUDIOCPP_MODEL_FOLDER / "t8-model.json").read_text(
+                encoding="utf-8"
+            )
+        )
     except (OSError, json.JSONDecodeError, TypeError):
         pass
+    if not isinstance(model, dict):
+        model = {}
     release = str(runtime.get("release") or "").strip()
     backend = str(runtime.get("backend") or "").strip()
     runtime_fallback = None
@@ -529,7 +711,11 @@ def component_status(
         runtime_fallback,
     )
     model_filename = _MODEL_FILES.get(str(model.get("quantization") or "").lower())
-    model_fallback = root / "models" / AUDIOCPP_MODEL_FOLDER / model_filename if model_filename else None
+    model_fallback = (
+        root / "models" / AUDIOCPP_MODEL_FOLDER / model_filename
+        if model_filename
+        else None
+    )
     model_path = _resolved_manifest_path(
         root,
         model,
@@ -542,12 +728,16 @@ def component_status(
         expected_size=_nonnegative_int(runtime.get("executableSize")),
         expected_sha256=str(runtime.get("executableSha256") or ""),
         verify_hash=True,
+        manifest_valid=_nonnegative_int(runtime.get("schemaVersion"))
+        == COMPONENT_SCHEMA_VERSION,
     )
     model_ready, model_integrity = _file_integrity(
         model_path,
         expected_size=_nonnegative_int(model.get("size")),
         expected_sha256=str(model.get("sha256") or ""),
         verify_hash=verify_hash,
+        manifest_valid=_nonnegative_int(model.get("schemaVersion"))
+        == COMPONENT_SCHEMA_VERSION,
     )
     return {
         "root": str(root),

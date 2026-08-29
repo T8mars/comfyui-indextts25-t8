@@ -3,8 +3,10 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import os
 import zipfile
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -26,7 +28,9 @@ class _Response(io.BytesIO):
 
 def test_component_download_verifies_hash(tmp_path: Path, monkeypatch):
     payload = b"verified-component"
-    monkeypatch.setattr(manager.urllib.request, "urlopen", lambda *args, **kwargs: _Response(payload))
+    monkeypatch.setattr(
+        manager.urllib.request, "urlopen", lambda *args, **kwargs: _Response(payload)
+    )
     target = manager._download(
         "https://example.invalid/file",
         tmp_path / "file.zip",
@@ -44,7 +48,9 @@ def test_component_download_recovers_completed_part(tmp_path: Path, monkeypatch)
     monkeypatch.setattr(
         manager.urllib.request,
         "urlopen",
-        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("network not expected")),
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("network not expected")
+        ),
     )
     assert (
         manager._download(
@@ -77,7 +83,9 @@ def test_component_runtime_install_and_status(tmp_path: Path, monkeypatch):
     }
     monkeypatch.setattr(manager, "_request_json", lambda _url: release)
     monkeypatch.setattr(manager, "_is_windows_platform", lambda: True)
-    monkeypatch.setattr(manager.urllib.request, "urlopen", lambda *args, **kwargs: _Response(data))
+    monkeypatch.setattr(
+        manager.urllib.request, "urlopen", lambda *args, **kwargs: _Response(data)
+    )
     result = manager.install_runtime("cpu", data_root=tmp_path)
     assert Path(result["executable"]).read_bytes() == b"exe"
     assert manager.component_status(tmp_path)["runtimeReady"] is True
@@ -94,13 +102,19 @@ def test_component_model_install_records_revision(tmp_path: Path, monkeypatch):
         "url": "https://example.invalid/model",
     }
     monkeypatch.setattr(manager, "_model_metadata", lambda _quantization: metadata)
-    monkeypatch.setattr(manager.urllib.request, "urlopen", lambda *args, **kwargs: _Response(payload))
+    monkeypatch.setattr(
+        manager.urllib.request, "urlopen", lambda *args, **kwargs: _Response(payload)
+    )
     result = manager.install_model("q8_0", data_root=tmp_path)
-    manifest = json.loads((Path(result["modelPath"]).parent / "t8-model.json").read_text(encoding="utf-8"))
+    manifest = json.loads(
+        (Path(result["modelPath"]).parent / "t8-model.json").read_text(encoding="utf-8")
+    )
     assert manifest["revision"] == "a" * 40
 
 
-def test_component_model_integrity_and_relative_path_survive_move(tmp_path: Path, monkeypatch):
+def test_component_model_integrity_and_relative_path_survive_move(
+    tmp_path: Path, monkeypatch
+):
     payload = b"portable-gguf"
     metadata = {
         "filename": "index-tts2_5-q8_0.gguf",
@@ -111,7 +125,9 @@ def test_component_model_integrity_and_relative_path_survive_move(tmp_path: Path
         "url": "https://example.invalid/model",
     }
     monkeypatch.setattr(manager, "_model_metadata", lambda _quantization: metadata)
-    monkeypatch.setattr(manager.urllib.request, "urlopen", lambda *args, **kwargs: _Response(payload))
+    monkeypatch.setattr(
+        manager.urllib.request, "urlopen", lambda *args, **kwargs: _Response(payload)
+    )
     original = tmp_path / "original"
     moved = tmp_path / "moved"
     manager.install_model("q8_0", data_root=original)
@@ -126,6 +142,108 @@ def test_component_model_integrity_and_relative_path_survive_move(tmp_path: Path
     corrupt_status = manager.component_status(moved, verify_hash=True)
     assert corrupt_status["modelReady"] is False
     assert corrupt_status["modelIntegrity"] == "sha256-mismatch"
+
+
+def test_component_hash_cache_detects_same_stat_tamper(tmp_path: Path, monkeypatch):
+    payload = b"portable-gguf"
+    metadata = {
+        "filename": "index-tts2_5-q8_0.gguf",
+        "repositoryPath": "IndexTTS2.5-GGUF/index-tts2_5-q8_0.gguf",
+        "revision": "c" * 40,
+        "size": len(payload),
+        "sha256": hashlib.sha256(payload).hexdigest(),
+        "url": "https://example.invalid/model",
+    }
+    monkeypatch.setattr(manager, "_model_metadata", lambda _quantization: metadata)
+    monkeypatch.setattr(
+        manager.urllib.request, "urlopen", lambda *args, **kwargs: _Response(payload)
+    )
+    result = manager.install_model("q8_0", data_root=tmp_path)
+    model = Path(result["modelPath"])
+    assert manager.component_status(tmp_path, verify_hash=True)["modelReady"] is True
+    original = model.stat()
+
+    model.write_bytes(b"tampered-gguf")
+    os.utime(model, ns=(original.st_atime_ns, original.st_mtime_ns))
+
+    status = manager.component_status(tmp_path, verify_hash=True)
+    assert status["modelReady"] is False
+    assert status["modelIntegrity"] == "sha256-mismatch"
+
+
+def test_component_status_rejects_external_manifest_path(tmp_path: Path):
+    root = manager._root(tmp_path)
+    root.mkdir(parents=True)
+    outside = tmp_path / "outside.exe"
+    outside.write_bytes(b"trusted-looking")
+    (root / "current-runtime.json").write_text(
+        json.dumps(
+            {
+                "schemaVersion": manager.COMPONENT_SCHEMA_VERSION,
+                "release": "v1",
+                "backend": "cpu",
+                "executable": str(outside),
+                "executableSize": outside.stat().st_size,
+                "executableSha256": hashlib.sha256(outside.read_bytes()).hexdigest(),
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    status = manager.component_status(tmp_path, verify_hash=True)
+
+    assert status["runtimeReady"] is False
+    assert status["runtimeIntegrity"] == "missing"
+    assert status["executable"] == ""
+
+
+def test_install_model_rejects_invalid_full_part_before_disk_preflight(
+    tmp_path: Path,
+    monkeypatch,
+):
+    payload = b"portable-gguf"
+    metadata = {
+        "filename": "index-tts2_5-q8_0.gguf",
+        "repositoryPath": "IndexTTS2.5-GGUF/index-tts2_5-q8_0.gguf",
+        "revision": "d" * 40,
+        "size": len(payload),
+        "sha256": hashlib.sha256(payload).hexdigest(),
+        "url": "https://example.invalid/model",
+    }
+    root = manager._root(tmp_path)
+    target = root / "models" / manager.AUDIOCPP_MODEL_FOLDER / metadata["filename"]
+    part = target.with_suffix(target.suffix + ".download.part")
+    part.parent.mkdir(parents=True)
+    part.write_bytes(b"tampered-gguf")
+    monkeypatch.setattr(manager, "_model_metadata", lambda _quantization: metadata)
+    monkeypatch.setattr(
+        manager.shutil,
+        "disk_usage",
+        lambda _path: SimpleNamespace(free=manager.DISK_RESERVE_BYTES + 1),
+    )
+    monkeypatch.setattr(
+        manager,
+        "_download",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("download must not start")
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match="空间不足"):
+        manager.install_model("q8_0", data_root=tmp_path)
+
+    assert not part.exists()
+
+
+def test_component_status_handles_non_object_manifest(tmp_path: Path):
+    root = manager._root(tmp_path)
+    root.mkdir(parents=True)
+    (root / "current-runtime.json").write_text("[]", encoding="utf-8")
+
+    status = manager.component_status(tmp_path)
+
+    assert status["runtimeReady"] is False
+    assert status["runtimeIntegrity"] == "manifest-invalid"
 
 
 def test_component_runtime_rollback_keeps_old_executable(tmp_path: Path, monkeypatch):
@@ -147,7 +265,9 @@ def test_component_runtime_rollback_keeps_old_executable(tmp_path: Path, monkeyp
     }
     monkeypatch.setattr(manager, "_request_json", lambda _url: release)
     monkeypatch.setattr(manager, "_is_windows_platform", lambda: True)
-    monkeypatch.setattr(manager.urllib.request, "urlopen", lambda *args, **kwargs: _Response(data))
+    monkeypatch.setattr(
+        manager.urllib.request, "urlopen", lambda *args, **kwargs: _Response(data)
+    )
     first = manager.install_runtime("cpu", data_root=tmp_path)
     executable = Path(first["executable"])
     original_copytree = manager.shutil.copytree

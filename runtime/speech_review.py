@@ -26,6 +26,7 @@ ASR_LANGUAGE_CODES = {
 }
 _CACHE: dict[tuple[str, str, str, str], Any] = {}
 _LOCK = threading.RLock()
+_INFERENCE_LOCK = threading.RLock()
 _NON_WORD = re.compile(r"[^\w]+", re.UNICODE)
 _WORD_TOKEN = re.compile(r"[^\W_]+", re.UNICODE)
 _CJK = re.compile(r"[\u3400-\u9fff\u3040-\u30ff]")
@@ -107,7 +108,7 @@ def asr_cache_status() -> dict[str, Any]:
 
 
 def clear_asr_cache() -> int:
-    with _LOCK:
+    with _INFERENCE_LOCK, _LOCK:
         count = len(_CACHE)
         _CACHE.clear()
     gc.collect()
@@ -379,7 +380,7 @@ def _openai_words(segments) -> list[dict[str, Any]]:
     return words
 
 
-def transcribe_waveform(
+def _transcribe_waveform_locked(
     waveform,
     sample_rate: int,
     *,
@@ -460,6 +461,13 @@ def transcribe_waveform(
         "segments": len(segments),
         "word_timestamps": words,
     }
+
+
+def transcribe_waveform(*args, **kwargs) -> dict[str, Any]:
+    """Transcribe while preventing cache eviction from racing an active ASR model."""
+
+    with _INFERENCE_LOCK:
+        return _transcribe_waveform_locked(*args, **kwargs)
 
 
 __all__ = [

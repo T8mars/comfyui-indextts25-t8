@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import threading
+
 import numpy as np
 import torch
 
@@ -53,3 +55,52 @@ def test_asr_cache_status_and_clear_release_all_entries(monkeypatch):
     assert status["cached_models"] == 2
     assert speech_review.clear_asr_cache() == 2
     assert speech_review.asr_cache_status() == {"cached_models": 0, "entries": []}
+
+
+def test_clear_asr_cache_waits_for_active_transcription(monkeypatch):
+    inference_started = threading.Event()
+    allow_finish = threading.Event()
+    clear_finished = threading.Event()
+    errors = []
+
+    class FakeWhisper:
+        def transcribe(self, _audio, **_kwargs):
+            inference_started.set()
+            if not allow_finish.wait(5):
+                raise TimeoutError("test transcription was not released")
+            return {"text": "ok", "language": "en", "segments": []}
+
+    monkeypatch.setattr(
+        speech_review, "load_asr_model", lambda *args, **kwargs: (FakeWhisper(), "cpu")
+    )
+    monkeypatch.setattr(
+        speech_review, "resolve_asr_backend", lambda _backend: "openai_whisper"
+    )
+    speech_review._CACHE.clear()
+    speech_review._CACHE[("openai_whisper", "base", "cpu", "")] = object()
+
+    def transcribe():
+        try:
+            speech_review.transcribe_waveform(
+                torch.zeros(1, 16000), 16000, language="EN"
+            )
+        except Exception as exc:  # pragma: no cover - asserted below
+            errors.append(exc)
+
+    worker = threading.Thread(target=transcribe)
+    worker.start()
+    assert inference_started.wait(5)
+
+    clearer = threading.Thread(
+        target=lambda: (speech_review.clear_asr_cache(), clear_finished.set())
+    )
+    clearer.start()
+    assert not clear_finished.wait(0.1)
+
+    allow_finish.set()
+    worker.join(5)
+    clearer.join(5)
+    assert not worker.is_alive()
+    assert not clearer.is_alive()
+    assert errors == []
+    assert clear_finished.is_set()

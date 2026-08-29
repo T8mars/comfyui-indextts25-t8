@@ -50,6 +50,27 @@ def test_manual_release_is_deferred_for_active_user(tmp_path: Path, monkeypatch)
     assert disposed == [entry]
 
 
+def test_release_all_defers_active_entries_and_disposes_idle_entries(
+    tmp_path: Path, monkeypatch
+):
+    cache = ModelCache()
+    active_handle = ModelHandle(tmp_path / "active", "cpu", False)
+    idle_handle = ModelHandle(tmp_path / "idle", "cpu", False)
+    active = _cached_entry(cache, active_handle, users=1)
+    idle = _cached_entry(cache, idle_handle)
+    disposed = []
+    monkeypatch.setattr(cache, "_dispose", lambda item, device: disposed.append(item))
+
+    assert cache.clear() == 1
+    assert cache.size() == 1
+    assert active.pending_release is True
+    assert disposed == [idle]
+
+    cache.done(active_handle, active)
+    assert cache.size() == 0
+    assert disposed == [idle, active]
+
+
 def test_optional_initialization_failure_falls_back(tmp_path: Path, monkeypatch):
     calls = []
 

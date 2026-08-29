@@ -71,7 +71,9 @@ class ModelCache:
                 return entry
 
             IndexTTS2 = _load_core_class()
-            LOGGER.info("Loading IndexTTS 2.5 from %s on %s", handle.model_dir, handle.device)
+            LOGGER.info(
+                "Loading IndexTTS 2.5 from %s on %s", handle.model_dir, handle.device
+            )
             constructor_kwargs = {
                 "cfg_path": str(handle.model_dir / "config.yaml"),
                 "model_dir": str(handle.model_dir),
@@ -81,7 +83,9 @@ class ModelCache:
                 "reference_device": handle.reference_device,
                 "reuse_spk_cond_for_emo": handle.reuse_spk_cond_for_emo,
                 "reference_cache_dir": (
-                    str(handle.reference_cache_dir) if handle.reference_cache_dir else None
+                    str(handle.reference_cache_dir)
+                    if handle.reference_cache_dir
+                    else None
                 ),
                 "reference_cache_namespace": (
                     f"{handle.model_revision}:{handle.model_fingerprint}:"
@@ -98,7 +102,9 @@ class ModelCache:
             except Exception as exc:
                 if handle.acceleration_effective == "off":
                     raise
-                LOGGER.exception("Optional acceleration initialization failed; reloading normal mode")
+                LOGGER.exception(
+                    "Optional acceleration initialization failed; reloading normal mode"
+                )
                 gc.collect()
                 if handle.device.startswith("cuda") and torch.cuda.is_available():
                     torch.cuda.empty_cache()
@@ -110,12 +116,14 @@ class ModelCache:
                 )
                 model = IndexTTS2(**constructor_kwargs)
                 handle.acceleration_effective = "off"
-                handle.acceleration_note = (
-                    f"可选加速初始化失败（{type(exc).__name__}: {exc}），已自动回退普通模式"
-                )
-            if handle.use_cuda_kernel and not bool(getattr(model, "use_cuda_kernel", False)):
+                handle.acceleration_note = f"可选加速初始化失败（{type(exc).__name__}: {exc}），已自动回退普通模式"
+            if handle.use_cuda_kernel and not bool(
+                getattr(model, "use_cuda_kernel", False)
+            ):
                 handle.acceleration_effective = "off"
-                handle.acceleration_note = "BigVGAN CUDA 融合核加载失败，上游已自动回退普通实现"
+                handle.acceleration_note = (
+                    "BigVGAN CUDA 融合核加载失败，上游已自动回退普通实现"
+                )
             entry = CacheEntry(
                 model=model,
                 users=1,
@@ -140,7 +148,9 @@ class ModelCache:
         self._dispose(entry, handle.device)
         return True
 
-    def done(self, handle: ModelHandle, entry: CacheEntry, *, release: bool = False) -> None:
+    def done(
+        self, handle: ModelHandle, entry: CacheEntry, *, release: bool = False
+    ) -> None:
         """Return an acquired entry and evict it safely when requested."""
         dispose = None
         with self._guard:
@@ -169,13 +179,18 @@ class ModelCache:
             torch.cuda.empty_cache()
 
     def clear(self) -> int:
+        """Release idle entries now and defer active entries until their users finish."""
+
+        removed: list[tuple[CacheEntry, str]] = []
         with self._guard:
-            count = len(self._entries)
-            self._entries.clear()
-        gc.collect()
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-        return count
+            for key, entry in list(self._entries.items()):
+                entry.pending_release = True
+                if entry.users == 0:
+                    self._entries.pop(key)
+                    removed.append((entry, str(key[1])))
+        for entry, device in removed:
+            self._dispose(entry, device)
+        return len(removed)
 
     def evict_idle(self, idle_seconds: float) -> int:
         """Evict only this extension's idle, currently unused model entries."""
@@ -219,7 +234,9 @@ class ModelCache:
             cuda.update(
                 allocated_mb=round(torch.cuda.memory_allocated() / (1024**2), 2),
                 reserved_mb=round(torch.cuda.memory_reserved() / (1024**2), 2),
-                max_allocated_mb=round(torch.cuda.max_memory_allocated() / (1024**2), 2),
+                max_allocated_mb=round(
+                    torch.cuda.max_memory_allocated() / (1024**2), 2
+                ),
             )
         return {"cached_models": len(entries), "entries": entries, "cuda": cuda}
 

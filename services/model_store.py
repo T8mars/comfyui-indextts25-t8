@@ -13,7 +13,7 @@ MANIFEST_PATH = PLUGIN_ROOT / "manifests" / "model_2_5.json"
 MODEL_FOLDER_NAME = "IndexTTS-2.5"
 MISSING_MODEL_OPTION = "[未找到] 请将模型放入 models/TTS/IndexTTS-2.5"
 MODEL_REPOSITORY_URL = "https://huggingface.co/t8star/IndexTTS-2.5-Comfy"
-_HASH_CACHE: dict[tuple[str, int, int], str] = {}
+_HASH_CACHE: dict[tuple[str, int, int, int], str] = {}
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,7 +59,10 @@ def configured_model_roots() -> list[Path]:
     import folder_paths
 
     register_model_paths()
-    return [Path(item).expanduser().resolve() for item in folder_paths.get_folder_paths("TTS")]
+    return [
+        Path(item).expanduser().resolve()
+        for item in folder_paths.get_folder_paths("TTS")
+    ]
 
 
 def _looks_like_model(path: Path) -> bool:
@@ -86,7 +89,9 @@ def discover_models(roots: Iterable[Path] | None = None) -> dict[str, Path]:
                 directories.clear()
             else:
                 directories[:] = [
-                    name for name in directories if name not in {".git", "__pycache__", "hf_cache"}
+                    name
+                    for name in directories
+                    if name not in {".git", "__pycache__", "hf_cache"}
                 ]
             if "config.yaml" not in files or not _looks_like_model(model_dir):
                 continue
@@ -94,7 +99,9 @@ def discover_models(roots: Iterable[Path] | None = None) -> dict[str, Path]:
 
     result: dict[str, Path] = {}
     seen_paths: set[Path] = set()
-    for label, path in sorted(candidates, key=lambda item: (item[0].lower(), str(item[1]).lower())):
+    for label, path in sorted(
+        candidates, key=lambda item: (item[0].lower(), str(item[1]).lower())
+    ):
         if path in seen_paths:
             continue
         seen_paths.add(path)
@@ -126,9 +133,79 @@ def resolve_model(model_name: str, custom_model_path: str = "") -> Path:
     return models[model_name]
 
 
+def _file_change_token(path: Path, stat_result: os.stat_result) -> int:
+    """Return a content-change token that ordinary timestamp restoration cannot reset."""
+
+    if os.name != "nt":
+        return int(getattr(stat_result, "st_ctime_ns", 0))
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        class FileBasicInfo(ctypes.Structure):
+            _fields_ = [
+                ("creation_time", ctypes.c_longlong),
+                ("last_access_time", ctypes.c_longlong),
+                ("last_write_time", ctypes.c_longlong),
+                ("change_time", ctypes.c_longlong),
+                ("file_attributes", wintypes.DWORD),
+            ]
+
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        create_file = kernel32.CreateFileW
+        create_file.argtypes = [
+            wintypes.LPCWSTR,
+            wintypes.DWORD,
+            wintypes.DWORD,
+            wintypes.LPVOID,
+            wintypes.DWORD,
+            wintypes.DWORD,
+            wintypes.HANDLE,
+        ]
+        create_file.restype = wintypes.HANDLE
+        get_info = kernel32.GetFileInformationByHandleEx
+        get_info.argtypes = [
+            wintypes.HANDLE,
+            ctypes.c_int,
+            wintypes.LPVOID,
+            wintypes.DWORD,
+        ]
+        get_info.restype = wintypes.BOOL
+        close_handle = kernel32.CloseHandle
+        close_handle.argtypes = [wintypes.HANDLE]
+        close_handle.restype = wintypes.BOOL
+        handle = create_file(
+            str(path),
+            0x0080,
+            0x00000001 | 0x00000002 | 0x00000004,
+            None,
+            3,
+            0x02000000,
+            None,
+        )
+        if handle == wintypes.HANDLE(-1).value:
+            raise OSError(ctypes.get_last_error(), "CreateFileW failed")
+        try:
+            info = FileBasicInfo()
+            if not get_info(handle, 0, ctypes.byref(info), ctypes.sizeof(info)):
+                raise OSError(
+                    ctypes.get_last_error(), "GetFileInformationByHandleEx failed"
+                )
+            return int(info.change_time)
+        finally:
+            close_handle(handle)
+    except (AttributeError, OSError, ValueError):
+        return int(getattr(stat_result, "st_ctime_ns", 0))
+
+
 def _sha256(path: Path, on_chunk: Callable[[int], None] | None = None) -> str:
     stat = path.stat()
-    key = (str(path.resolve()), stat.st_size, stat.st_mtime_ns)
+    key = (
+        str(path.resolve()),
+        stat.st_size,
+        stat.st_mtime_ns,
+        _file_change_token(path, stat),
+    )
     cached = _HASH_CACHE.get(key)
     if cached is not None:
         if on_chunk is not None:
@@ -142,6 +219,8 @@ def _sha256(path: Path, on_chunk: Callable[[int], None] | None = None) -> str:
                 on_chunk(len(chunk))
     value = digest.hexdigest()
     _HASH_CACHE[key] = value
+    while len(_HASH_CACHE) > 64:
+        _HASH_CACHE.pop(next(iter(_HASH_CACHE)))
     return value
 
 
@@ -209,11 +288,16 @@ def model_fingerprint(model_dir: Path | str) -> str:
         path = model_dir.joinpath(*relative.split("/"))
         try:
             stat = path.stat()
-            parts.append(f"{relative}:{stat.st_size}:{stat.st_mtime_ns}")
+            parts.append(
+                f"{relative}:{stat.st_size}:{stat.st_mtime_ns}:"
+                f"{_file_change_token(path, stat)}"
+            )
         except FileNotFoundError:
             parts.append(f"{relative}:missing")
     return hashlib.sha256("\n".join(parts).encode("utf-8")).hexdigest()
 
 
 def default_model_target(comfy_root: Path | str) -> Path:
-    return Path(comfy_root).expanduser().resolve() / "models" / "TTS" / MODEL_FOLDER_NAME
+    return (
+        Path(comfy_root).expanduser().resolve() / "models" / "TTS" / MODEL_FOLDER_NAME
+    )

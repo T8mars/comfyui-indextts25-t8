@@ -21,7 +21,15 @@ Creator: **Bilibili: T8star-Aix**.
 
 This repository is locked to the IndexTTS 2.5 inference core and the official 2.5 model manifest. It will not fall back to or accidentally load IndexTTS 2.0.
 
-Current baseline: **ComfyUI Node 0.20.2 · Desktop 0.21.0 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**.
+Current baseline: **ComfyUI Node 0.20.4 · Desktop 0.21.1 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**.
+
+### v0.20.4 model integrity, concurrent release, and portable asset hardening
+
+- Full SHA-256 validation and model-cache fingerprints now include a file change marker that ordinary timestamp restoration cannot overwrite, detecting same-size replacements.
+- “Release all models” defers active entries instead of allowing a second model copy to load; ASR cache clearing also waits for the current transcription to finish.
+- Model downloads stop before network transfer when missing files plus the 1 GiB reserve exceed available space, reporting both required and available capacity.
+- The audio.cpp component installer adds resume integrity checks, extraction-space preflight, transactional replacement, manifest path containment, and Windows file-change detection.
+- Saved voice bundles reject Windows case/Unicode path aliases and duplicate roles, while refreshes no longer create an unbounded sequence of cache directories.
 
 ### v0.20.2 ComfyUI V3 test fix
 

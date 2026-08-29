@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import re
 from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
 
 from services import downloader, model_store
 
@@ -14,7 +18,11 @@ def _metadata(data: bytes) -> dict:
 def test_discover_and_validate_model_directory(tmp_path: Path, monkeypatch):
     model_dir = tmp_path / "IndexTTS-2.5"
     model_dir.mkdir()
-    files = {"config.yaml": b"version: 2.5", "gpt.pth": b"gpt", "nested/model.bin": b"model"}
+    files = {
+        "config.yaml": b"version: 2.5",
+        "gpt.pth": b"gpt",
+        "nested/model.bin": b"model",
+    }
     for relative, data in files.items():
         path = model_dir / relative
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -36,14 +44,40 @@ def test_discover_and_validate_model_directory(tmp_path: Path, monkeypatch):
     assert report.mismatched == ("gpt.pth",)
 
 
+def test_model_hash_cache_detects_same_stat_replacement(tmp_path: Path, monkeypatch):
+    original = b"good-model"
+    replacement = b"evil-model"
+    model = tmp_path / "gpt.pth"
+    model.write_bytes(original)
+    manifest = {
+        "modelRevision": "formal-2.5",
+        "files": {"gpt.pth": _metadata(original)},
+    }
+    monkeypatch.setattr(model_store, "load_manifest", lambda: manifest)
+    model_store._HASH_CACHE.clear()
+
+    assert model_store.validate_model_dir(tmp_path, verify_hashes=True).valid
+    before = model.stat()
+    model.write_bytes(replacement)
+    os.utime(model, ns=(before.st_atime_ns, before.st_mtime_ns))
+
+    report = model_store.validate_model_dir(tmp_path, verify_hashes=True)
+    assert report.mismatched == ("gpt.pth",)
+
+
 def test_manifest_is_pinned_to_formal_index_tts_25():
     manifest = model_store.load_manifest()
     assert manifest["codeRevision"] == "ee40fa7d6c6b8a2c7f06105f9f1e65775b74868c"
     assert re.fullmatch(r"[0-9a-f]{40}", manifest["modelRevision"])
-    assert manifest["files"]["config.yaml"]["sha256"] == "18adf417be3e8f5e2e48e30f7420c719170a6870619436250f360d626877870e"
+    assert (
+        manifest["files"]["config.yaml"]["sha256"]
+        == "18adf417be3e8f5e2e48e30f7420c719170a6870619436250f360d626877870e"
+    )
     assert manifest["modelRepository"] == "t8star/IndexTTS-2.5-Comfy"
     assert manifest["upstreamModelRepository"] == "IndexTeam/IndexTTS-2.5"
-    assert manifest["upstreamModelRevision"] == "c39ce5ba981572cb187443877ff559dfb246ce63"
+    assert (
+        manifest["upstreamModelRevision"] == "c39ce5ba981572cb187443877ff559dfb246ce63"
+    )
     assert manifest["files"]["bpe.model"] == {
         "size": 475997,
         "sha256": "b2a5ce8090d32da3642cc4f81fdc996376bc6dd3f4cd5e3d165f71120d9f2bc8",
@@ -170,17 +204,73 @@ def test_model_download_progress_is_monotonic_and_reports_disk_preflight():
     assert fractions == sorted(fractions)
 
 
+def test_model_download_stops_before_network_when_space_is_insufficient(
+    tmp_path: Path, monkeypatch
+):
+    manifest = {
+        "files": {
+            "large.bin": {"size": 2 * 1024**3, "sha256": "0" * 64},
+        }
+    }
+    report = model_store.ValidationReport(
+        model_dir=tmp_path,
+        missing=("large.bin",),
+    )
+    download_started = []
+    monkeypatch.setattr(downloader, "load_manifest", lambda: manifest)
+    monkeypatch.setattr(
+        downloader, "validate_model_dir", lambda *args, **kwargs: report
+    )
+    monkeypatch.setattr(
+        downloader.shutil,
+        "disk_usage",
+        lambda _path: SimpleNamespace(free=600 * 1024**2),
+    )
+    monkeypatch.setattr(
+        downloader,
+        "download_main_model",
+        lambda *args, **kwargs: download_started.append(True),
+    )
+
+    with pytest.raises(RuntimeError, match="空间不足"):
+        downloader.ensure_model_bundle(
+            tmp_path,
+            accept_license=True,
+            skip_auxiliary=True,
+        )
+
+    assert download_started == []
+
+
 def test_comfy_requirements_do_not_replace_torch_or_pull_training_stacks():
-    requirements = (model_store.PLUGIN_ROOT / "requirements.txt").read_text(encoding="utf-8").lower()
-    active = [line.strip() for line in requirements.splitlines() if line.strip() and not line.lstrip().startswith("#")]
-    assert not any(line.startswith(("torch", "torchaudio", "torchvision")) for line in active)
-    assert not any(line.startswith(("descript-audiotools", "openai-whisper")) for line in active)
+    requirements = (
+        (model_store.PLUGIN_ROOT / "requirements.txt")
+        .read_text(encoding="utf-8")
+        .lower()
+    )
+    active = [
+        line.strip()
+        for line in requirements.splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    ]
+    assert not any(
+        line.startswith(("torch", "torchaudio", "torchvision")) for line in active
+    )
+    assert not any(
+        line.startswith(("descript-audiotools", "openai-whisper")) for line in active
+    )
     assert len(active) == 8
     assert not any(line.startswith(("matplotlib", "modelscope")) for line in active)
     assert [line for line in active if "<" in line] == ["transformers>=4.52.1,<5"]
 
-    optional = (model_store.PLUGIN_ROOT / "requirements-modelscope.txt").read_text(encoding="utf-8").lower()
+    optional = (
+        (model_store.PLUGIN_ROOT / "requirements-modelscope.txt")
+        .read_text(encoding="utf-8")
+        .lower()
+    )
     optional_active = [
-        line.strip() for line in optional.splitlines() if line.strip() and not line.lstrip().startswith("#")
+        line.strip()
+        for line in optional.splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
     ]
     assert optional_active == ["modelscope>=1.27"]

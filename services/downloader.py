@@ -32,7 +32,6 @@ LICENSE_NOTICE = (
     "下载即表示你已阅读并接受节点目录中的 LICENSE、LICENSE_ZH.txt 与 DISCLAIMER。\n"
     "本项目是第三方衍生集成；原始权利人不对本衍生品背书、担保或承担责任。"
 )
-MINIMUM_FREE_BYTES = 512 * 1024 * 1024
 DISK_RESERVE_BYTES = 1024 * 1024 * 1024
 
 
@@ -120,7 +119,9 @@ class ModelDownloadProgress:
         self._transfer(force=True)
 
     def resume_file(self, received: int) -> None:
-        self.current_received = min(self.current_total, max(self.current_received, int(received)))
+        self.current_received = min(
+            self.current_total, max(self.current_received, int(received))
+        )
         self._transfer(force=True)
 
     def update_file(self, received: int) -> None:
@@ -218,10 +219,7 @@ def download_main_model(
             from huggingface_hub.file_download import get_local_download_paths
 
         selected = set(_selected_files(manifest, include_auxiliary=include_auxiliary))
-        requested = sorted(
-            selected.intersection([*missing, *mismatched])
-            or selected
-        )
+        requested = sorted(selected.intersection([*missing, *mismatched]) or selected)
         for index, relative in enumerate(requested, start=1):
             if progress is not None:
                 progress.begin_file(relative, index)
@@ -312,7 +310,10 @@ def download_auxiliary_models(target: Path, source: str) -> None:
     root_string = str(PLUGIN_ROOT)
     if root_string not in sys.path:
         sys.path.insert(0, root_string)
-    from indextts.utils.model_download import ensure_models_available, set_download_source
+    from indextts.utils.model_download import (
+        ensure_models_available,
+        set_download_source,
+    )
 
     set_download_source(source)
     ensure_models_available(str(target))
@@ -350,9 +351,13 @@ def ensure_model_bundle(
         required = list(dict.fromkeys([*initial.missing, *initial.mismatched]))
         free_bytes = shutil.disk_usage(target).free
         reporter.preflight(required, free_bytes)
-        if required and free_bytes < MINIMUM_FREE_BYTES:
+        required_bytes = sum(int(manifest["files"][item]["size"]) for item in required)
+        minimum_bytes = required_bytes + DISK_RESERVE_BYTES
+        if required and free_bytes < minimum_bytes:
             raise RuntimeError(
-                "模型目录可用空间不足 512 MiB，无法安全继续下载；请清理空间或更换目录。"
+                "模型目录空间不足，无法安全继续下载；"
+                f"至少需要约 {minimum_bytes / 1024**3:.2f} GiB，"
+                f"当前可用 {free_bytes / 1024**3:.2f} GiB。请清理空间或更换目录。"
             )
         if not initial.valid:
             download_main_model(
@@ -388,12 +393,26 @@ def _default_target_from_layout() -> Path | None:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="下载并校验 IndexTTS 2.5 正式模型")
-    parser.add_argument("--target", type=Path, help="目标模型目录，例如 ComfyUI/models/TTS/IndexTTS-2.5")
-    parser.add_argument("--comfy-root", type=Path, help="ComfyUI 根目录；目标将自动放入 models/TTS/IndexTTS-2.5")
-    parser.add_argument("--source", choices=["modelscope", "huggingface"], default="huggingface")
-    parser.add_argument("--accept-license", action="store_true", help="确认已接受模型许可证和免责声明")
-    parser.add_argument("--verify-only", action="store_true", help="只执行完整 SHA-256 校验，不下载")
-    parser.add_argument("--skip-aux", action="store_true", help="跳过 Wav2Vec2-BERT、BigVGAN 等辅助模型")
+    parser.add_argument(
+        "--target", type=Path, help="目标模型目录，例如 ComfyUI/models/TTS/IndexTTS-2.5"
+    )
+    parser.add_argument(
+        "--comfy-root",
+        type=Path,
+        help="ComfyUI 根目录；目标将自动放入 models/TTS/IndexTTS-2.5",
+    )
+    parser.add_argument(
+        "--source", choices=["modelscope", "huggingface"], default="huggingface"
+    )
+    parser.add_argument(
+        "--accept-license", action="store_true", help="确认已接受模型许可证和免责声明"
+    )
+    parser.add_argument(
+        "--verify-only", action="store_true", help="只执行完整 SHA-256 校验，不下载"
+    )
+    parser.add_argument(
+        "--skip-aux", action="store_true", help="跳过 Wav2Vec2-BERT、BigVGAN 等辅助模型"
+    )
     return parser
 
 
@@ -407,7 +426,9 @@ def resolve_target(args: argparse.Namespace) -> Path:
     detected = _default_target_from_layout()
     if detected is not None:
         return detected
-    raise ValueError("当前节点不在 ComfyUI/custom_nodes 下，请显式提供 --target 或 --comfy-root。")
+    raise ValueError(
+        "当前节点不在 ComfyUI/custom_nodes 下，请显式提供 --target 或 --comfy-root。"
+    )
 
 
 def main(argv: list[str] | None = None) -> int:

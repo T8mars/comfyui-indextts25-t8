@@ -6,6 +6,7 @@ import hashlib
 import json
 import tempfile
 import threading
+import unicodedata
 import zlib
 import zipfile
 from dataclasses import dataclass
@@ -27,6 +28,7 @@ MAX_VOICE_BUNDLE_MEMBERS = 1024
 MAX_VOICE_PROFILES = 256
 MAX_VOICE_MANIFEST_BYTES = 4 * 1024**2
 _CACHE_LOCK = threading.RLock()
+_CACHE_REFRESH_TOKENS: dict[str, int] = {}
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,9 +52,24 @@ def default_voice_library_root() -> Path:
 
 def _safe_member(name: str) -> PurePosixPath:
     value = PurePosixPath(str(name).replace("\\", "/"))
-    if value.is_absolute() or not value.parts or any(part in {"", ".", ".."} for part in value.parts):
+    if (
+        value.is_absolute()
+        or not value.parts
+        or any(part in {"", ".", ".."} for part in value.parts)
+    ):
         raise ValueError(f"音色包包含不安全路径：{name}")
     return value
+
+
+def _portable_member_key(name: str) -> str:
+    member = _safe_member(name)
+    normalized_parts = []
+    for part in member.parts:
+        normalized = unicodedata.normalize("NFC", part).rstrip(" .").casefold()
+        if not normalized:
+            raise ValueError(f"音色包包含 Windows 不兼容路径：{name}")
+        normalized_parts.append(normalized)
+    return "/".join(normalized_parts)
 
 
 def _read_manifest(bundle_path: Path) -> dict[str, Any]:
@@ -61,13 +78,27 @@ def _read_manifest(bundle_path: Path) -> dict[str, Any]:
             members = archive.infolist()
             if len(members) > MAX_VOICE_BUNDLE_MEMBERS:
                 raise ValueError(f"音色包文件数量超过安全上限：{bundle_path.name}")
-            if any(member.file_size > MAX_VOICE_BUNDLE_MEMBER_BYTES for member in members):
+            if any(
+                member.file_size > MAX_VOICE_BUNDLE_MEMBER_BYTES for member in members
+            ):
                 raise ValueError(f"音色包包含超过 2 GiB 的单个文件：{bundle_path.name}")
-            if sum(member.file_size for member in members) > MAX_VOICE_BUNDLE_TOTAL_BYTES:
+            if (
+                sum(member.file_size for member in members)
+                > MAX_VOICE_BUNDLE_TOTAL_BYTES
+            ):
                 raise ValueError(f"音色包解压后总大小超过 4 GiB：{bundle_path.name}")
-            normalized_names = [_safe_member(member.filename).as_posix() for member in members if not member.is_dir()]
+            normalized_names = [
+                _safe_member(member.filename).as_posix()
+                for member in members
+                if not member.is_dir()
+            ]
             if len(normalized_names) != len(set(normalized_names)):
                 raise ValueError(f"音色包包含重复文件名：{bundle_path.name}")
+            portable_names = [_portable_member_key(name) for name in normalized_names]
+            if len(portable_names) != len(set(portable_names)):
+                raise ValueError(
+                    f"音色包包含 Windows 下会互相覆盖的文件名：{bundle_path.name}"
+                )
             manifest_info = archive.getinfo("manifest.json")
             if manifest_info.file_size > MAX_VOICE_MANIFEST_BYTES:
                 raise ValueError(f"音色包 manifest.json 超过 4 MiB：{bundle_path.name}")
@@ -79,19 +110,35 @@ def _read_manifest(bundle_path: Path) -> dict[str, Any]:
         UnicodeDecodeError,
         json.JSONDecodeError,
     ) as exc:
-        raise ValueError(f"音色包 manifest.json 缺失或损坏：{bundle_path.name}") from exc
-    if not isinstance(payload, dict) or payload.get("schemaVersion") != VOICE_BUNDLE_SCHEMA_VERSION:
+        raise ValueError(
+            f"音色包 manifest.json 缺失或损坏：{bundle_path.name}"
+        ) from exc
+    if (
+        not isinstance(payload, dict)
+        or payload.get("schemaVersion") != VOICE_BUNDLE_SCHEMA_VERSION
+    ):
         raise ValueError(f"不支持的音色包版本：{bundle_path.name}")
     if not isinstance(payload.get("profiles"), list):
         raise ValueError(f"音色包角色列表无效：{bundle_path.name}")
     if len(payload["profiles"]) > MAX_VOICE_PROFILES:
         raise ValueError(f"单个音色包最多包含 256 个角色：{bundle_path.name}")
     expected = {"manifest.json"}
+    profile_names: set[str] = set()
+    profile_ids: set[str] = set()
     for profile in payload["profiles"]:
         if not isinstance(profile, dict):
             raise ValueError(f"音色包角色数据格式无效：{bundle_path.name}")
-        if not str(profile.get("name") or "").strip():
+        profile_name = str(profile.get("name") or "").strip()
+        if not profile_name:
             raise ValueError(f"音色包包含空角色名称：{bundle_path.name}")
+        profile_id = str(profile.get("profile_id") or "").strip()
+        name_key = unicodedata.normalize("NFC", profile_name).casefold()
+        id_key = unicodedata.normalize("NFC", profile_id).casefold()
+        if name_key in profile_names or (id_key and id_key in profile_ids):
+            raise ValueError(f"音色包包含重复角色名称或角色 ID：{bundle_path.name}")
+        profile_names.add(name_key)
+        if id_key:
+            profile_ids.add(id_key)
         speaker = str(profile.get("audio_path") or "")
         if not speaker:
             raise ValueError(f"音色包角色缺少音色参考音频：{bundle_path.name}")
@@ -108,7 +155,9 @@ def _read_manifest(bundle_path: Path) -> dict[str, Any]:
             detail.append("未列入清单：" + "、".join(extra[:5]))
         if missing:
             detail.append("缺少：" + "、".join(missing[:5]))
-        raise ValueError(f"音色包文件清单不一致（{'; '.join(detail)}）：{bundle_path.name}")
+        raise ValueError(
+            f"音色包文件清单不一致（{'; '.join(detail)}）：{bundle_path.name}"
+        )
     return payload
 
 
@@ -130,7 +179,9 @@ def scan_saved_voices(root: str | Path | None = None) -> list[SavedVoiceEntry]:
                 continue
             profile_id = str(profile.get("profile_id") or index)
             key = f"{bundle_path.name}::{profile_id}"
-            tags = " / ".join(str(item) for item in profile.get("tags") or [] if str(item).strip())
+            tags = " / ".join(
+                str(item) for item in profile.get("tags") or [] if str(item).strip()
+            )
             label = f"{name} · {bundle_path.stem}"
             if tags:
                 label += f" · {tags}"
@@ -157,7 +208,9 @@ def saved_voice_fingerprint(root: str | Path | None = None) -> str:
             digest.update(str(stat.st_mtime_ns).encode("ascii"))
             try:
                 with zipfile.ZipFile(path) as archive:
-                    for info in sorted(archive.infolist(), key=lambda item: item.filename):
+                    for info in sorted(
+                        archive.infolist(), key=lambda item: item.filename
+                    ):
                         digest.update(info.filename.encode("utf-8"))
                         digest.update(str(info.file_size).encode("ascii"))
                         digest.update(str(info.CRC).encode("ascii"))
@@ -200,17 +253,21 @@ def _cache_file(
                 info = archive.getinfo(normalized)
             except KeyError as exc:
                 raise ValueError(f"音色包缺少音频文件：{member}") from exc
+            source_key = f"{entry.bundle_path.resolve()}:{normalized}"
             bundle_key = hashlib.sha256(
-                (f"{entry.bundle_path.resolve()}:{normalized}:{info.file_size}:{info.CRC}:{int(refresh_token)}").encode(
-                    "utf-8"
-                )
+                f"{source_key}:{info.file_size}:{info.CRC}".encode("utf-8")
             ).hexdigest()[:20]
             destination = (root / ".cache" / bundle_key / Path(*member.parts)).resolve()
             cache_root = (root / ".cache" / bundle_key).resolve()
             if cache_root not in destination.parents:
                 raise ValueError("音色包音频路径越界。")
+            token = int(refresh_token)
+            force_refresh = _CACHE_REFRESH_TOKENS.get(source_key) != token
+            if force_refresh:
+                destination.unlink(missing_ok=True)
             if destination.is_file() and (
-                destination.stat().st_size != info.file_size or _crc32(destination) != info.CRC
+                destination.stat().st_size != info.file_size
+                or _crc32(destination) != info.CRC
             ):
                 destination.unlink(missing_ok=True)
             if not destination.is_file():
@@ -221,11 +278,17 @@ def _cache_file(
                     with archive.open(info) as source, temporary.open("wb") as output:
                         while chunk := source.read(1024 * 1024):
                             output.write(chunk)
-                    if temporary.stat().st_size != info.file_size or _crc32(temporary) != info.CRC:
+                    if (
+                        temporary.stat().st_size != info.file_size
+                        or _crc32(temporary) != info.CRC
+                    ):
                         raise ValueError(f"音色包缓存校验失败：{member}")
                     temporary.replace(destination)
                 finally:
                     temporary.unlink(missing_ok=True)
+            _CACHE_REFRESH_TOKENS[source_key] = token
+            while len(_CACHE_REFRESH_TOKENS) > 256:
+                _CACHE_REFRESH_TOKENS.pop(next(iter(_CACHE_REFRESH_TOKENS)))
             return destination
 
 
