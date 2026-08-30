@@ -28,6 +28,7 @@ from torch import nn
 from torch.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
 
 from transformers.activations import ACT2FN
+from transformers.cache_utils import Cache, DynamicCache
 import transformers
 
 from indextts.gpt.transformers_generation_utils import GenerationMixin
@@ -1026,11 +1027,19 @@ class GPT2Model(GPT2PreTrainedModel):
         if token_type_ids is not None:
             token_type_ids = token_type_ids.view(-1, input_shape[-1])
 
-        if past_key_values is None:
-            past_length = 0
-            past_key_values = tuple([None] * len(self.h))
+        cache_input = past_key_values
+        cache_is_modern = isinstance(cache_input, Cache) or cache_input is None
+        if isinstance(cache_input, Cache):
+            if not hasattr(cache_input, "to_legacy_cache"):
+                raise TypeError("IndexTTS GPT currently supports DynamicCache-compatible cache objects.")
+            legacy_cache = cache_input.to_legacy_cache()
+            past_length = int(cache_input.get_seq_length())
         else:
-            past_length = past_key_values[0][0].size(-2)
+            legacy_cache = cache_input or ()
+            past_length = legacy_cache[0][0].size(-2) if legacy_cache else 0
+        past_key_values = tuple(legacy_cache) + tuple(
+            [None] * (len(self.h) - len(legacy_cache))
+        )
         if position_ids is None:
             position_ids = torch.arange(past_length, input_shape[-1] + past_length, dtype=torch.long, device=device)
             position_ids = position_ids.unsqueeze(0)
@@ -1170,6 +1179,9 @@ class GPT2Model(GPT2PreTrainedModel):
         # Add last hidden state
         if output_hidden_states:
             all_hidden_states = all_hidden_states + (hidden_states,)
+
+        if use_cache and cache_is_modern:
+            presents = DynamicCache.from_legacy_cache(presents)
 
         if not return_dict:
             return tuple(

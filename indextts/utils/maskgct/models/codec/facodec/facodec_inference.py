@@ -19,6 +19,8 @@ import torchaudio
 import librosa
 from collections import OrderedDict
 
+from indextts.utils.audio_io import save_audio_file
+
 
 class FAcodecInference(object):
     def __init__(self, args=None, cfg=None):
@@ -73,7 +75,7 @@ class FAcodecInference(object):
 
         os.makedirs(output_dir, exist_ok=True)
         source_name = source.split("/")[-1].split(".")[0]
-        torchaudio.save(
+        save_audio_file(
             f"{output_dir}/reconstructed_{source_name}.wav",
             full_pred_wave[0].cpu(),
             self.cfg.preprocess_params.sr,
@@ -125,7 +127,7 @@ class FAcodecInference(object):
         os.makedirs(output_dir, exist_ok=True)
         source_name = source.split("/")[-1].split(".")[0]
         reference_name = reference.split("/")[-1].split(".")[0]
-        torchaudio.save(
+        save_audio_file(
             f"{output_dir}/converted_{source_name}_to_{reference_name}.wav",
             full_pred_wave[0].cpu(),
             self.cfg.preprocess_params.sr,

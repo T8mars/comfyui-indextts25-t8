@@ -44,6 +44,8 @@ class ResBlock(nn.Module):
 
 
 class GPT2InferenceModel(GPT2PreTrainedModel, GenerationMixin):
+    _supports_cache_class = True
+
     def __init__(self, config, gpt, text_pos_emb, embeddings, norm, linear, kv_cache=False):
         super().__init__(config)
         # Note: the argument named `text_pos_emb` here actually represents the mel position embedding
@@ -204,6 +206,9 @@ class GPT2InferenceModel(GPT2PreTrainedModel, GenerationMixin):
         :meth:`~transformers.PreTrainedModel.beam_search` or :meth:`~transformers.PreTrainedModel.beam_sample` is
         called. This is required to match :obj:`past_key_values` with the correct beam_idx at every generation step.
         """
+        if hasattr(past, "reorder_cache"):
+            past.reorder_cache(beam_idx)
+            return past
         return tuple(
             tuple(
                 past_state.index_select(0, beam_idx.to(past_state.device))

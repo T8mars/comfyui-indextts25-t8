@@ -45,6 +45,9 @@ def test_language_aware_metrics_and_normalization():
     assert zh["passed"] and zh["metric"] == "cer"
     en = speech_review.review_transcript("one small test", "one test", "EN", 0.5)
     assert en["metric"] == "wer" and en["wer"] == 0.333333
+    ar = speech_review.review_transcript("إِلَى ٱلْمَدِينَةِ", "الـي المدينة", "AR", 0.99)
+    assert ar["wer"] == 0.0
+    assert "arabic_diacritics_removed" in ar["normalization"]
 
 
 def test_asr_cache_status_and_clear_release_all_entries(monkeypatch):

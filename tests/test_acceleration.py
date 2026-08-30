@@ -66,11 +66,14 @@ def test_preflight_includes_dependency_versions_without_importing_models():
     assert set(report["versions"]) == {
         "torch",
         "cuda_runtime",
+        "torchaudio",
+        "torchcodec",
         "deepspeed",
         "flash_attn",
         "triton",
         "ninja",
     }
+    assert report["runtime_checks"]["torchcodec"]["ready"] is True
 
 
 def test_gpt_acceleration_never_uses_implicit_default_cuda_device():

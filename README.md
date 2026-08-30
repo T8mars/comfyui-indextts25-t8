@@ -21,7 +21,44 @@ IndexTTS 2.5 的 ComfyUI V3 原生节点集成。节点菜单位于：
 
 本目录固定使用 IndexTTS 2.5 推理核心和正式 2.5 模型清单，不会回退或误载 IndexTTS 2.0。
 
-当前版本基线：**ComfyUI Node 0.21.0 · Desktop 0.22.0 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**。
+当前版本基线：**ComfyUI Node 0.21.2 · Desktop 0.22.1 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**。
+
+### v0.21.2 Arabic、Cache 与双显存质量门禁
+
+- 正式 ASR 配置保持 OpenAI Whisper `20250625`；中英日西使用 `base`，Arabic 改用同一 WAV 实测 WER 从 `0.6154` 降至 `0.1923` 的 `small`。Arabic 比较会移除变音符号/拖长符并统一 Alef/Ya 常见字形，但不会掩盖辅音发音错误。
+- GPT 推理边界迁移到 Transformers `Cache` / `DynamicCache` 新接口，同时保留旧 tuple 输入兼容；真实五语言生成不再出现旧 `past_key_values` 格式弃用警告。
+- Torchaudio 2.9+ 启动预检会在加载模型前检查 TorchCodec 和 FFmpeg 共享库；Windows 仅有 `ffmpeg.exe` 而缺少 DLL 时会直接给出可操作说明。便携包固定 Torchaudio 2.8，不受影响。
+- 每周/手动 GPU 工作流串行运行正式 8GB 与 24GB 档。RTX 实测两档均通过：峰值分别约 `3.34 GiB` 与 `5.52 GiB`；脱敏基线为 `quality_baselines/openai-whisper-mixed-8gb-gpu.json` 和 `quality_baselines/openai-whisper-mixed-24gb-gpu.json`。
+- 新增质量趋势任务，把最近历史报告汇总为 JSON、Markdown 和 SVG，持续跟踪平均 CER/WER、中位 RTF 与峰值显存；完整 WAV/报告保留 30 天，趋势保留 90 天。
+
+### v0.21.1 固定 ASR 基线与依赖迁移
+
+- OpenAI Whisper 固定为 `20250625`；正式 GPU 基线固定使用 `base`、CUDA、同一参考音色与同一 seed，记录中英日西阿五语言 CER/WER。
+- 新增独立的每周/手动 GPU 质量工作流，只在带 `gpu` 与 `indextts25` 标签的自托管 Windows runner 上执行，不让普通 PR/Push CI 加载约 10 GB 模型。
+- IndexTTS GPT 推理类显式继承 `GenerationMixin`；Torchaudio 2.9+ 改用原生 TorchCodec `AudioDecoder/AudioEncoder`，2.8 便携环境继续使用旧后端。
+- 普通 CI 增加 Linux torch/torchaudio 2.9 + TorchCodec 0.9 兼容矩阵；版本提升后已重新生成 33 组 UI 与 33 组 API 工作流。
+- Windows 上使用 Torchaudio 2.9 / TorchCodec 时，还需要系统能找到 FFmpeg 共享库（DLL）；只有独立的 `ffmpeg.exe` 不足以加载 TorchCodec。官方便携包仍固定使用 Torchaudio 2.8，不受此要求影响。
+- 脱敏基线位于 `quality_baselines/openai-whisper-base-gpu.json`；定时任务的完整 WAV 与报告作为 30 天 Actions artifact 保存。
+
+### 五语言质量回归与 CLI
+
+- `scripts/run_multilingual_quality_regression.py` 使用同一参考音色依次生成中、英、日、西、阿固定长文本，输出 WAV 与 `quality-report.json`。
+- 报告包含可选 CER/WER、内部段语速离散度、削波、静音、时长、RTF 和峰值显存；`--baseline` 可与旧报告做可解释的回退检查。
+- `indextts.cli` 已改为正式 IndexTTS 2.5 五语言推理，支持情感参考/向量/文本、时长、采样、CFM、精度、参考编码器设备与可选加速。
+- Desktop 开发分支同步增加跨段语速柱状图、原始/自动重试/当前采用三路试听和内部单段重做合并。
+
+```powershell
+# 在节点仓库目录执行；不会下载主模型或参考音频；启用 ASR 时可能下载 Whisper 到输出目录
+..\.venv\Scripts\python.exe scripts\run_multilingual_quality_regression.py `
+  --model-dir D:\ComfyUI\models\TTS\IndexTTS-2.5 `
+  --voice D:\ComfyUI\input\voice_reference.wav `
+  --asr-backend auto --output-dir .\quality-regression --strict
+
+..\.venv\Scripts\python.exe -m indextts.cli "欢迎使用正式 IndexTTS 2.5。" `
+  --voice D:\ComfyUI\input\voice_reference.wav `
+  --model-dir D:\ComfyUI\models\TTS\IndexTTS-2.5 --language ZH `
+  --output-path .\cli-output.wav
+```
 
 ### v0.21.0 跨段语速异常保护
 
@@ -29,7 +66,7 @@ IndexTTS 2.5 的 ComfyUI V3 原生节点集成。节点菜单位于：
 - 只有后续分段突然降到基线 45% 以下、且差异足够大时才标为异常；短句、一般情绪放慢、确定性采样和原生目标时长不会被强行改速。
 - 异常时仅以更小 Token 上限和独立 seed 重做该段，不重做整条长文本；新候选必须明显更接近基线且不过快才会替换原段。
 - 状态输出增加 `segment_rate_guard`，包含基线、比率、是否重试及是否采用，方便定位长文本尾部拖慢问题。
-- 0.20.9 已通过 Comfy Registry 安全扫描并正式激活；原 Publish 工作流重跑后全部成功。
+- 0.21.0 已通过 Comfy Registry 安全扫描并正式激活；Publish 工作流幂等重跑后全部成功。
 
 ### v0.20.9 Registry 扫描兼容与稳定性修复
 

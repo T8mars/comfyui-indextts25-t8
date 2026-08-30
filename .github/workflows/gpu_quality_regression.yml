@@ -1,0 +1,145 @@
+name: Scheduled GPU Audio Quality
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Monday 03:15 Asia/Shanghai. This workflow is isolated from normal CI.
+    - cron: "15 19 * * 0"
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: indextts25-gpu-quality-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  multilingual-quality:
+    name: ZH EN JA ES AR / ${{ matrix.profile }}
+    runs-on: [self-hosted, Windows, X64, gpu, indextts25]
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        include:
+          - profile: 8gb
+            precision: fp16
+            baseline: quality_baselines/openai-whisper-mixed-8gb-gpu.json
+          - profile: 24gb
+            precision: auto
+            baseline: quality_baselines/openai-whisper-mixed-24gb-gpu.json
+    env:
+      INDEXTTS_GPU_PYTHON: ${{ vars.INDEXTTS_GPU_PYTHON }}
+      INDEXTTS_MODEL_DIR: ${{ vars.INDEXTTS_MODEL_DIR }}
+      INDEXTTS_REFERENCE_VOICE: ${{ vars.INDEXTTS_REFERENCE_VOICE }}
+      INDEXTTS_ASR_CACHE_DIR: ${{ vars.INDEXTTS_ASR_CACHE_DIR }}
+    steps:
+      - name: Check out node
+        uses: actions/checkout@v7
+      - name: Verify pinned GPU runner inputs
+        shell: pwsh
+        run: |
+          $python = if ($env:INDEXTTS_GPU_PYTHON) { $env:INDEXTTS_GPU_PYTHON } else { "python" }
+          if (-not $env:INDEXTTS_MODEL_DIR) { throw "Set repository variable INDEXTTS_MODEL_DIR." }
+          if (-not $env:INDEXTTS_REFERENCE_VOICE) { throw "Set repository variable INDEXTTS_REFERENCE_VOICE." }
+          if (-not (Test-Path -LiteralPath $env:INDEXTTS_MODEL_DIR)) { throw "INDEXTTS_MODEL_DIR does not exist." }
+          if (-not (Test-Path -LiteralPath $env:INDEXTTS_REFERENCE_VOICE)) { throw "INDEXTTS_REFERENCE_VOICE does not exist." }
+          & $python -c "import importlib.metadata as m; assert m.version('openai-whisper') == '20250625'; import torch; assert torch.cuda.is_available(); print(torch.__version__, torch.cuda.get_device_name(0))"
+      - name: Run pinned five-language GPU baseline
+        shell: pwsh
+        run: |
+          $python = if ($env:INDEXTTS_GPU_PYTHON) { $env:INDEXTTS_GPU_PYTHON } else { "python" }
+          $asrCache = if ($env:INDEXTTS_ASR_CACHE_DIR) { $env:INDEXTTS_ASR_CACHE_DIR } else { Join-Path $env:RUNNER_TEMP "indextts25-whisper" }
+          $output = "gpu-quality-output-${{ matrix.profile }}"
+          & $python scripts/run_multilingual_quality_regression.py `
+            --model-dir $env:INDEXTTS_MODEL_DIR `
+            --voice $env:INDEXTTS_REFERENCE_VOICE `
+            --output-dir $output `
+            --vram-profile ${{ matrix.profile }} `
+            --precision ${{ matrix.precision }} `
+            --asr-backend openai_whisper `
+            --asr-model base `
+            --asr-model-for AR=small `
+            --asr-device cuda `
+            --asr-download-root $asrCache `
+            --baseline ${{ matrix.baseline }} `
+            --strict
+      - name: Upload quality evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: indextts25-gpu-quality-${{ github.run_id }}-${{ matrix.profile }}
+          path: |
+            gpu-quality-output-${{ matrix.profile }}/*.wav
+            gpu-quality-output-${{ matrix.profile }}/quality-report.json
+          if-no-files-found: warn
+          retention-days: 30
+
+  quality-trend:
+    name: Build CER/WER, RTF and VRAM history
+    needs: multilingual-quality
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out node
+        uses: actions/checkout@v7
+      - name: Download current profile reports
+        uses: actions/download-artifact@v7
+        with:
+          pattern: indextts25-gpu-quality-${{ github.run_id }}-*
+          path: gpu-history/current
+      - name: Download recent historical reports
+        uses: actions/github-script@v8
+        env:
+          HISTORY_DIR: gpu-history/previous
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            const artifacts = await github.paginate(
+              github.rest.actions.listArtifactsForRepo,
+              { owner: context.repo.owner, repo: context.repo.repo, per_page: 100 }
+            );
+            const recent = artifacts
+              .filter((item) => !item.expired)
+              .filter((item) => /^indextts25-gpu-quality-\d+-(8gb|24gb)$/.test(item.name))
+              .filter((item) => item.workflow_run?.id !== context.runId)
+              .sort((left, right) => right.created_at.localeCompare(left.created_at))
+              .slice(0, 20);
+            fs.mkdirSync(process.env.HISTORY_DIR, { recursive: true });
+            for (const artifact of recent) {
+              const response = await github.rest.actions.downloadArtifact({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                artifact_id: artifact.id,
+                archive_format: 'zip'
+              });
+              fs.writeFileSync(
+                path.join(process.env.HISTORY_DIR, `${artifact.id}.zip`),
+                Buffer.from(response.data)
+              );
+            }
+            core.info(`Downloaded ${recent.length} historical artifacts.`);
+      - name: Expand historical artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          find gpu-history/previous -name '*.zip' -print0 | while IFS= read -r -d '' archive; do
+            destination="${archive%.zip}"
+            mkdir -p "$destination"
+            unzip -q "$archive" -d "$destination"
+          done
+      - name: Build trend JSON, Markdown and SVG
+        run: >-
+          python scripts/build_quality_trend_report.py
+          --input gpu-history
+          --output-dir gpu-quality-trend
+      - name: Upload quality trend
+        uses: actions/upload-artifact@v6
+        with:
+          name: indextts25-gpu-quality-trend-${{ github.run_id }}
+          path: gpu-quality-trend/*
+          if-no-files-found: error
+          retention-days: 90

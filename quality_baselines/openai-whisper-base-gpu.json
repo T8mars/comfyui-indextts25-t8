@@ -1,0 +1,188 @@
+{
+  "schema_version": 1,
+  "baseline_kind": "indextts25-multilingual-gpu",
+  "created_at": "2026-08-30T15:38:34+0800",
+  "platform": "Windows-10-10.0.26200-SP0",
+  "python": "3.10.20",
+  "torch": "2.8.0+cu128",
+  "device": "cuda:0",
+  "precision": "bf16",
+  "seed": 20260830,
+  "asr_runtime": {
+    "backend": "openai_whisper",
+    "model": "base",
+    "package_version": "20250625"
+  },
+  "cases": [
+    {
+      "id": "zh_narration",
+      "language": "ZH",
+      "rtf": 0.6778,
+      "peak_vram_bytes": 5661889024,
+      "audio": {
+        "sample_rate": 22050,
+        "samples": 339329,
+        "duration_seconds": 15.3891,
+        "peak": 0.870331,
+        "rms": 0.097589,
+        "rms_dbfs": -20.212,
+        "dc_offset": 9.67e-05,
+        "clipping_ratio": 0.0,
+        "silence_ratio": 0.181818
+      },
+      "segment_rates": {
+        "eligible_segments": 2,
+        "suspect_segments": 0,
+        "accepted_retries": 0,
+        "median_units_per_second": 4.2546,
+        "coefficient_of_variation": 0.0185,
+        "slowest_to_median_ratio": 0.9815
+      },
+      "asr": {
+        "enabled": true,
+        "backend": "openai_whisper",
+        "package_version": "20250625",
+        "model": "base",
+        "metric": "CER",
+        "error_rate": 0.153846,
+        "similarity": 0.846154
+      }
+    },
+    {
+      "id": "en_narration",
+      "language": "EN",
+      "rtf": 0.5815,
+      "peak_vram_bytes": 6055805952,
+      "audio": {
+        "sample_rate": 22050,
+        "samples": 242944,
+        "duration_seconds": 11.0179,
+        "peak": 0.712036,
+        "rms": 0.095242,
+        "rms_dbfs": -20.423,
+        "dc_offset": 8.8e-05,
+        "clipping_ratio": 0.0,
+        "silence_ratio": 0.161525
+      },
+      "segment_rates": {
+        "eligible_segments": 1,
+        "suspect_segments": 0,
+        "accepted_retries": 0,
+        "median_units_per_second": 2.7228,
+        "coefficient_of_variation": 0.0,
+        "slowest_to_median_ratio": 1.0
+      },
+      "asr": {
+        "enabled": true,
+        "backend": "openai_whisper",
+        "package_version": "20250625",
+        "model": "base",
+        "metric": "WER",
+        "error_rate": 0.0,
+        "similarity": 1.0
+      }
+    },
+    {
+      "id": "ja_narration",
+      "language": "JA",
+      "rtf": 0.6162,
+      "peak_vram_bytes": 6202160128,
+      "audio": {
+        "sample_rate": 22050,
+        "samples": 283138,
+        "duration_seconds": 12.8407,
+        "peak": 0.66922,
+        "rms": 0.090675,
+        "rms_dbfs": -20.85,
+        "dc_offset": 5.23e-05,
+        "clipping_ratio": 0.0,
+        "silence_ratio": 0.203733
+      },
+      "segment_rates": {
+        "eligible_segments": 3,
+        "suspect_segments": 0,
+        "accepted_retries": 0,
+        "median_units_per_second": 4.8663,
+        "coefficient_of_variation": 0.0781,
+        "slowest_to_median_ratio": 0.9036
+      },
+      "asr": {
+        "enabled": true,
+        "backend": "openai_whisper",
+        "package_version": "20250625",
+        "model": "base",
+        "metric": "CER",
+        "error_rate": 0.0,
+        "similarity": 1.0
+      }
+    },
+    {
+      "id": "es_narration",
+      "language": "ES",
+      "rtf": 0.6177,
+      "peak_vram_bytes": 6198093824,
+      "audio": {
+        "sample_rate": 22050,
+        "samples": 279554,
+        "duration_seconds": 12.6782,
+        "peak": 0.804626,
+        "rms": 0.117753,
+        "rms_dbfs": -18.581,
+        "dc_offset": 0.0001573,
+        "clipping_ratio": 0.0,
+        "silence_ratio": 0.143533
+      },
+      "segment_rates": {
+        "eligible_segments": 3,
+        "suspect_segments": 0,
+        "accepted_retries": 0,
+        "median_units_per_second": 2.5087,
+        "coefficient_of_variation": 0.0115,
+        "slowest_to_median_ratio": 0.9894
+      },
+      "asr": {
+        "enabled": true,
+        "backend": "openai_whisper",
+        "package_version": "20250625",
+        "model": "base",
+        "metric": "WER",
+        "error_rate": 0.0,
+        "similarity": 1.0
+      }
+    },
+    {
+      "id": "ar_narration",
+      "language": "AR",
+      "rtf": 0.6005,
+      "peak_vram_bytes": 6217491456,
+      "audio": {
+        "sample_rate": 22050,
+        "samples": 349186,
+        "duration_seconds": 15.8361,
+        "peak": 0.793854,
+        "rms": 0.114023,
+        "rms_dbfs": -18.86,
+        "dc_offset": 5.48e-05,
+        "clipping_ratio": 0.0,
+        "silence_ratio": 0.151515
+      },
+      "segment_rates": {
+        "eligible_segments": 3,
+        "suspect_segments": 0,
+        "accepted_retries": 0,
+        "median_units_per_second": 1.6025,
+        "coefficient_of_variation": 0.1089,
+        "slowest_to_median_ratio": 0.929
+      },
+      "asr": {
+        "enabled": true,
+        "backend": "openai_whisper",
+        "package_version": "20250625",
+        "model": "base",
+        "metric": "WER",
+        "error_rate": 0.615385,
+        "similarity": 0.384615
+      }
+    }
+  ]
+}

@@ -21,7 +21,45 @@ Creator: **Bilibili: T8star-Aix**.
 
 This repository is locked to the IndexTTS 2.5 inference core and the official 2.5 model manifest. It will not fall back to or accidentally load IndexTTS 2.0.
 
-Current baseline: **ComfyUI Node 0.21.0 · Desktop 0.22.0 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**.
+Current baseline: **ComfyUI Node 0.21.2 · Desktop 0.22.1 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**.
+
+### v0.21.2 Arabic, Cache API, and dual-VRAM quality gates
+
+- OpenAI Whisper stays pinned to `20250625`. ZH/EN/JA/ES use `base`; AR uses `small`, which reduced WER on the same WAV from `0.6154` to `0.1923`. Arabic comparison removes diacritics/tatweel and normalizes common Alef/Ya forms without hiding consonant errors.
+- GPT inference now exposes the Transformers `Cache` / `DynamicCache` API while accepting legacy tuple input. Real five-language generation no longer emits the legacy `past_key_values` deprecation warning.
+- Torchaudio 2.9+ startup preflight checks TorchCodec and FFmpeg shared libraries before model loading. Windows systems with only `ffmpeg.exe` receive an actionable DLL diagnostic. The bundled Torchaudio 2.8 path is unaffected.
+- The weekly/manual GPU workflow serializes formal 8 GB and 24 GB profiles. Both passed on RTX hardware with peaks near `3.34 GiB` and `5.52 GiB`. Path-free baselines are `quality_baselines/openai-whisper-mixed-8gb-gpu.json` and `quality_baselines/openai-whisper-mixed-24gb-gpu.json`.
+- A trend job publishes JSON, Markdown, and SVG history for mean CER/WER, median RTF, and peak VRAM. Full WAV/report artifacts are retained for 30 days and trends for 90 days.
+
+### v0.21.1 pinned ASR baseline and dependency migrations
+
+- OpenAI Whisper is pinned to `20250625`; the formal GPU baseline uses `base`, CUDA, one reference voice, and one seed across ZH/EN/JA/ES/AR CER/WER measurements.
+- A separate weekly/manual GPU workflow runs only on a self-hosted Windows runner labeled `gpu` and `indextts25`, so ordinary PR/push CI never loads the roughly 10 GB model.
+- IndexTTS GPT inference classes now inherit `GenerationMixin` explicitly. Torchaudio 2.9+ uses native TorchCodec `AudioDecoder/AudioEncoder`, while the bundled 2.8 runtime retains its stable backend.
+- Normal CI adds a Linux torch/torchaudio 2.9 + TorchCodec 0.9 compatibility job. All 33 UI and 33 API workflows were regenerated after the version bump.
+- On Windows, Torchaudio 2.9 / TorchCodec also needs discoverable FFmpeg shared libraries (DLLs); a standalone `ffmpeg.exe` is not sufficient to load TorchCodec. The official portable bundle remains pinned to Torchaudio 2.8 and is unaffected.
+- The path-free baseline is `quality_baselines/openai-whisper-base-gpu.json`; complete WAVs and reports are retained as 30-day Actions artifacts.
+
+### Five-language quality regression and CLI
+
+- `scripts/run_multilingual_quality_regression.py` synthesizes fixed long-form ZH/EN/JA/ES/AR cases with one reference voice and writes every WAV plus `quality-report.json`.
+- The report includes optional CER/WER, internal-segment rate variation, clipping, silence, duration, RTF, and peak VRAM. `--baseline` performs explainable regression checks against an earlier report.
+- `indextts.cli` now uses the official IndexTTS 2.5 multilingual inference class and exposes reference/vector/text emotion, duration, sampling, CFM, precision, reference-device, and optional acceleration controls.
+- The Desktop development branch also adds a visual internal-segment rate chart, separate original/automatic-retry/current previews, and segment-only regeneration followed by safe reassembly.
+
+```powershell
+# Run from this node repository. It does not download IndexTTS/reference audio;
+# optional ASR may download Whisper into the output directory.
+..\.venv\Scripts\python.exe scripts\run_multilingual_quality_regression.py `
+  --model-dir D:\ComfyUI\models\TTS\IndexTTS-2.5 `
+  --voice D:\ComfyUI\input\voice_reference.wav `
+  --asr-backend auto --output-dir .\quality-regression --strict
+
+..\.venv\Scripts\python.exe -m indextts.cli "An IndexTTS 2.5 CLI sample." `
+  --voice D:\ComfyUI\input\voice_reference.wav `
+  --model-dir D:\ComfyUI\models\TTS\IndexTTS-2.5 --language EN `
+  --output-path .\cli-output.wav
+```
 
 ### v0.21.0 cross-segment speech-rate anomaly guard
 
@@ -29,7 +67,7 @@ Current baseline: **ComfyUI Node 0.21.0 · Desktop 0.22.0 · Core `ee40fa7d` · 
 - A later segment is suspicious only when its rate collapses below 45% of that baseline by a meaningful margin. Short lines, ordinary emotional slowing, deterministic sampling, and native target-duration synthesis are not forcibly accelerated.
 - Only the suspicious segment is regenerated with a smaller token limit and independent seed. The retry replaces the original only when it is materially closer to the baseline without becoming too fast.
 - Status output includes `segment_rate_guard` with the baseline, ratio, retry decision, and accepted candidate for diagnosing slow long-text tails.
-- Version 0.20.9 passed Comfy Registry security scanning and is Active; its original Publish workflow is now fully green after an idempotent rerun.
+- Version 0.21.0 passed Comfy Registry security scanning and is Active; its Publish workflow is fully green after an idempotent rerun.
 
 ### v0.20.9 Registry scanner compatibility and stability fixes
 

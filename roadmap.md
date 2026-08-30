@@ -1,9 +1,36 @@
 # T8star-Aix IndexTTS 2.5 路线图
 
 本路线图同时记录 ComfyUI 节点和桌面整合包的共同方向。项目只支持 **IndexTTS 2.5**。当前公开基线为
-**ComfyUI Node 0.21.0 / Desktop 0.22.0**。
+**ComfyUI Node 0.21.2 / Desktop 0.22.1**。
 ComfyUI 基础依赖不强装 DeepSpeed、FlashAttention、Triton；桌面整合包内置与固定 Python/torch/CUDA
 ABI 匹配的可选轮子，仍不默认启用。
+
+## 下一版开发分支（未发布）
+
+- [x] 新增中、英、日、西、阿五语言真实模型回归，报告 CER/WER、分段语速、削波、静音、时长、RTF 与峰值显存。
+- [x] 支持与旧 `quality-report.json` 对比，严格模式在明确音质或性能回退时返回失败状态。
+- [x] Desktop 把 `segment_rate_guard` 显示为语速柱状图和可读表格，并分别保存原始段、自动重试候选与当前采用段。
+- [x] 用户可只重做选中内部段并重新合并最终 WAV；首次完整结果保留在受路径约束的工作区中。
+- [x] `indextts.cli` 使用正式 IndexTTS 2.5 五语言推理，暴露情感、时长、采样、CFM、精度和可选加速参数，并通过真实 BF16 WAV 冒烟。
+- [x] 将旧“尚未开发”规划改为历史架构文档，并同步当前 Node/Desktop 状态与使用示例。
+- [x] RTX 真实权重生成 5 组固定 WAV：严格门禁通过、全部无削波、RTF 0.552–0.864、峰值显存不超过 5.77 GB。
+- [x] 根仓库 155 项、节点 172 项测试通过（另 1 项按环境跳过）；compileall、Pylint Fatal、Comfy 节点校验、Electron 打包与包内运行时自检通过。
+
+## v0.21.2
+
+- [x] Arabic ASR 固定为 Whisper `small`，同一 WAV 的 WER 从 0.6154 降至 0.1923；其余语言继续使用 `base`。
+- [x] Arabic CER/WER 比较加入保守字形规范化；GPT 推理迁移到 Transformers `DynamicCache` 并保留旧 tuple 兼容。
+- [x] Torchaudio 2.9+ 增加 TorchCodec/FFmpeg 共享 DLL 启动预检，便携 Torchaudio 2.8 路径保持不变。
+- [x] RTX 真机完成 8GB/24GB 五语言双档回归，峰值约 3.34/5.52 GiB；新增两份脱敏基线。
+- [x] 定时任务新增 JSON/Markdown/SVG 历史趋势产物，跟踪 CER/WER、RTF 与峰值显存。
+
+## v0.21.1
+
+- [x] 固定 OpenAI Whisper `20250625` 与 `base` CUDA 质量配置，生成中英日西阿真实 CER/WER 脱敏 GPU 基线。
+- [x] 新增独立的每周/手动自托管 GPU 工作流，普通 CI 不下载或加载大模型。
+- [x] GPT 推理类显式继承 `GenerationMixin`，消除 Transformers 4.50+ 的继承风险。
+- [x] Torchaudio 2.9+ 使用原生 TorchCodec I/O，保留 2.8 便携运行时兼容和清晰 ABI 错误提示。
+- [x] 普通 CI 增加 torch/torchaudio 2.9 + TorchCodec 0.9 矩阵，版本提升后刷新全部 33 组 UI/API 示例。
 
 ## v0.21.0
 
@@ -166,4 +193,4 @@ ABI 匹配的可选轮子，仍不默认启用。
 ## 后续候选
 
 - vLLM-Omni Linux/服务端 sidecar，用于并发和吞吐优先场景。
-- 波形时间轴拖拽吸附；v0.11.0 已提供波形、逐字标记和逐句毫秒级时间轴编辑。
+- 波形时间轴拖拽吸附已由 Desktop 提供；下一阶段只考虑更细的 ASR 音素级吸附，不重复建设现有功能。

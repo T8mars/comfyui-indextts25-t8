@@ -148,7 +148,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_ModelLoader",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.21.0"
+        "ver": "0.21.2"
       },
       "widgets_values": [
         "IndexTTS-2.5",
@@ -305,7 +305,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_EmotionControl",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.21.0"
+        "ver": "0.21.2"
       },
       "widgets_values": [
         "reference_audio",
@@ -476,7 +476,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_Generate",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.21.0"
+        "ver": "0.21.2"
       },
       "widgets_values": [
         "虽然经历了许多困难，我们依然看见了新的希望。",
