@@ -109,11 +109,11 @@ def test_torchcodec_preflight_accepts_loadable_native_modules(monkeypatch):
     assert report["ffmpeg_shared_libraries"] == "loaded"
 
 
-@pytest.mark.skipif(
-    not audio_io.uses_torchcodec_io(),
-    reason="native TorchCodec roundtrip runs in the Torchaudio 2.9 CI matrix",
-)
 def test_real_torchcodec_roundtrip(tmp_path):
+    if not audio_io.uses_torchcodec_io():
+        pytest.skip("native TorchCodec roundtrip runs in the Torchaudio 2.9+ CI matrices")
+    runtime = audio_io.probe_torchcodec_runtime()
+    assert runtime["ready"] is True, runtime["reason"]
     sample_rate = 24000
     timeline = torch.arange(sample_rate, dtype=torch.float32) / sample_rate
     original = (0.2 * torch.sin(2 * torch.pi * 440 * timeline)).unsqueeze(0)

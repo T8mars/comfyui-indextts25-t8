@@ -21,7 +21,13 @@ IndexTTS 2.5 的 ComfyUI V3 原生节点集成。节点菜单位于：
 
 本目录固定使用 IndexTTS 2.5 推理核心和正式 2.5 模型清单，不会回退或误载 IndexTTS 2.0。
 
-当前版本基线：**ComfyUI Node 0.21.2 · Desktop 0.22.1 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**。
+当前版本基线：**ComfyUI Node 0.21.3 · Desktop 0.22.1 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**。
+
+### v0.21.3 Linux TorchCodec 发布兼容
+
+- Linux current 测试现在安装与当前 Torch/Torchaudio 匹配的 TorchCodec；固定 2.9 矩阵继续使用 TorchCodec 0.9。
+- 两套 Linux TorchCodec 测试都会安装 FFmpeg 共享开发库并执行真实 WAV 编解码，不会通过跳过测试掩盖原生库加载失败。
+- PCM 归一化测试改为验证公共音频写入边界，不再绑定 Torchaudio 2.8 的旧 `torchaudio.save` 实现。推理功能与 0.21.2 相同。
 
 ### v0.21.2 Arabic、Cache 与双显存质量门禁
 

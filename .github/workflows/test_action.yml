@@ -21,7 +21,7 @@ jobs:
             os: ubuntu-latest
             python: "3.11"
             torch-packages: torch torchvision torchaudio
-            torchcodec_package: ""
+            torchcodec_package: torchcodec
           - name: Linux Torchaudio 2.9 / TorchCodec 0.9
             os: ubuntu-latest
             python: "3.11"
@@ -54,6 +54,11 @@ jobs:
       - name: Install TorchCodec migration dependency
         if: matrix.torchcodec_package != ''
         run: python -m pip install ${{ matrix.torchcodec_package }} --index-url https://download.pytorch.org/whl/cpu
+      - name: Install FFmpeg shared libraries for TorchCodec
+        if: runner.os == 'Linux' && matrix.torchcodec_package != ''
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes ffmpeg libavcodec-dev libavformat-dev libavutil-dev libavfilter-dev libswresample-dev libswscale-dev
       - name: Run tests against ComfyUI V3 API
         env:
           COMFYUI_ROOT: ${{ github.workspace }}/.comfyui

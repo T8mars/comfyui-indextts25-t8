@@ -21,7 +21,13 @@ Creator: **Bilibili: T8star-Aix**.
 
 This repository is locked to the IndexTTS 2.5 inference core and the official 2.5 model manifest. It will not fall back to or accidentally load IndexTTS 2.0.
 
-Current baseline: **ComfyUI Node 0.21.2 · Desktop 0.22.1 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**.
+Current baseline: **ComfyUI Node 0.21.3 · Desktop 0.22.1 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**.
+
+### v0.21.3 Linux TorchCodec release compatibility
+
+- Linux current CI now installs the TorchCodec version matching current Torch/Torchaudio; the pinned 2.9 matrix keeps TorchCodec 0.9.
+- Both Linux TorchCodec jobs install FFmpeg shared development libraries and perform a real WAV encode/decode roundtrip instead of hiding native-loader failures behind a skipped test.
+- PCM normalization tests now validate the public audio-write boundary rather than the legacy Torchaudio 2.8 `torchaudio.save` implementation. Inference behavior is unchanged from 0.21.2.
 
 ### v0.21.2 Arabic, Cache API, and dual-VRAM quality gates
 

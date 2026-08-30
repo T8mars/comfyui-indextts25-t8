@@ -1,5 +1,6 @@
 import ast
 from pathlib import Path
+import importlib.util
 
 import torch
 
@@ -73,7 +74,11 @@ def test_preflight_includes_dependency_versions_without_importing_models():
         "triton",
         "ninja",
     }
-    assert report["runtime_checks"]["torchcodec"]["ready"] is True
+    torchcodec = report["runtime_checks"]["torchcodec"]
+    if torchcodec["required"] and importlib.util.find_spec("torchcodec") is None:
+        assert torchcodec["ready"] is False
+    else:
+        assert torchcodec["ready"] is True, torchcodec["reason"]
 
 
 def test_gpt_acceleration_never_uses_implicit_default_cuda_device():

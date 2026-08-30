@@ -44,8 +44,8 @@ def test_console_logging_is_safe_for_spanish_on_non_utf8_windows(monkeypatch):
 def test_pcm_wav_save_is_normalized_for_torchcodec(monkeypatch, tmp_path):
     captured = {}
     monkeypatch.setattr(
-        common.torchaudio,
-        "save",
+        common,
+        "save_audio_file",
         lambda path, wav, rate, **kwargs: captured.update(wav=wav.clone()),
     )
     common.save_pcm_wav(
