@@ -21,10 +21,11 @@ IndexTTS 2.5 的 ComfyUI V3 原生节点集成。节点菜单位于：
 
 本目录固定使用 IndexTTS 2.5 推理核心和正式 2.5 模型清单，不会回退或误载 IndexTTS 2.0。
 
-当前版本基线：**ComfyUI Node 0.20.8 · Desktop 0.21.1 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**。
+当前版本基线：**ComfyUI Node 0.20.9 · Desktop 0.21.1 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**。
 
-### v0.20.8 稳定性、取消响应与发布包修复
+### v0.20.9 Registry 扫描兼容与稳定性修复
 
+- Linux 与 Windows 发布门禁新增针对 `services/model_store.py` 的 Pylint/Astroid Fatal 检查，可在发布前拦截能够由源码复现的 `F0002/astroid-error`。
 - Hugging Face 模型自动下载改为当前进程内的分块流式传输，不再启动下载工作子进程；保留进度、中止、断点续传、固定版本及文件大小/SHA-256 校验。
 - 修复多 GPU 使用 `cuda:1` 及更高编号显卡时，GPT 加速张量错误落到默认 `cuda:0` 的问题。
 - 修复停止 audio.cpp、Hugging Face 模型下载、分段生成及 ASR 候选检查时响应不及时或遗留子进程的问题。

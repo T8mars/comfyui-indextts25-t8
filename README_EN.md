@@ -21,10 +21,11 @@ Creator: **Bilibili: T8star-Aix**.
 
 This repository is locked to the IndexTTS 2.5 inference core and the official 2.5 model manifest. It will not fall back to or accidentally load IndexTTS 2.0.
 
-Current baseline: **ComfyUI Node 0.20.8 · Desktop 0.21.1 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**.
+Current baseline: **ComfyUI Node 0.20.9 · Desktop 0.21.1 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**.
 
-### v0.20.8 stability, cancellation, and package fixes
+### v0.20.9 Registry scanner compatibility and stability fixes
 
+- Linux and Windows release gates now run a Pylint/Astroid fatal-error check against `services/model_store.py`, catching any source-reproducible `F0002/astroid-error` before publication.
 - Hugging Face model downloads now use chunked streaming in the current process instead of launching a download worker process, while preserving progress, cancellation, resume, pinned revisions, size checks, and SHA-256 verification.
 - Fixed GPT acceleration tensors falling back to the default `cuda:0` device when the loader selects `cuda:1` or a higher-numbered GPU.
 - Fixed delayed cancellation and orphaned subprocesses across audio.cpp, Hugging Face model downloads, segmented generation, and ASR candidate review.
