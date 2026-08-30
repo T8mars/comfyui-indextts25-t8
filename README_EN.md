@@ -21,7 +21,15 @@ Creator: **Bilibili: T8star-Aix**.
 
 This repository is locked to the IndexTTS 2.5 inference core and the official 2.5 model manifest. It will not fall back to or accidentally load IndexTTS 2.0.
 
-Current baseline: **ComfyUI Node 0.20.9 · Desktop 0.21.1 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**.
+Current baseline: **ComfyUI Node 0.21.0 · Desktop 0.22.0 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**.
+
+### v0.21.0 cross-segment speech-rate anomaly guard
+
+- Every real internal long-text segment records speech units, actual audio duration, and units per second. A median baseline is created only after at least two stable segments.
+- A later segment is suspicious only when its rate collapses below 45% of that baseline by a meaningful margin. Short lines, ordinary emotional slowing, deterministic sampling, and native target-duration synthesis are not forcibly accelerated.
+- Only the suspicious segment is regenerated with a smaller token limit and independent seed. The retry replaces the original only when it is materially closer to the baseline without becoming too fast.
+- Status output includes `segment_rate_guard` with the baseline, ratio, retry decision, and accepted candidate for diagnosing slow long-text tails.
+- Version 0.20.9 passed Comfy Registry security scanning and is Active; its original Publish workflow is now fully green after an idempotent rerun.
 
 ### v0.20.9 Registry scanner compatibility and stability fixes
 

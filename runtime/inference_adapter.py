@@ -9,6 +9,10 @@ from typing import Any
 
 import torch
 from transformers import StoppingCriteria, StoppingCriteriaList
+from indextts.speech_rate_guard import (
+    assess_segment_speech_rates,
+    retry_candidate_improves_rate,
+)
 
 from .audio_adapter import indextts_result_to_audio
 from .audio_processing import concatenate_with_pauses
@@ -148,6 +152,8 @@ def run_inference(
     entry = MODEL_CACHE.acquire(handle)
     results: list[Any] = []
     long_text_guard_reports: list[dict[str, Any]] = []
+    segment_rate_guard_reports: list[dict[str, Any]] = []
+    block_segment_records: list[list[dict[str, Any]]] = []
     inference_error: Exception | None = None
     started_at = time.perf_counter()
     peak_memory_mb = None
@@ -191,7 +197,11 @@ def run_inference(
                 for block_index, chunk in enumerate(plan.chunks):
                     throw_if_processing_interrupted()
                     with scoped_seed(int(seed) + block_index, handle.device):
+                        latest_segment_records: list[dict[str, Any]] = []
+
                         def generate_with_limit(limit: int):
+                            nonlocal latest_segment_records
+                            latest_segment_records = []
                             infer_kwargs = dict(
                                 spk_audio_prompt=str(speaker_path),
                                 text=chunk.text,
@@ -212,6 +222,7 @@ def run_inference(
                                 stopping_criteria=StoppingCriteriaList(
                                     [_ComfyInterruptStoppingCriteria()]
                                 ),
+                                segment_collector=latest_segment_records,
                                 **sampling.generation_kwargs(),
                             )
                             if native_chunk_durations[block_index] is not None:
@@ -237,6 +248,158 @@ def run_inference(
                         results.append(result)
                         guard_report["speech_block"] = block_index + 1
                         long_text_guard_reports.append(guard_report)
+                        block_audio = indextts_result_to_audio(result)
+                        normalized_records: list[dict[str, Any]] = []
+                        for raw_record in latest_segment_records:
+                            record_audio = indextts_result_to_audio(
+                                (
+                                    int(raw_record.get("sample_rate") or 22_050),
+                                    raw_record.get("waveform"),
+                                )
+                            )
+                            normalized_records.append(
+                                {
+                                    **raw_record,
+                                    "index": sum(
+                                        len(item) for item in block_segment_records
+                                    )
+                                    + len(normalized_records)
+                                    + 1,
+                                    "speech_block": block_index + 1,
+                                    "language": language,
+                                    "duration_seconds": (
+                                        record_audio["waveform"].shape[-1]
+                                        / record_audio["sample_rate"]
+                                    ),
+                                    "audio": record_audio,
+                                }
+                            )
+                        if not normalized_records:
+                            normalized_records.append(
+                                {
+                                    "index": sum(
+                                        len(item) for item in block_segment_records
+                                    )
+                                    + 1,
+                                    "speech_block": block_index + 1,
+                                    "text": chunk.text,
+                                    "language": language,
+                                    "duration_seconds": (
+                                        block_audio["waveform"].shape[-1]
+                                        / block_audio["sample_rate"]
+                                    ),
+                                    "audio": block_audio,
+                                }
+                            )
+                        block_segment_records.append(normalized_records)
+
+                flat_records = [
+                    record for records in block_segment_records for record in records
+                ]
+                segment_rate_guard_reports = assess_segment_speech_rates(flat_records)
+                if target_duration_seconds is None and len(flat_records) >= 3:
+                    retry_limit = max(
+                        20,
+                        min(
+                            max(20, int(plan.max_tokens) - 1),
+                            int(round(int(plan.max_tokens) * 2 / 3)),
+                        ),
+                    )
+                    for rate_report in segment_rate_guard_reports:
+                        if not rate_report.get("suspect"):
+                            continue
+                        rate_report["retried"] = False
+                        if not sampling.do_sample:
+                            rate_report["retry_skipped"] = "deterministic_sampling"
+                            continue
+                        position = int(rate_report["position"])
+                        record = flat_records[position]
+                        try:
+                            throw_if_processing_interrupted()
+                            with scoped_seed(
+                                int(seed) + 100_003 + position,
+                                handle.device,
+                            ):
+                                retry_kwargs = dict(
+                                    spk_audio_prompt=str(speaker_path),
+                                    text=str(record["text"]),
+                                    output_path=None,
+                                    lang=language.upper(),
+                                    emo_audio_prompt=emo_audio_prompt,
+                                    emo_alpha=float(emotion.strength),
+                                    emo_vector=emo_vector,
+                                    use_emo_text=use_emo_text,
+                                    emo_text=emo_text,
+                                    use_random=bool(emotion.use_random),
+                                    interval_silence=0,
+                                    verbose=False,
+                                    max_text_tokens_per_segment=retry_limit,
+                                    duration_factor=float(duration_factor),
+                                    text_normalization=False,
+                                    interrupt_callback=throw_if_processing_interrupted,
+                                    stopping_criteria=StoppingCriteriaList(
+                                        [_ComfyInterruptStoppingCriteria()]
+                                    ),
+                                    **sampling.generation_kwargs(),
+                                )
+                                retry_result = entry.model.infer(**retry_kwargs)
+                            retry_audio = indextts_result_to_audio(retry_result)
+                            retry_units_per_second = (
+                                float(rate_report["speech_units"])
+                                / max(
+                                    1e-6,
+                                    retry_audio["waveform"].shape[-1]
+                                    / retry_audio["sample_rate"],
+                                )
+                            )
+                            accepted = retry_candidate_improves_rate(
+                                float(rate_report["units_per_second"]),
+                                retry_units_per_second,
+                                float(rate_report["baseline_units_per_second"]),
+                            )
+                            rate_report.update(
+                                retried=True,
+                                retry_limit=retry_limit,
+                                retry_duration_seconds=round(
+                                    retry_audio["waveform"].shape[-1]
+                                    / retry_audio["sample_rate"],
+                                    4,
+                                ),
+                                retry_units_per_second=round(
+                                    retry_units_per_second, 4
+                                ),
+                                accepted=accepted,
+                            )
+                            if accepted:
+                                record["audio"] = retry_audio
+                                record["duration_seconds"] = (
+                                    retry_audio["waveform"].shape[-1]
+                                    / retry_audio["sample_rate"]
+                                )
+                        except Exception as retry_error:
+                            throw_if_processing_interrupted()
+                            rate_report.update(
+                                retried=True,
+                                accepted=False,
+                                retry_error=(
+                                    str(retry_error).strip()
+                                    or type(retry_error).__name__
+                                ),
+                            )
+                    if any(
+                        item.get("accepted") for item in segment_rate_guard_reports
+                    ):
+                        for block_index, records in enumerate(block_segment_records):
+                            pauses = [int(sampling.segment_silence_ms)] * len(records)
+                            pauses[-1] = 0
+                            rebuilt = concatenate_with_pauses(
+                                [record["audio"] for record in records],
+                                pauses,
+                            )
+                            results[block_index] = (
+                                rebuilt["sample_rate"],
+                                rebuilt["waveform"][0],
+                            )
             finally:
                 if temporarily_disabled_accel:
                     entry.model.gpt.accel_engine = accel_engine
@@ -312,6 +475,15 @@ def run_inference(
     if latin_guards:
         status += " | long_text_guard=" + json.dumps(
             latin_guards, ensure_ascii=False, separators=(",", ":")
+        )
+    rate_guards = [
+        item
+        for item in segment_rate_guard_reports
+        if item.get("eligible") or item.get("suspect")
+    ]
+    if rate_guards:
+        status += " | segment_rate_guard=" + json.dumps(
+            rate_guards, ensure_ascii=False, separators=(",", ":")
         )
     if handle.acceleration_note:
         notes.append(handle.acceleration_note)

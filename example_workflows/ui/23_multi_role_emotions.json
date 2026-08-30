@@ -148,7 +148,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_ModelLoader",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.20.9"
+        "ver": "0.21.0"
       },
       "widgets_values": [
         "IndexTTS-2.5",
@@ -372,7 +372,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_EmotionControl",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.20.9"
+        "ver": "0.21.0"
       },
       "widgets_values": [
         "vector",
@@ -509,7 +509,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_EmotionControl",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.20.9"
+        "ver": "0.21.0"
       },
       "widgets_values": [
         "vector",
@@ -585,7 +585,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_VoiceProfile",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.20.9"
+        "ver": "0.21.0"
       },
       "widgets_values": [
         "角色A",
@@ -653,7 +653,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_VoiceProfile",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.20.9"
+        "ver": "0.21.0"
       },
       "widgets_values": [
         "角色B",
@@ -705,7 +705,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_MergeVoiceEmotions",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.20.9"
+        "ver": "0.21.0"
       },
       "title": "合并各角色的音色与独立情感"
     },
@@ -774,7 +774,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_DialogueScript",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.20.9"
+        "ver": "0.21.0"
       },
       "widgets_values": [
         "batch",
@@ -988,7 +988,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_DialogueGenerate",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.20.9"
+        "ver": "0.21.0"
       },
       "widgets_values": [
         20260818,

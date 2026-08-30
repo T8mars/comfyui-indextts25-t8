@@ -148,7 +148,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_ModelLoader",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.20.9"
+        "ver": "0.21.0"
       },
       "widgets_values": [
         "IndexTTS-2.5",
@@ -237,7 +237,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_SavedVoice",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.20.9"
+        "ver": "0.21.0"
       },
       "widgets_values": [
         "未找到音色包（请放入 voices 目录）",
@@ -285,7 +285,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_RoleLibrary",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.20.9"
+        "ver": "0.21.0"
       }
     },
     {
@@ -353,7 +353,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_DialogueScript",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.20.9"
+        "ver": "0.21.0"
       },
       "widgets_values": [
         "batch",
@@ -567,7 +567,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_DialogueGenerate",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.20.9"
+        "ver": "0.21.0"
       },
       "widgets_values": [
         20260818,

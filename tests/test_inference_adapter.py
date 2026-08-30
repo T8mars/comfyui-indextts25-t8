@@ -296,3 +296,87 @@ def test_optional_runtime_failure_reloads_normal_mode(tmp_path: Path, monkeypatc
         8,
     )
     assert len(failing_calls) == 1
+
+
+def test_cross_segment_slowdown_retries_only_the_suspect_segment(
+    tmp_path: Path, monkeypatch
+):
+    texts = (
+        "one two three four five six",
+        "seven eight nine ten eleven twelve",
+        "this tail segment becomes much too slow",
+    )
+    plan = SimpleNamespace(
+        chunks=tuple(
+            SimpleNamespace(text=text, pause_after_ms=0, pause_before_ms=0)
+            for text in texts
+        ),
+        segments=tuple(
+            SimpleNamespace(token_count=12, speech_block=index + 1)
+            for index in range(3)
+        ),
+        max_tokens=60,
+        total_pause_ms=0,
+    )
+    monkeypatch.setattr(
+        inference_adapter, "build_generation_plan", lambda *args, **kwargs: plan
+    )
+
+    class RateGuardFakeModel(FakeModel):
+        def __init__(self):
+            super().__init__()
+            self.calls = []
+
+        def infer(self, **kwargs):
+            self.calls.append(kwargs)
+            collector = kwargs.get("segment_collector")
+            text = kwargs["text"]
+            is_retry = collector is None and text == texts[-1]
+            seconds = 3.0 if is_retry else (12.0 if text == texts[-1] else 2.4)
+            waveform = torch.zeros(1, round(22_050 * seconds))
+            if collector is not None:
+                collector.append(
+                    {
+                        "index": 1,
+                        "text": text,
+                        "language": "EN",
+                        "token_count": 12,
+                        "sample_rate": 22_050,
+                        "duration_seconds": seconds,
+                        "waveform": waveform,
+                    }
+                )
+            return 22_050, waveform
+
+    fake = RateGuardFakeModel()
+    monkeypatch.setattr(
+        inference_adapter.MODEL_CACHE,
+        "acquire",
+        lambda handle: SimpleNamespace(
+            model=fake, lock=__import__("threading").RLock()
+        ),
+    )
+    monkeypatch.setattr(
+        inference_adapter.MODEL_CACHE, "done", lambda *args, **kwargs: None
+    )
+    monkeypatch.setattr(
+        inference_adapter,
+        "comfy_audio_to_reference_wav",
+        lambda audio, kind: (tmp_path / f"{kind}.wav", ()),
+    )
+
+    audio, status = inference_adapter.run_inference(
+        ModelHandle(tmp_path, "cpu", False),
+        {"waveform": torch.zeros(1, 1, 100), "sample_rate": 22_050},
+        "ignored",
+        "EN",
+        1.0,
+        42,
+        sampling=SamplingConfig(do_sample=True),
+    )
+
+    assert len(fake.calls) == 4
+    assert fake.calls[-1]["text"] == texts[-1]
+    assert "segment_rate_guard=" in status
+    assert '"accepted":true' in status
+    assert audio["waveform"].shape[-1] == round(22_050 * 7.8)

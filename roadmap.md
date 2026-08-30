@@ -1,9 +1,23 @@
 # T8star-Aix IndexTTS 2.5 路线图
 
 本路线图同时记录 ComfyUI 节点和桌面整合包的共同方向。项目只支持 **IndexTTS 2.5**。当前公开基线为
-**ComfyUI Node 0.20.5 / Desktop 0.21.1**。
+**ComfyUI Node 0.21.0 / Desktop 0.22.0**。
 ComfyUI 基础依赖不强装 DeepSpeed、FlashAttention、Triton；桌面整合包内置与固定 Python/torch/CUDA
 ABI 匹配的可选轮子，仍不默认启用。
+
+## v0.21.0
+
+- [x] 对每个内部长文本分段采集真实时长和语言感知文字单位，形成稳健的前序中位语速基线。
+- [x] 仅在后续分段语速低于基线 45% 时单独重做该段；候选没有明显改善则保留原音频。
+- [x] 短句、一般情绪放慢、确定性采样和原生目标时长模式不自动重做。
+- [x] 生成状态写入可审计的 `segment_rate_guard` 报告，并覆盖选择性重做的单元测试。
+- [x] 0.20.9 已在 Comfy Registry 正式激活，原 Publish 任务幂等重跑后全部成功。
+
+## v0.20.9
+
+- [x] 模型下载改为当前进程内 Hugging Face 分块传输，保留进度、中止、续传和完整性校验。
+- [x] 新增 Pylint 4 Fatal/Astroid 双平台 CI 门禁，Registry 扫描器兼容问题可在发布前复现时被拦截。
+- [x] Linux Python 3.11、Windows Portable Python 3.10 / torch 2.8、打包、上传与 Registry 激活全部完成。
 
 ## v0.20.5
 

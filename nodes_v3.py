@@ -743,7 +743,7 @@ class T8IndexTTS25SamplingConfig(io.ComfyNode):
             display_name="IndexTTS 2.5 采样设置 · T8star-Aix",
             category=CATEGORY,
             search_aliases=["IndexTTS sampling", "TTS sampling config"],
-            description="集中配置确定性、采样、语言感知长文本分段、标点/显式停顿和文本归一化参数。",
+            description="集中配置确定性、采样、语言感知长文本分段、跨段语速异常保护、标点/显式停顿和文本归一化参数。",
             inputs=[
                 io.Boolean.Input(
                     "do_sample",
