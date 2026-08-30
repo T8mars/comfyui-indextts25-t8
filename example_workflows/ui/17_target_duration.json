@@ -148,7 +148,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_ModelLoader",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.21.3"
+        "ver": "0.21.4"
       },
       "widgets_values": [
         "IndexTTS-2.5",
@@ -373,7 +373,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_Generate",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.21.3"
+        "ver": "0.21.4"
       },
       "widgets_values": [
         "这段语音会使用原生长度调节器，在一次推理中适配到五秒。",

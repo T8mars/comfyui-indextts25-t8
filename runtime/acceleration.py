@@ -46,6 +46,22 @@ def _distribution_version(*names: str) -> str | None:
     return None
 
 
+def describe_acceleration_failure(error: BaseException) -> str:
+    """Return an actionable explanation for optional acceleration failures."""
+
+    detail = str(error).strip() or type(error).__name__
+    normalized = detail.casefold()
+    if "waves_per_eu" in normalized and (
+        "unrecognised" in normalized or "unrecognized" in normalized
+    ):
+        return (
+            "当前 PyTorch/Triton 编译组合误传了仅适用于 AMD 的 waves_per_eu 参数；"
+            "已判定 GPT/torch.compile 加速与本机环境不兼容"
+            f"（{detail}）"
+        )
+    return f"{type(error).__name__}: {detail}"
+
+
 def probe_acceleration(device: str) -> dict:
     audio_runtime = probe_torchcodec_runtime()
     cuda = bool(torch.cuda.is_available() and str(device).startswith("cuda"))
@@ -168,6 +184,7 @@ def resolve_acceleration(mode: str, device: str, capabilities: dict | None = Non
 __all__ = [
     "AccelerationSelection",
     "MODES",
+    "describe_acceleration_failure",
     "probe_acceleration",
     "recommend_runtime_config",
     "resolve_acceleration",

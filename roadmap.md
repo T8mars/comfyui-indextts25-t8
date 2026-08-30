@@ -1,9 +1,16 @@
 # T8star-Aix IndexTTS 2.5 路线图
 
 本路线图同时记录 ComfyUI 节点和桌面整合包的共同方向。项目只支持 **IndexTTS 2.5**。当前公开基线为
-**ComfyUI Node 0.21.2 / Desktop 0.22.1**。
+**ComfyUI Node 0.21.4 / Desktop 0.22.2**。
 ComfyUI 基础依赖不强装 DeepSpeed、FlashAttention、Triton；桌面整合包内置与固定 Python/torch/CUDA
 ABI 匹配的可选轮子，仍不默认启用。
+
+## v0.21.4
+
+- [x] 将 NVIDIA `waves_per_eu` 报错识别为 PyTorch/Triton 加速兼容问题，并保留原始错误详情。
+- [x] 加速运行失败后释放缓存模型，以普通模式自动重试；精确错误回归测试覆盖该路径。
+- [x] Desktop 流式试听同步接入回退，高显存显卡不再默认选择实验性 GPT 加速。
+- [x] 刷新全部 33 组 UI/API 工作流并完成完整发布门禁。
 
 ## 下一版开发分支（未发布）
 

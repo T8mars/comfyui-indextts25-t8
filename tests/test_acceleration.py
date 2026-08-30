@@ -5,10 +5,19 @@ import importlib.util
 import torch
 
 from runtime.acceleration import (
+    describe_acceleration_failure,
     probe_acceleration,
     recommend_runtime_config,
     resolve_acceleration,
 )
+
+
+def test_waves_per_eu_error_is_reported_as_a_torch_triton_mismatch():
+    message = describe_acceleration_failure(
+        RuntimeError("Keyword argument waves_per_eu was specified but unrecognised")
+    )
+    assert "仅适用于 AMD" in message
+    assert "GPT/torch.compile 加速与本机环境不兼容" in message
 
 
 def caps(cuda=True, *, nvcc=False, cxx=False, **modules):

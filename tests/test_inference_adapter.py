@@ -242,7 +242,9 @@ def test_optional_runtime_failure_reloads_normal_mode(tmp_path: Path, monkeypatc
 
     def failing_infer(**kwargs):
         failing_calls.append(kwargs)
-        raise RuntimeError("optional kernel failed")
+        raise RuntimeError(
+            "Keyword argument waves_per_eu was specified but unrecognised"
+        )
 
     failing.infer = failing_infer
     monkeypatch.setattr(inference_adapter, "_progress_callback", lambda: (lambda value, desc="": None))
@@ -284,6 +286,7 @@ def test_optional_runtime_failure_reloads_normal_mode(tmp_path: Path, monkeypatc
     assert normal.kwargs is not None
     assert releases[0] == ("torch_compile", True)
     assert "自动重载普通模式" in status
+    assert "仅适用于 AMD" in status
     assert handle.acceleration_effective == "off"
     assert handle.use_torch_compile is False
 

@@ -21,7 +21,13 @@ IndexTTS 2.5 的 ComfyUI V3 原生节点集成。节点菜单位于：
 
 本目录固定使用 IndexTTS 2.5 推理核心和正式 2.5 模型清单，不会回退或误载 IndexTTS 2.0。
 
-当前版本基线：**ComfyUI Node 0.21.3 · Desktop 0.22.1 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**。
+当前版本基线：**ComfyUI Node 0.21.4 · Desktop 0.22.2 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**。
+
+### v0.21.4 PyTorch/Triton 加速兼容回退
+
+- 识别 NVIDIA 环境中错误传入 AMD 专用 `waves_per_eu` 参数的 PyTorch/Triton 组合，并输出可操作的兼容诊断。
+- GPT/torch.compile 可选加速运行失败时，释放加速模型、切换普通模式并自动重试，避免整条工作流失败。
+- 重新生成并校验全部 33 组 UI 示例工作流；Desktop 0.22.2 同步修复流式试听回退并采用安全默认配置。
 
 ### v0.21.3 Linux TorchCodec 发布兼容
 

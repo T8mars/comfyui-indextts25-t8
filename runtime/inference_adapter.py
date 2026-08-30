@@ -14,6 +14,7 @@ from indextts.speech_rate_guard import (
     retry_candidate_improves_rate,
 )
 
+from .acceleration import describe_acceleration_failure
 from .audio_adapter import indextts_result_to_audio
 from .audio_processing import concatenate_with_pauses
 from .model_cache import MODEL_CACHE
@@ -426,7 +427,7 @@ def run_inference(
             handle.use_deepspeed = False
             handle.acceleration_effective = "off"
             handle.acceleration_note = (
-                f"可选加速运行失败（{type(inference_error).__name__}: {inference_error}），"
+                f"可选加速运行失败（{describe_acceleration_failure(inference_error)}），"
                 "已自动重载普通模式"
             )
             try:

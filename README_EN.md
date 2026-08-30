@@ -21,7 +21,13 @@ Creator: **Bilibili: T8star-Aix**.
 
 This repository is locked to the IndexTTS 2.5 inference core and the official 2.5 model manifest. It will not fall back to or accidentally load IndexTTS 2.0.
 
-Current baseline: **ComfyUI Node 0.21.3 · Desktop 0.22.1 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**.
+Current baseline: **ComfyUI Node 0.21.4 · Desktop 0.22.2 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**.
+
+### v0.21.4 PyTorch/Triton acceleration fallback
+
+- Detects PyTorch/Triton combinations that incorrectly pass the AMD-only `waves_per_eu` option on NVIDIA and reports an actionable compatibility diagnostic.
+- When optional GPT/torch.compile acceleration fails at runtime, the node releases the accelerated model, reloads normal mode, and retries instead of failing the whole workflow.
+- Regenerates and validates all 33 UI example workflows; Desktop 0.22.2 applies the same fix to streaming playback and uses a conservative default profile.
 
 ### v0.21.3 Linux TorchCodec release compatibility
 
