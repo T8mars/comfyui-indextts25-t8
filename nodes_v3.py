@@ -53,6 +53,7 @@ from .runtime.acceleration import (
 from .runtime.dialogue import (
     compose_timeline,
     fit_duration_factor,
+    format_batch_script,
     missing_roles,
     parse_batch_script,
     parse_srt,
@@ -1442,7 +1443,8 @@ class T8IndexTTS25DialogueScript(io.ComfyNode):
             search_aliases=["SRT", "字幕配音", "批量台词", "dialogue script"],
             description=(
                 "批量格式：角色|台词|语言|时长系数|逐句情感；最后一列支持 text:描述 或 "
-                "vector:喜,怒,哀,惧,厌恶,低落,惊喜,平静。SRT 可写 "
+                "vector:喜,怒,哀,惧,厌恶,低落,惊喜,平静，并可追加 ;strength=0.75；"
+                "推荐一行一句，无需手写 JSON。SRT 可写 "
                 "[角色|emotion=text:生气、激动] 台词；留空继承角色默认情感。"
             ),
             inputs=[
@@ -1458,12 +1460,14 @@ class T8IndexTTS25DialogueScript(io.ComfyNode):
                     multiline=True,
                     dynamic_prompts=False,
                     default=(
-                        "旁白|先用平静语气介绍。|ZH|1.0|text:平静、从容\n"
-                        "旁白|同一个角色突然非常生气！|ZH|1.0|vector:0,0.8,0,0,0,0,0,0\n"
+                        "旁白|先用平静语气介绍。|ZH|1.0|text:平静、从容;strength=0.75\n"
+                        "旁白|同一个角色突然非常生气！|ZH|1.0|vector:0,0.8,0,0,0,0,0,0;strength=0.85\n"
                         "旁白|这一句恢复角色默认情感。|ZH|1.0"
                     ),
                     tooltip=(
-                        "支持 角色|台词|语言|时长系数|逐句情感、JSON 数组或 SRT。"
+                        "推荐每行：角色|台词|语言|时长系数|逐句情感。情感可写 text:描述、"
+                        "vector:8个数、speaker；可追加 ;strength=0~1 和 ;random=true。"
+                        "留空继承角色；旧 JSON 数组仍然兼容。台词中的 | 请写成 \\|。"
                         "此输入已关闭 ComfyUI 动态提示词解析，JSON 的大括号不会被改写。"
                     ),
                 ),
@@ -1480,7 +1484,8 @@ class T8IndexTTS25DialogueScript(io.ComfyNode):
             ],
             outputs=[
                 DialogueScriptType.Output("dialogue_script", display_name="台词脚本"),
-                io.String.Output("script_preview", display_name="解析预览 JSON"),
+                io.String.Output("script_preview", display_name="机器解析预览 JSON（无需手写）"),
+                io.String.Output("human_script", display_name="一行一句可编辑批量脚本"),
             ],
         )
 
@@ -1512,6 +1517,7 @@ class T8IndexTTS25DialogueScript(io.ComfyNode):
         return io.NodeOutput(
             DialogueScript(lines, script_type),
             json.dumps(payload, ensure_ascii=False, indent=2),
+            format_batch_script(lines),
         )
 
 

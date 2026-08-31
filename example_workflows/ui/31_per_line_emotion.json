@@ -148,7 +148,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_ModelLoader",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.22.0"
+        "ver": "0.23.0"
       },
       "widgets_values": [
         "IndexTTS-2.5",
@@ -311,7 +311,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_VoiceProfile",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.22.0"
+        "ver": "0.23.0"
       },
       "widgets_values": [
         "角色A",
@@ -379,7 +379,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_VoiceProfile",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.22.0"
+        "ver": "0.23.0"
       },
       "widgets_values": [
         "角色B",
@@ -431,7 +431,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_RoleLibrary",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.22.0"
+        "ver": "0.23.0"
       }
     },
     {
@@ -494,16 +494,21 @@
           "name": "script_preview",
           "type": "STRING",
           "links": []
+        },
+        {
+          "name": "human_script",
+          "type": "STRING",
+          "links": []
         }
       ],
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_DialogueScript",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.22.0"
+        "ver": "0.23.0"
       },
       "widgets_values": [
         "batch",
-        "[\n  {\n    \"role\": \"角色A\",\n    \"text\": \"我先平静地把事情说明白。\",\n    \"language\": \"ZH\",\n    \"duration_factor\": 1.0,\n    \"emotion\": {\n      \"mode\": \"text\",\n      \"text\": \"平静、从容、像正常说明情况\",\n      \"strength\": 0.75\n    }\n  },\n  {\n    \"role\": \"角色A\",\n    \"text\": \"可是你为什么一直在骗我！\",\n    \"language\": \"ZH\",\n    \"duration_factor\": 1.0,\n    \"emotion\": {\n      \"mode\": \"vector\",\n      \"vector\": [\n        0.0,\n        0.8,\n        0.0,\n        0.0,\n        0.0,\n        0.0,\n        0.0,\n        0.0\n      ],\n      \"strength\": 0.85\n    }\n  },\n  {\n    \"role\": \"角色A\",\n    \"text\": \"这一句没有 emotion 字段，会继承角色默认情感。\",\n    \"language\": \"ZH\",\n    \"duration_factor\": 1.0\n  }\n]",
+        "角色A|我先平静地把事情说明白。|ZH|1.0|text:平静、从容、像正常说明情况;strength=0.75\n角色A|可是你为什么一直在骗我！|ZH|1.0|vector:0,0.8,0,0,0,0,0,0;strength=0.85\n角色A|这一句最后一列留空，会继承角色默认情感。|ZH|1.0",
         "角色A",
         "ZH"
       ]
@@ -713,7 +718,7 @@
       "properties": {
         "Node name for S&R": "T8_IndexTTS25_DialogueGenerate",
         "cnr_id": "comfyui-indextts25-t8",
-        "ver": "0.22.0"
+        "ver": "0.23.0"
       },
       "widgets_values": [
         20260818,

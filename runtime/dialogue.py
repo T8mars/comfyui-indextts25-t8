@@ -99,6 +99,7 @@ def parse_emotion_override(
                 if raw.lower().startswith(prefix.lower()):
                     raw = raw[len(prefix) :].strip()
                     break
+            raw, compact_options = _split_compact_emotion_options(raw)
             lowered = raw.lower()
             if lowered in {"", "inherit", "default", "继承", "角色默认"}:
                 value = {"mode": "inherit"}
@@ -110,6 +111,7 @@ def parse_emotion_override(
                 value = {"mode": "text", "text": re.split(r"[:：]", raw, maxsplit=1)[1]}
             else:
                 value = {"mode": "text", "text": raw}
+            value.update(compact_options)
     elif isinstance(value, (list, tuple)):
         value = {"mode": "vector", "vector": value}
     if not isinstance(value, dict):
@@ -146,10 +148,16 @@ def parse_emotion_override(
     elif isinstance(use_random_value, str) and use_random_value.strip().lower() in {
         "true",
         "false",
+        "1",
+        "0",
+        "是",
+        "否",
+        "开",
+        "关",
     }:
-        use_random = use_random_value.strip().lower() == "true"
+        use_random = use_random_value.strip().lower() in {"true", "1", "是", "开"}
     else:
-        raise ValueError(f"{label}的 use_random 必须是 true 或 false。")
+        raise ValueError(f"{label}的 random/use_random 必须是 true 或 false。")
 
     vector: tuple[float, ...] | None = None
     if mode == "vector":
@@ -169,26 +177,45 @@ def parse_emotion_override(
     return mode, text, vector, strength, use_random
 
 
+def _split_compact_emotion_options(raw: str) -> tuple[str, dict[str, Any]]:
+    """Peel recognized ``;key=value`` options from compact emotion text."""
+
+    remaining = str(raw)
+    options: dict[str, Any] = {}
+    while True:
+        match = re.search(
+            r"[;；]\s*(strength|强度|random|随机|use_random)\s*[=:：]\s*([^;；]*?)\s*$",
+            remaining,
+            flags=re.IGNORECASE,
+        )
+        if not match:
+            break
+        key = match.group(1).lower()
+        option_key = "strength" if key in {"strength", "强度"} else "use_random"
+        options[option_key] = match.group(2)
+        remaining = remaining[: match.start()].rstrip()
+    return remaining.strip(), options
+
+
 def format_emotion_override(line: DialogueLine) -> str:
     if line.emotion_mode == "inherit":
-        return ""
-    payload: dict[str, Any] = {"mode": line.emotion_mode}
-    if line.emotion_mode == "text":
-        payload["text"] = line.emotion_text
+        base = ""
+    elif line.emotion_mode == "speaker":
+        base = "speaker"
+    elif line.emotion_mode == "text":
+        base = f"text:{line.emotion_text}"
     elif line.emotion_mode == "vector":
-        payload["vector"] = list(line.emotion_vector or ())
+        base = "vector:" + ",".join(f"{item:g}" for item in line.emotion_vector or ())
+    else:
+        base = line.emotion_mode
+    options = []
     if line.emotion_strength != 1.0:
-        payload["strength"] = line.emotion_strength
+        options.append(f"strength={line.emotion_strength:g}")
     if line.emotion_use_random:
-        payload["use_random"] = True
-    if set(payload) == {"mode"}:
-        return str(payload["mode"])
-    if line.emotion_strength == 1.0 and not line.emotion_use_random:
-        if line.emotion_mode == "text":
-            return f"text:{line.emotion_text}"
-        if line.emotion_mode == "vector":
-            return "vector:" + ",".join(f"{item:g}" for item in line.emotion_vector or ())
-    return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+        options.append("random=true")
+    if not base and options:
+        base = "inherit"
+    return ";".join([part for part in (base, *options) if part])
 
 
 def split_role_text_emotion(text: str, default_role: str) -> tuple[str, str, Any]:
@@ -345,7 +372,18 @@ def _split_batch_fields(line: str) -> list[str]:
     fields: list[str] = []
     current: list[str] = []
     annotation_depth = 0
+    escaped = False
     for character in line:
+        if escaped:
+            escaped_value = {"n": "\n", "r": "\r", "|": "|", "\\": "\\"}.get(
+                character, "\\" + character
+            )
+            current.append(escaped_value)
+            escaped = False
+            continue
+        if character == "\\":
+            escaped = True
+            continue
         if character == "<":
             annotation_depth += 1
         elif character == ">" and annotation_depth:
@@ -355,8 +393,41 @@ def _split_batch_fields(line: str) -> list[str]:
             current = []
         else:
             current.append(character)
+    if escaped:
+        current.append("\\")
     fields.append("".join(current).strip())
     return fields
+
+
+def _escape_batch_field(value: Any) -> str:
+    return (
+        str(value)
+        .replace("\\", "\\\\")
+        .replace("\r\n", "\n")
+        .replace("\r", "\n")
+        .replace("\n", "\\n")
+        .replace("|", "\\|")
+    )
+
+
+def format_batch_script(lines: Sequence[DialogueLine]) -> str:
+    """Serialize dialogue as editable, one-line-per-sentence batch text."""
+
+    rendered = []
+    for line in lines:
+        rendered.append(
+            "|".join(
+                _escape_batch_field(value)
+                for value in (
+                    line.role,
+                    line.text,
+                    line.language,
+                    f"{line.duration_factor:g}",
+                    format_emotion_override(line),
+                )
+            )
+        )
+    return "\n".join(rendered)
 
 
 def parse_batch_script(
@@ -529,6 +600,7 @@ __all__ = [
     "TimelinePlacement",
     "compose_timeline",
     "fit_duration_factor",
+    "format_batch_script",
     "format_emotion_override",
     "missing_roles",
     "parse_batch_script",

@@ -7,6 +7,7 @@ from runtime.dialogue import (
     DialogueLine,
     compose_timeline,
     fit_duration_factor,
+    format_batch_script,
     missing_roles,
     parse_batch_script,
     parse_srt,
@@ -127,6 +128,44 @@ def test_same_role_supports_per_line_emotion_overrides():
     )[0]
     assert srt_line.role == "旁白"
     assert srt_line.emotion_text == "惊讶、激动"
+
+
+def test_human_batch_emotion_options_and_escaping_round_trip():
+    lines = parse_batch_script(
+        "旁白|先说明\\|再换行\\n继续。|ZH|1.1|text:平静；但坚定;强度=0.75\n"
+        "旁白|突然惊讶。|ZH|0.9|vector:0,0,0,0,0,0,0.8,0;strength=0.85;random=true"
+    )
+    assert lines[0].text == "先说明|再换行\n继续。"
+    assert lines[0].emotion_text == "平静；但坚定"
+    assert lines[0].emotion_strength == pytest.approx(0.75)
+    assert lines[1].emotion_strength == pytest.approx(0.85)
+    assert lines[1].emotion_use_random is True
+
+    exported = format_batch_script(lines)
+    restored = parse_batch_script(exported)
+    assert restored == lines
+    assert "{\"mode\"" not in exported
+
+
+def test_legacy_json_emotion_stays_compatible_with_human_output():
+    lines = parse_batch_script(
+        json.dumps(
+            [
+                {
+                    "role": "A",
+                    "text": "旧 JSON",
+                    "emotion": {
+                        "mode": "text",
+                        "text": "认真",
+                        "strength": 0.6,
+                    },
+                }
+            ],
+            ensure_ascii=False,
+        )
+    )
+    assert lines[0].emotion_strength == pytest.approx(0.6)
+    assert format_batch_script(lines).endswith("text:认真;strength=0.6")
 
 
 @pytest.mark.parametrize(

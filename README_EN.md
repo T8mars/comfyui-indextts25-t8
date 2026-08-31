@@ -21,7 +21,14 @@ Creator: **Bilibili: T8star-Aix**.
 
 This repository is locked to the IndexTTS 2.5 inference core and the official 2.5 model manifest. It will not fall back to or accidentally load IndexTTS 2.0.
 
-Current baseline: **ComfyUI Node 0.22.0 · Desktop 0.23.0 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**.
+Current baseline: **ComfyUI Node 0.23.0 · Desktop 0.24.0 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**.
+
+### v0.23.0 human-readable per-line emotion and timeline exchange
+
+- Batch dialogue now recommends one sentence per line as `role|text|language|duration factor|emotion`, without hand-written JSON. It supports `text:`, the eight-value `vector:`, `speaker`, `;strength=0..1`, and `;random=true`.
+- Existing JSON arrays remain fully compatible. A new human-readable batch-script output safely round-trips literal pipes and line breaks.
+- Example 31 now demonstrates the compact syntax, and all 33 UI/API workflows are regenerated for 0.23.0.
+- Companion Desktop 0.24.0 adds an in-place eight-vector guide and standalone JSON/CSV editable-timeline import/export.
 
 ### v0.22.0 Chinese number/date normalization verification
 

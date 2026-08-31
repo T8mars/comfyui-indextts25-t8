@@ -68,6 +68,13 @@ def test_registers_all_pure_v3_nodes():
     )
     assert dialogue_script_input.dynamic_prompts is False
     assert dialogue_script_input.as_dict()["dynamicPrompts"] is False
+    dialogue_outputs = schemas_by_id["T8_IndexTTS25_DialogueScript"].outputs
+    assert [item.id for item in dialogue_outputs] == [
+        "dialogue_script",
+        "script_preview",
+        "human_script",
+    ]
+    assert "无需手写 JSON" in schemas_by_id["T8_IndexTTS25_DialogueScript"].description
     suggestion_schema = schemas_by_id["T8_IndexTTS25_DialogueEmotionSuggest"]
     suggestion_inputs = {item.id: item for item in suggestion_schema.inputs}
     assert suggestion_inputs["context_window"].as_dict()["default"] == 2

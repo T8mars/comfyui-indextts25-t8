@@ -719,6 +719,7 @@ def add_dialogue_script(
         [
             output("dialogue_script", "T8_INDEXTTS25_DIALOGUE_SCRIPT"),
             output("script_preview", "STRING"),
+            output("human_script", "STRING"),
         ],
         [script_type, script, default_role, default_language],
     )
@@ -1726,39 +1727,10 @@ def multi_role_emotions_pair() -> tuple[dict[str, Any], dict[str, Any]]:
 
 
 def per_line_emotion_pair() -> tuple[dict[str, Any], dict[str, Any]]:
-    script = json.dumps(
-        [
-            {
-                "role": "角色A",
-                "text": "我先平静地把事情说明白。",
-                "language": "ZH",
-                "duration_factor": 1.0,
-                "emotion": {
-                    "mode": "text",
-                    "text": "平静、从容、像正常说明情况",
-                    "strength": 0.75,
-                },
-            },
-            {
-                "role": "角色A",
-                "text": "可是你为什么一直在骗我！",
-                "language": "ZH",
-                "duration_factor": 1.0,
-                "emotion": {
-                    "mode": "vector",
-                    "vector": [0.0, 0.8, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-                    "strength": 0.85,
-                },
-            },
-            {
-                "role": "角色A",
-                "text": "这一句没有 emotion 字段，会继承角色默认情感。",
-                "language": "ZH",
-                "duration_factor": 1.0,
-            },
-        ],
-        ensure_ascii=False,
-        indent=2,
+    script = (
+        "角色A|我先平静地把事情说明白。|ZH|1.0|text:平静、从容、像正常说明情况;strength=0.75\n"
+        "角色A|可是你为什么一直在骗我！|ZH|1.0|vector:0,0.8,0,0,0,0,0,0;strength=0.85\n"
+        "角色A|这一句最后一列留空，会继承角色默认情感。|ZH|1.0"
     )
     return _dialogue_pair("31 同一角色逐句情感覆盖", "batch", script)
 

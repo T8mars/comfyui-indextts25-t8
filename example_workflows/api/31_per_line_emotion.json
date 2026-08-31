@@ -69,7 +69,7 @@
     "class_type": "T8_IndexTTS25_DialogueScript",
     "inputs": {
       "script_type": "batch",
-      "script": "[\n  {\n    \"role\": \"角色A\",\n    \"text\": \"我先平静地把事情说明白。\",\n    \"language\": \"ZH\",\n    \"duration_factor\": 1.0,\n    \"emotion\": {\n      \"mode\": \"text\",\n      \"text\": \"平静、从容、像正常说明情况\",\n      \"strength\": 0.75\n    }\n  },\n  {\n    \"role\": \"角色A\",\n    \"text\": \"可是你为什么一直在骗我！\",\n    \"language\": \"ZH\",\n    \"duration_factor\": 1.0,\n    \"emotion\": {\n      \"mode\": \"vector\",\n      \"vector\": [\n        0.0,\n        0.8,\n        0.0,\n        0.0,\n        0.0,\n        0.0,\n        0.0,\n        0.0\n      ],\n      \"strength\": 0.85\n    }\n  },\n  {\n    \"role\": \"角色A\",\n    \"text\": \"这一句没有 emotion 字段，会继承角色默认情感。\",\n    \"language\": \"ZH\",\n    \"duration_factor\": 1.0\n  }\n]",
+      "script": "角色A|我先平静地把事情说明白。|ZH|1.0|text:平静、从容、像正常说明情况;strength=0.75\n角色A|可是你为什么一直在骗我！|ZH|1.0|vector:0,0.8,0,0,0,0,0,0;strength=0.85\n角色A|这一句最后一列留空，会继承角色默认情感。|ZH|1.0",
       "default_role": "角色A",
       "default_language": "ZH"
     }
