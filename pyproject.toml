@@ -1,6 +1,6 @@
 [project]
 name = "indextts25-t8"
-version = "0.21.4"
+version = "0.22.0"
 description = "ComfyUI V3 nodes for the official IndexTTS 2.5 model, by T8star-Aix"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -26,6 +26,10 @@ classifiers = [
 [project.optional-dependencies]
 asr = ["openai-whisper==20250625", "opencc-python-reimplemented>=0.1.7"]
 asr-fast = ["faster-whisper>=1.2.0", "opencc-python-reimplemented>=0.1.7"]
+text-normalization = [
+  "wetext>=0.1.7,<0.2; sys_platform != 'linux'",
+  "WeTextProcessing>=1.2.0,<2; sys_platform == 'linux'",
+]
 
 [project.urls]
 Repository = "https://github.com/T8mars/comfyui-indextts25-t8"

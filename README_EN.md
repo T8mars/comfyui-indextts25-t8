@@ -21,7 +21,14 @@ Creator: **Bilibili: T8star-Aix**.
 
 This repository is locked to the IndexTTS 2.5 inference core and the official 2.5 model manifest. It will not fall back to or accidentally load IndexTTS 2.0.
 
-Current baseline: **ComfyUI Node 0.21.4 · Desktop 0.22.2 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**.
+Current baseline: **ComfyUI Node 0.22.0 · Desktop 0.23.0 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**.
+
+### v0.22.0 Chinese number/date normalization verification
+
+- Sampling settings identify number/date normalization explicitly, while the environment node performs a real `1939年 → 一九三九年` smoke test instead of trusting package presence alone.
+- Windows/macOS can optionally use `wetext`; Linux can optionally use `WeTextProcessing`. Missing or failed backends preserve the source text and do not block generation.
+- Adds a separate optional requirements file and bilingual installation guidance so platform wheel availability cannot break the normal node installation.
+- Regenerates and validates all 33 UI and 33 API example workflows.
 
 ### v0.21.4 PyTorch/Triton acceleration fallback
 
@@ -382,7 +389,38 @@ Windows portable build:
 
 Restart ComfyUI afterward. Do not install transformers 5.x by itself or reinstall ComfyUI's PyTorch for this purpose.
 
-Chinese number/date normalization is optional. On Windows you can install `wetext`; when it is missing or incompatible with the active Python version, the nodes automatically continue with the original text. Writing numbers as spoken words is recommended. This optional package does not affect the 2.5 model, duration adaptation, or text emotion.
+## Chinese numbers, dates, and years
+
+Incorrect Arabic-digit pronunciation is normally a **text-front-end** issue, not a voice-cloning or reference-audio failure.
+Enable **Text normalization (numbers/dates)** in `IndexTTS 2.5 Sampling Config`. Before inference, context determines
+whether the value should be read digit by digit or as a quantity:
+
+| Source text | Intended spoken form | Meaning |
+|---|---|---|
+| `1939年` | `一九三九年` | a year, read digit by digit |
+| `1939个人` | `一千九百三十九个人` | a quantity |
+
+This feature is an independent optional dependency: `wetext>=0.1.7,<0.2` on Windows/macOS and
+`WeTextProcessing>=1.2.0,<2` on Linux. Run `IndexTTS 2.5 Environment & Optional Acceleration` and inspect
+`text_normalization` in its JSON report. The backend is ready only when `verified` is `true` and the smoke-test output is
+`一九三九年`.
+
+From the node directory in a standard environment:
+
+```powershell
+python -m pip install -r requirements-text-normalization.txt
+```
+
+From the `ComfyUI_windows_portable` directory:
+
+```powershell
+.\python_embeded\python.exe -m pip install -r .\ComfyUI\custom_nodes\comfyui-indextts25-T8\requirements-text-normalization.txt
+```
+
+Package-manager users can alternatively run `python -m pip install -e ".[text-normalization]"`. Restart ComfyUI after
+installation. If the dependency is absent or fails the smoke test, generation continues with the original text; write the
+intended spoken form explicitly in that case. This optional package does not affect model loading, duration adaptation,
+or text emotion.
 
 ## Model location
 

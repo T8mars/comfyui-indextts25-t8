@@ -21,7 +21,14 @@ IndexTTS 2.5 的 ComfyUI V3 原生节点集成。节点菜单位于：
 
 本目录固定使用 IndexTTS 2.5 推理核心和正式 2.5 模型清单，不会回退或误载 IndexTTS 2.0。
 
-当前版本基线：**ComfyUI Node 0.21.4 · Desktop 0.22.2 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**。
+当前版本基线：**ComfyUI Node 0.22.0 · Desktop 0.23.0 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**。
+
+### v0.22.0 中文数字/日期归一化自检
+
+- 采样设置明确标注数字/日期归一化，环境节点会真实验证 `1939年 → 一九三九年`，不会只根据包是否安装判断可用。
+- Windows/macOS 可选使用 `wetext`，Linux 可选使用 `WeTextProcessing`；缺失或自检失败时保留原文继续生成。
+- 新增独立可选依赖文件和中英文安装说明，普通安装不会因平台轮子缺失而失败。
+- 刷新并校验全部 33 组 UI 与 33 组 API 示例工作流。
 
 ### v0.21.4 PyTorch/Triton 加速兼容回退
 
@@ -394,9 +401,35 @@ Windows 便携版：
 
 升级后重启 ComfyUI。不要单独安装 `transformers` 5.x，也不要因此重装 ComfyUI 的 PyTorch。
 
-中文数字、日期等文本归一化依赖是可选项。在 Windows 上可额外安装 `wetext`；不安装或当前 Python
-版本不兼容时，节点会自动使用原文本继续生成，建议把数字写成口语形式。该可选项不会影响 2.5 模型、
-语速适配或文本情感功能。
+## 中文数字、日期与年份怎么读
+
+阿拉伯数字的异常读法通常发生在**文本前端**，与参考音频或音色克隆是否成功无关。请在
+`IndexTTS 2.5 采样设置` 中开启“文本归一化（数字/日期）”。正常情况下，文本在送入模型前会按语境转换：
+
+| 原文 | 推荐读法 | 说明 |
+|---|---|---|
+| `1939年` | `一九三九年` | 年份按位读 |
+| `1939个人` | `一千九百三十九个人` | 数量按数值读 |
+
+文本归一化是一个独立可选依赖：Windows/macOS 使用 `wetext>=0.1.7,<0.2`，Linux 使用
+`WeTextProcessing>=1.2.0,<2`。在 `IndexTTS 2.5 环境与可选加速` 节点的 JSON 中查看
+`text_normalization`：只有 `verified: true` 且示例输出为 `一九三九年` 才表示真实可用。
+
+普通环境在本节点目录执行：
+
+```powershell
+python -m pip install -r requirements-text-normalization.txt
+```
+
+Windows 便携版请在 `ComfyUI_windows_portable` 目录执行：
+
+```powershell
+.\python_embeded\python.exe -m pip install -r .\ComfyUI\custom_nodes\comfyui-indextts25-T8\requirements-text-normalization.txt
+```
+
+也可通过 Python 包可选项安装：`python -m pip install -e ".[text-normalization]"`。安装后重启
+ComfyUI。缺少依赖或自检失败时，节点会保留原文继续生成；此时请直接写“一九三九年”等希望听到的
+口语形式。该可选项不会影响模型加载、语速适配或文本情感功能。
 
 ## 模型位置
 

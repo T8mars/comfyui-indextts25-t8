@@ -85,7 +85,26 @@ def test_registers_all_pure_v3_nodes():
     assert loader_inputs["reuse_spk_cond_for_emo"].as_dict()["default"] is False
     assert loader_inputs["download_missing"].as_dict()["default"] is False
     assert loader_inputs["accept_model_license"].as_dict()["default"] is False
+    sampling_inputs = {
+        item.id: item
+        for item in schemas_by_id["T8_IndexTTS25_SamplingConfig"].inputs
+    }
+    normalization_input = sampling_inputs["text_normalization"].as_dict()
+    assert normalization_input["display_name"] == "文本归一化（数字/日期）"
+    assert "1939年" in normalization_input["tooltip"]
+    assert "数字/日期" in schemas_by_id["T8_IndexTTS25_Environment"].description
     assert not hasattr(plugin, "NODE_CLASS_MAPPINGS")
+
+
+def test_environment_report_includes_verified_text_normalization():
+    _load_plugin()
+    from comfyui_indextts25_t8_test import nodes_v3
+
+    result = nodes_v3.T8IndexTTS25Environment.execute("cpu")
+    report = json.loads(result[0])
+
+    assert report["text_normalization"]["verified"] is True
+    assert report["text_normalization"]["example_output"] == "一九三九年"
 
 
 def test_audiocpp_generation_uses_explicit_local_paths(

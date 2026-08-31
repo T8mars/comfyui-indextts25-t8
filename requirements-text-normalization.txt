@@ -1,0 +1,5 @@
+# Optional text normalization used by IndexTTS before tokenization.
+# Windows/macOS use the lightweight wetext package; Linux uses the upstream
+# WeTextProcessing/Pynini implementation.
+wetext>=0.1.7,<0.2; sys_platform != "linux"
+WeTextProcessing>=1.2.0,<2; sys_platform == "linux"

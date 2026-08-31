@@ -14,6 +14,7 @@ from comfy_api.latest import ComfyExtension, io
 from typing_extensions import override
 
 from .indextts.utils.reference_condition_cache import ReferenceConditionCache
+from .indextts.utils.front import probe_text_normalization
 from .project_meta import PROJECT_VERSION
 from .runtime.inference_adapter import (
     NativeTargetDurationUnsupported,
@@ -743,7 +744,10 @@ class T8IndexTTS25SamplingConfig(io.ComfyNode):
             display_name="IndexTTS 2.5 采样设置 · T8star-Aix",
             category=CATEGORY,
             search_aliases=["IndexTTS sampling", "TTS sampling config"],
-            description="集中配置确定性、采样、语言感知长文本分段、跨段语速异常保护、标点/显式停顿和文本归一化参数。",
+            description=(
+                "集中配置确定性、采样、语言感知长文本分段、跨段语速异常保护、标点/显式停顿"
+                "和文本归一化参数；数字/日期归一化后端可在“环境与可选加速”节点中检查。"
+            ),
             inputs=[
                 io.Boolean.Input(
                     "do_sample",
@@ -902,7 +906,13 @@ class T8IndexTTS25SamplingConfig(io.ComfyNode):
                     advanced=True,
                 ),
                 io.Boolean.Input(
-                    "text_normalization", display_name="文本归一化", default=True
+                    "text_normalization",
+                    display_name="文本归一化（数字/日期）",
+                    default=True,
+                    tooltip=(
+                        "启用后会在送入模型前处理数字、日期和常见符号，例如 1939年 → 一九三九年。"
+                        "该功能需要可选 wetext/WeTextProcessing；缺失时保留原文，并可在环境节点查看状态。"
+                    ),
                 ),
             ],
             outputs=[
@@ -2752,8 +2762,18 @@ class T8IndexTTS25Environment(io.ComfyNode):
             node_id="T8_IndexTTS25_Environment",
             display_name="IndexTTS 2.5 环境与可选加速 · T8star-Aix",
             category=CATEGORY,
-            search_aliases=["加速诊断", "DeepSpeed", "FlashAttention", "Triton"],
-            description="只做能力探测，不安装依赖、不加载模型；DeepSpeed 等附加包缺失属于正常情况。",
+            search_aliases=[
+                "加速诊断",
+                "DeepSpeed",
+                "FlashAttention",
+                "Triton",
+                "文本归一化",
+                "数字读法",
+            ],
+            description=(
+                "只做能力探测，不安装依赖、不加载模型；除加速能力外，也会验证中文数字/日期"
+                "归一化后端并显示 1939年 的实际结果。"
+            ),
             inputs=[
                 io.Combo.Input(
                     "device",
@@ -2787,6 +2807,7 @@ class T8IndexTTS25Environment(io.ComfyNode):
                     "recommended": recommend_runtime_config(capabilities),
                     "capabilities": capabilities,
                     "modes": modes,
+                    "text_normalization": probe_text_normalization(),
                 },
                 ensure_ascii=False,
                 indent=2,
@@ -2996,7 +3017,8 @@ class T8IndexTTS25Generate(io.ComfyNode):
                     dynamic_prompts=True,
                     tooltip=(
                         "可直接使用 <文字|读音>：中文 <行|XING2>、英文 CMU 音素、日语假名；"
-                        "批量规则建议连接“发音控制”节点。"
+                        "批量规则建议连接“发音控制”节点。年份建议开启采样设置里的文本归一化；"
+                        "若环境报告显示后端不可用，可直接写“一九三九年”等口语形式。"
                     ),
                 ),
                 io.Combo.Input(
