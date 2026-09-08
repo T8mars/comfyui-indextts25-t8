@@ -863,6 +863,7 @@ class T8IndexTTS25SamplingConfig(io.ComfyNode):
                     min=20,
                     max=300,
                     step=5,
+                    tooltip="非中日韩等语言的大值会自动限制到约 86 Token 的安全上限；较小自定义值不重复缩小。",
                 ),
                 io.Int.Input(
                     "segment_silence_ms",

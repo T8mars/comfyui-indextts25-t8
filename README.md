@@ -21,7 +21,13 @@ IndexTTS 2.5 的 ComfyUI V3 原生节点集成。节点菜单位于：
 
 本目录固定使用 IndexTTS 2.5 推理核心和正式 2.5 模型清单，不会回退或误载 IndexTTS 2.0。
 
-当前版本基线：**ComfyUI Node 0.23.0 · Desktop 0.24.0 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**。
+当前版本基线：**ComfyUI Node 0.23.1 · Desktop 0.26.2 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**。
+
+### v0.23.1 非 CJK 长文本安全分段
+
+- 对齐官方 PR #802：英文、西班牙语等非 CJK 文本的大分段值按 `3.1 / 4.3` 语音 Token 密度比例限制到约 86 Token，降低长段末句读错或编造内容的风险。
+- 自动模式已有的 EN/ES=60、AR=80 等较小限制不会被重复缩小；中文、日语、韩语、粤语和未知语言保持原行为。
+- 预览、状态报告与真实推理使用同一有效上限；全部 33 组 UI/API 工作流已刷新到 0.23.1。
 
 ### v0.23.0 人类可读逐句情感与时间轴交换
 

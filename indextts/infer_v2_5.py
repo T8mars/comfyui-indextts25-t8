@@ -33,6 +33,10 @@ from indextts.utils.ja_g2p import JapaneseG2PProcessor
 from indextts.utils.nemo_tn import normalize_text as nemo_text_normalize
 from indextts.utils.precision import resolve_gpt_precision
 from indextts.utils.reference_condition_cache import ReferenceConditionCache
+from indextts.utils.text_segmentation import (
+    language_aware_token_budget,
+    language_from_prefix,
+)
 
 from indextts.s2mel.modules.commons import load_checkpoint2, MyModel
 from indextts.s2mel.modules.bigvgan import bigvgan
@@ -739,8 +743,12 @@ class IndexTTS2:
 
     def split_text_by_tokens(self, text, max_tokens, lang_prefix=""):
         capacity = self.gpt.text_pos_embedding.emb.num_embeddings
-        budget = min(max_tokens, capacity - 2) - self._token_len(lang_prefix)
-        budget = max(1, budget)
+        budget = language_aware_token_budget(
+            max_tokens,
+            self._token_len(lang_prefix),
+            language=language_from_prefix(lang_prefix),
+            capacity=capacity,
+        )
         if self._token_len(text) <= budget:
             return [text]
 

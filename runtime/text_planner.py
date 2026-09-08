@@ -15,6 +15,8 @@ from math import isfinite
 from pathlib import Path
 from typing import Any, Callable
 
+from indextts.utils.text_segmentation import language_aware_token_budget
+
 
 LANGUAGE_AUTO_LIMITS = {
     "ZH": 120,
@@ -352,7 +354,11 @@ def split_text_by_tokens(
     """Mirror the official punctuation-first splitter with an injected counter."""
 
     prefix = f"<|{str(language).lower()}|> "
-    budget = max(1, int(max_tokens) - token_counter(prefix))
+    budget = language_aware_token_budget(
+        max_tokens,
+        token_counter(prefix),
+        language=language,
+    )
     if token_counter(text) <= budget:
         return [text]
     pieces: list[str] = []
@@ -415,6 +421,13 @@ def build_generation_plan(
     prefix = f"<|{normalized_language.lower()}|> "
     def counter(value):
         return _token_len(tokenizer, value)
+    prefix_tokens = counter(prefix)
+    content_budget = language_aware_token_budget(
+        limit,
+        prefix_tokens,
+        language=normalized_language,
+    )
+    limit = content_budget + prefix_tokens
     previews: list[SegmentPreview] = []
     for block_index, chunk in enumerate(chunks, 1):
         parts = split_text_by_tokens(chunk.text, limit, normalized_language, counter)

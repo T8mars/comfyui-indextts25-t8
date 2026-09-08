@@ -17,6 +17,28 @@ def test_language_aware_limits_are_conservative_for_latin_text():
     assert text_planner.effective_segment_limit("JA", "custom", 75) == 75
 
 
+def test_non_cjk_large_budget_is_capped_without_double_scaling_small_limits():
+    long_english = "A" * 90
+    capped = text_planner.split_text_by_tokens(long_english, 120, "EN", len)
+    assert len(capped) == 2
+    assert max(map(len, capped)) <= 81
+
+    conservative = "B" * 50
+    assert text_planner.split_text_by_tokens(conservative, 60, "EN", len) == [
+        conservative
+    ]
+
+
+def test_cjk_budget_and_protected_pronunciation_tokens_are_preserved():
+    chinese = "甲" * 100
+    assert text_planner.split_text_by_tokens(chinese, 120, "ZH", len) == [chinese]
+
+    annotated = "A" * 70 + "<|SPECIAL_TOKEN_1|>BANK<|SPECIAL_TOKEN_2|>" + "B" * 30
+    parts = text_planner.split_text_by_tokens(annotated, 120, "EN", len)
+    assert "".join(parts) == annotated
+    assert any("<|SPECIAL_TOKEN_1|>BANK<|SPECIAL_TOKEN_2|>" in part for part in parts)
+
+
 def test_pause_planner_preserves_pronunciation_annotations_and_explicit_seconds():
     chunks = text_planner.split_speech_chunks(
         "<银行|YIN2 HANG2>到了。<pause=0.5>下一句，继续。",
@@ -48,6 +70,20 @@ def test_plan_reports_segments_pauses_and_gpt_cache_risk(tmp_path, monkeypatch):
     assert payload["gpt_accel_risk"] is False
     assert payload["gpt_accel_cache_fix"] is True
     assert all(item["token_count"] <= 60 for item in payload["segments"])
+
+
+def test_custom_non_cjk_plan_reports_the_effective_safe_limit(tmp_path, monkeypatch):
+    monkeypatch.setattr(text_planner, "_load_tokenizer", lambda _path: _CharacterTokenizer())
+    plan = text_planner.build_generation_plan(
+        "A" * 90,
+        "EN",
+        tmp_path,
+        segmentation_mode="custom",
+        max_text_tokens_per_segment=120,
+    )
+    assert plan.max_tokens == 88
+    assert [len(item.text) for item in plan.segments] == [81, 9]
+    assert plan.max_segment_tokens == 88
 
 
 def test_explicit_pause_rejects_unbounded_silence():
