@@ -10,7 +10,10 @@ from dataclasses import dataclass
 
 import torch
 
-from indextts.utils.audio_io import probe_torchcodec_runtime
+if "." in __package__:
+    from ..indextts.utils.audio_io import probe_torchcodec_runtime
+else:
+    from indextts.utils.audio_io import probe_torchcodec_runtime
 
 
 MODES = ("off", "auto_safe", "bigvgan_cuda", "torch_compile", "gpt_accel", "deepspeed")

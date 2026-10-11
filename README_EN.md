@@ -21,7 +21,20 @@ Creator: **Bilibili: T8star-Aix**.
 
 This repository is locked to the IndexTTS 2.5 inference core and the official 2.5 model manifest. It will not fall back to or accidentally load IndexTTS 2.0.
 
-Current baseline: **ComfyUI Node 0.23.0 · Desktop 0.24.0 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**.
+Current baseline: **ComfyUI Node 0.23.2 · Desktop 0.26.5 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**.
+
+### v0.23.2 isolated helper imports and actionable diagnostics
+
+- Fixes node registration using another extension's same-named `indextts` helper package and failing with `No module named 'indextts.speech_rate_guard'`.
+- Bundled helpers now use package-relative imports. Conflicting inference cores produce source-path diagnostics; the node does not replace another extension's package or promise that different cores can coexist in one process.
+- Adds real ComfyUI V3 registration regressions for both direct and `custom_nodes` package loading, and regenerates all 33 UI/API example pairs.
+- Physically missing node files still require a complete reinstall and a full ComfyUI restart; this change cannot repair an incomplete directory by itself.
+
+### v0.23.1 safer non-CJK long-text segmentation
+
+- Aligns with upstream PR #802: large non-CJK segment budgets use the `3.1 / 4.3` speech-token density ratio, reducing a 120-token budget to about 86 tokens.
+- Existing smaller automatic limits such as EN/ES=60 and AR=80 are not reduced again. Chinese, Japanese, Korean, Cantonese and unknown languages retain their previous behavior.
+- Preview, diagnostics and inference share the same effective limit; all 33 UI/API example pairs were refreshed for 0.23.1.
 
 ### v0.23.0 human-readable per-line emotion and timeline exchange
 
@@ -377,6 +390,12 @@ Windows portable build:
 For the faster CTranslate2 backend, install `faster-whisper>=1.2.0` and `opencc-python-reimplemented>=0.1.7`, then select the backend explicitly if desired. `pyproject.toml` also exposes `asr` and `asr-fast` optional dependency groups. The first proofreading run downloads the selected Whisper model to `ComfyUI/models/TTS/Whisper/`. Existing IndexTTS generation, timeline editing, and original-text subtitle rewriting continue to work without Whisper.
 
 The pinned core has been verified on Windows, Python 3.10, and PyTorch 2.8. For other ComfyUI Python versions, run the environment checker first because upstream compatibility may be narrower.
+
+### Cloud-image restore: `No module named 'indextts.speech_rate_guard'`
+
+- Check that `indextts/speech_rate_guard.py` exists inside this node directory. If missing, update/reinstall the complete node and fully restart ComfyUI; do not replace individual files.
+- If the file exists, another IndexTTS node or Python package may have loaded first. Node registration and lightweight tools use this node's bundled modules; model loading reports the conflicting core's path.
+- Disable duplicate IndexTTS nodes or run them in separate environments, then fully restart ComfyUI. This node will not unload, overwrite, or replace another node's loaded Python package.
 
 ### Dependency compatibility
 

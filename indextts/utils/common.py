@@ -5,7 +5,7 @@ import re
 import torch
 import torchaudio
 
-from indextts.utils.audio_io import load_audio_file, save_audio_file
+from .audio_io import load_audio_file, save_audio_file
 
 MATPLOTLIB_FLAG = False
 

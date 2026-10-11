@@ -15,7 +15,10 @@ from math import isfinite
 from pathlib import Path
 from typing import Any, Callable
 
-from indextts.utils.text_segmentation import language_aware_token_budget
+if "." in __package__:
+    from ..indextts.utils.text_segmentation import language_aware_token_budget
+else:
+    from indextts.utils.text_segmentation import language_aware_token_budget
 
 
 LANGUAGE_AUTO_LIMITS = {
@@ -323,7 +326,10 @@ def split_speech_chunks(
 
 @lru_cache(maxsize=8)
 def _load_tokenizer(model_dir: str):
-    from indextts.utils.tokenizer import get_tokenizer
+    if "." in __package__:
+        from ..indextts.utils.tokenizer import get_tokenizer
+    else:
+        from indextts.utils.tokenizer import get_tokenizer
 
     return get_tokenizer(multilingual=True, model_dir=str(Path(model_dir)))
 

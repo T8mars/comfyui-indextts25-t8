@@ -32,17 +32,22 @@ class CacheEntry:
 
 
 def _load_core_class():
-    require_runtime_dependencies(PLUGIN_ROOT)
     root_string = str(PLUGIN_ROOT)
-    if root_string not in sys.path:
-        sys.path.insert(0, root_string)
+    if root_string in sys.path:
+        sys.path.remove(root_string)
+    sys.path.insert(0, root_string)
     existing = sys.modules.get("indextts")
     if existing is not None:
-        existing_file = Path(getattr(existing, "__file__", "")).resolve()
-        if PLUGIN_ROOT not in existing_file.parents:
+        existing_filename = getattr(existing, "__file__", None)
+        existing_file = Path(existing_filename).resolve() if existing_filename else None
+        if existing_file != PLUGIN_ROOT / "indextts" / "__init__.py":
             raise RuntimeError(
-                "检测到其他 IndexTTS 包已先被载入，可能导致版本串用。请移除重复节点后重启 ComfyUI。"
+                f"检测到其他 IndexTTS 包已先被载入：{existing_filename or '<unknown>'}。"
+                f"本节点需要的核心位于 {PLUGIN_ROOT / 'indextts'}。"
+                "为避免版本串用，不会自动替换其他节点的包；请禁用重复 IndexTTS 节点，"
+                "或在独立环境运行本节点，然后完全重启 ComfyUI。"
             )
+    require_runtime_dependencies(PLUGIN_ROOT)
     try:
         from indextts.infer_v2_5 import IndexTTS2
     except Exception as exc:

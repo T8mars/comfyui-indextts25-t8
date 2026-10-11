@@ -21,7 +21,14 @@ IndexTTS 2.5 的 ComfyUI V3 原生节点集成。节点菜单位于：
 
 本目录固定使用 IndexTTS 2.5 推理核心和正式 2.5 模型清单，不会回退或误载 IndexTTS 2.0。
 
-当前版本基线：**ComfyUI Node 0.23.1 · Desktop 0.26.2 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**。
+当前版本基线：**ComfyUI Node 0.23.2 · Desktop 0.26.5 · Core `ee40fa7d` · Upstream Model `c39ce5ba`**。
+
+### v0.23.2 同名包导入隔离与故障提示
+
+- 修复其他节点先加载同名 `indextts` 包后，本节点注册时误用外部辅助模块而出现 `No module named 'indextts.speech_rate_guard'` 的问题。
+- 本节点辅助模块改用包内相对导入；推理核心发生冲突时显示冲突路径和处理方法，不自动替换其他节点的包，也不承诺不同核心可以在同一进程共存。
+- 新增真实 ComfyUI V3 节点注册回归测试，覆盖单层与 `custom_nodes` 两种加载方式；刷新全部 33 组 UI/API 示例工作流。
+- 如果节点文件本身缺失，仍需完整重装节点并完全重启 ComfyUI，不能仅靠本次更新修复不完整的目录。
 
 ### v0.23.1 非 CJK 长文本安全分段
 
@@ -393,6 +400,12 @@ IndexTTS 生成、时间轴编辑和原文字幕回写仍然正常使用。
 
 当前固定核心已在 Windows、Python 3.10、PyTorch 2.8 环境验证。其他 ComfyUI Python 版本请先运行
 环境检查脚本；上游对新版本 Python 的兼容范围可能更窄。
+
+### 云镜像恢复后提示 `No module named 'indextts.speech_rate_guard'`
+
+- 先检查节点目录下 `indextts/speech_rate_guard.py` 是否存在；缺失时请完整更新/重装节点并完全重启 ComfyUI，不要只覆盖单个文件。
+- 文件存在仍报错，通常是另一份 IndexTTS 节点或 Python 包先被加载。节点注册和轻量工具使用本节点内置模块；加载模型时若检测到同名核心冲突，会显示冲突包路径。
+- 请禁用重复的 IndexTTS 节点，或将它们放到独立环境，再完全重启 ComfyUI。本节点不会自动卸载、覆盖或替换其他节点已加载的 Python 包。
 
 ### 依赖版本兼容
 

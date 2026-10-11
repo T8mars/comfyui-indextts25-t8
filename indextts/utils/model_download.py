@@ -11,7 +11,7 @@ import os
 import shutil
 import tempfile
 
-from indextts.utils.network_detection import need_proxy
+from .network_detection import need_proxy
 
 logger = logging.getLogger(__name__)
 

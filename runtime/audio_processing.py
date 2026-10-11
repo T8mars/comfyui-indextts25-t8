@@ -7,7 +7,10 @@ from typing import Any
 import torch
 import torch.nn.functional as F
 
-from indextts.utils.common import fade_out_pcm_tail
+if "." in __package__:
+    from ..indextts.utils.common import fade_out_pcm_tail
+else:
+    from indextts.utils.common import fade_out_pcm_tail
 
 from .audio_adapter import validate_comfy_audio
 

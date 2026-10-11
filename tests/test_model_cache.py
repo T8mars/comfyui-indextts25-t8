@@ -1,10 +1,34 @@
 from __future__ import annotations
 
+import sys
+import types
 from pathlib import Path
+
+import pytest
 
 from runtime import model_cache
 from runtime.model_cache import CacheEntry, ModelCache
 from runtime.types import ModelHandle
+
+
+@pytest.mark.parametrize("foreign_filename", [None, "other-node/indextts/__init__.py"])
+def test_foreign_core_reports_source_before_checking_dependencies(
+    foreign_filename, monkeypatch
+):
+    foreign = types.ModuleType("indextts")
+    foreign.__file__ = foreign_filename
+    monkeypatch.setitem(sys.modules, "indextts", foreign)
+    monkeypatch.setattr(sys, "path", list(sys.path))
+
+    def unexpected_dependency_check(root):
+        pytest.fail("A package conflict should be reported before dependency checks")
+
+    monkeypatch.setattr(model_cache, "require_runtime_dependencies", unexpected_dependency_check)
+    with pytest.raises(RuntimeError) as error:
+        model_cache._load_core_class()
+    assert (foreign_filename or "<unknown>") in str(error.value)
+    assert "重启 ComfyUI" in str(error.value)
+    assert sys.modules["indextts"] is foreign
 
 
 def _cached_entry(

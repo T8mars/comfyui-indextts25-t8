@@ -9,10 +9,16 @@ from typing import Any
 
 import torch
 from transformers import StoppingCriteria, StoppingCriteriaList
-from indextts.speech_rate_guard import (
-    assess_segment_speech_rates,
-    retry_candidate_improves_rate,
-)
+if "." in __package__:
+    from ..indextts.speech_rate_guard import (
+        assess_segment_speech_rates,
+        retry_candidate_improves_rate,
+    )
+else:  # Standalone runtime imports used by CLI helpers and tests.
+    from indextts.speech_rate_guard import (
+        assess_segment_speech_rates,
+        retry_candidate_improves_rate,
+    )
 
 from .acceleration import describe_acceleration_failure
 from .audio_adapter import indextts_result_to_audio
